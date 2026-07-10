@@ -1,122 +1,305 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'theme/app_theme.dart';
+import 'screens/home_screen.dart';
+import 'screens/hotel_screen.dart';
+import 'screens/deals_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/create_itinerary_wizard_sheet.dart';
+import 'screens/trip_overview_screen.dart';
+import 'services/database_service.dart';
+import 'services/auth_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Status bar style
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
+
+  // Load environment variables from .env
+
+
+  // Seed initial categories & places in Supabase if empty
+  await DatabaseService().checkAndSeedData();
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      title: 'CLOUDMOOD',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      home: const CloudmoodMainShell(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class CloudmoodMainShell extends StatefulWidget {
+  const CloudmoodMainShell({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<CloudmoodMainShell> createState() => _CloudmoodMainShellState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
+  int _currentIndex = 0;
 
-  void _incrementCounter() {
+  // Render current body based on bottom navigation index
+  Widget _buildBody() {
+    switch (_currentIndex) {
+      case 0:
+        return CloudmoodHomeScreen(
+          onProfileTap: () {
+            setState(() {
+              _currentIndex = 4; // Switch to profile tab
+            });
+          },
+        );
+      case 1:
+        return const CloudmoodHotelScreen();
+      case 3:
+        return const CloudmoodDealsScreen();
+      case 4:
+        return const CloudmoodProfileScreen();
+      default:
+        return CloudmoodHomeScreen(
+          onProfileTap: () {
+            setState(() {
+              _currentIndex = 4;
+            });
+          },
+        );
+    }
+  }
+
+  void _handleNavTap(int index) {
+    if (index == 2) {
+      _showCreateMenuOverlay();
+      return;
+    }
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _currentIndex = index;
+    });
+  }
+
+  void _showCreateMenuOverlay() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: true,
+        pageBuilder: (context, _, __) => const CreateMenuOverlay(animationValue: 1.0),
+        transitionsBuilder: (context, animation, _, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    ).then((result) {
+      if (result == 'create_itinerary') {
+        _openCreateItinerarySheet();
+      }
+    });
+  }
+
+  void _openCreateItinerarySheet() {
+    final user = AuthService().currentUser.value;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Vui lòng đăng nhập để tạo lịch trình!'),
+          backgroundColor: AppTheme.primary,
+          behavior: SnackBarBehavior.fixed,
+          action: SnackBarAction(
+            label: 'Đăng nhập',
+            textColor: Colors.white,
+            onPressed: () {
+              setState(() => _currentIndex = 4);
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return CreateItineraryWizardSheet(userId: user.id);
+      },
+    ).then((result) {
+      if (result != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => TripOverviewScreen(itinerary: result),
+          ),
+        );
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+      extendBody: true,
+      body: _buildBody(),
+      bottomNavigationBar: _CloudmoodFloatingNav(
+        selectedIndex: _currentIndex,
+        onTap: _handleNavTap,
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
+    );
+  }
+}
+
+// ─── Floating Bottom Navigation Bar ────────────────────────────────────────────
+class _CloudmoodFloatingNav extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  const _CloudmoodFloatingNav({
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  static const _items = [
+    _NavItem(icon: Icons.home_rounded, activeIcon: Icons.home_rounded, label: 'Trang chủ'),
+    _NavItem(icon: Icons.hotel_outlined, activeIcon: Icons.hotel_rounded, label: 'Khách sạn'),
+    _NavItem(icon: Icons.add_circle_outline_rounded, activeIcon: Icons.add_circle_rounded, label: 'Tạo lịch'),
+    _NavItem(icon: Icons.local_offer_outlined, activeIcon: Icons.local_offer_rounded, label: 'Ưu đãi'),
+    _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Hồ sơ'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1A56DB).withAlpha(30),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withAlpha(15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(color: AppTheme.border, width: 1),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(_items.length, (i) {
+            final item = _items[i];
+            final isSelected = i == selectedIndex;
+            return _NavButton(
+              item: item,
+              isSelected: isSelected,
+              onTap: () => onTap(i),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
+}
+
+class _NavButton extends StatelessWidget {
+  final _NavItem item;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _NavButton({
+    required this.item,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOutCubic,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 16 : 12,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primary.withAlpha(18)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            Icon(
+              isSelected ? item.activeIcon : item.icon,
+              color: isSelected ? AppTheme.primary : AppTheme.subtitleText,
+              size: 22,
             ),
+            if (isSelected) ...[
+              const SizedBox(width: 6),
+              Text(
+                item.label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primary,
+                ),
+              ),
+            ],
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
     );
+  }
+}
+
+// Legacy alias for backward compat (used in home_screen.dart)
+class CustomBottomNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  const CustomBottomNavBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _CloudmoodFloatingNav(selectedIndex: selectedIndex, onTap: onTap);
   }
 }
