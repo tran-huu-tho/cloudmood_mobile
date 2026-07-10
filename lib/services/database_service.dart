@@ -253,8 +253,6 @@ class DatabaseService {
     required int itineraryId,
     int? placeId,
     required int day,
-    String arrivalTime = '09:00:00+07',
-    String leaveTime = '11:00:00+07',
     int sortOrder = 0,
     String? noteText,
   }) async {
@@ -263,8 +261,6 @@ class DatabaseService {
         'itineraryId': itineraryId,
         'placeId': placeId,
         'day': day,
-        'arrivalTime': arrivalTime,
-        'leaveTime': leaveTime,
         'sortOrder': sortOrder,
         'noteText': noteText,
       });
