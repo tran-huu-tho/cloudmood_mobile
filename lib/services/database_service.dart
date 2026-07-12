@@ -17,6 +17,20 @@ class DatabaseService {
     debugPrint('checkAndSeedData called - handled by backend or manual seeding in NestJS now.');
   }
 
+  /// Fetches all categories
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    try {
+      final response = await ApiClient.get('/mobile/categories');
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching categories: $e');
+      return [];
+    }
+  }
+
   /// Fetches places based on category name
   Future<List<Map<String, dynamic>>> fetchPlaces({String? categoryName}) async {
     try {
@@ -50,7 +64,32 @@ class DatabaseService {
       }
       return [];
     } catch (e) {
-      debugPrint('Error fetching places by destination: $e');
+      debugPrint('Error fetching places for destination: $e');
+      return [];
+    }
+  }
+
+  /// Searches places via backend (combines DB and Geoapify)
+  Future<List<Map<String, dynamic>>> searchPlaces({
+    required String destination,
+    String? query,
+    String? categoryName,
+  }) async {
+    try {
+      String endpoint = '/places/search?destination=${Uri.encodeComponent(destination)}';
+      if (query != null && query.isNotEmpty) {
+        endpoint += '&query=${Uri.encodeComponent(query)}';
+      }
+      if (categoryName != null && categoryName.isNotEmpty) {
+        endpoint += '&categoryName=${Uri.encodeComponent(categoryName)}';
+      }
+      final response = await ApiClient.get(endpoint);
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error searching places: $e');
       return [];
     }
   }
@@ -473,7 +512,15 @@ class DatabaseService {
 
   /// Fetches checklist templates
   Future<List<Map<String, dynamic>>> fetchChecklistTemplates() async {
-    // Return empty list for now since it's not implemented on backend
+    try {
+      final response = await ApiClient.get('/itineraries/checklist-templates');
+      if (response.statusCode == 200) {
+        final List data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      debugPrint('Error fetching checklist templates: $e');
+    }
     return [];
   }
 }

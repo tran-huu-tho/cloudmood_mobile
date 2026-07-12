@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -28,12 +29,17 @@ class TripOverviewScreen extends StatefulWidget {
 
 class _TripOverviewScreenState extends State<TripOverviewScreen>
     with SingleTickerProviderStateMixin {
+  Set<String>? _checkedSections;
+  Set<int>? _checkedDays;
   late TabController _tabController;
   late Map<String, dynamic> _itineraryData;
   bool _isLoading = true;
   List<Map<String, dynamic>> _allPlaces = [];
   List<Map<String, dynamic>> _details = [];
   List<Map<String, dynamic>> _savedPlaces = [];
+  List<Map<String, dynamic>> _searchCategories = [];
+  String? _activeSearchQuery;
+  List<Map<String, dynamic>> _filteredMapPlaces = [];
 
   // Overview Tab section names
   final List<String> _sectionNames = [];
@@ -99,6 +105,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   bool _isDragging = false;
   double? _dragHeight;
   final MapController _mapController = MapController();
+  LatLng? _currentLocation;
   Map<String, dynamic>? _selectedMapPlace;
 
   // AI Dialog state
@@ -112,6 +119,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   void initState() {
     super.initState();
     _itineraryData = widget.itinerary;
+    final int numDays = (_itineraryData['days'] as int?) ?? 1;
+    _checkedDays = Set.from(Iterable.generate(numDays, (i) => i + 1));
     _tabController = TabController(length: 4, vsync: this);
     _loadData();
   }
@@ -150,6 +159,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         for (var d in _savedPlaces) {
           if (d['section'] == oldTitle) {
             d['section'] = newTitle;
+            if (d['id'] != null) {
+              DatabaseService().updateSavedPlace(
+                d['id'] as int,
+                {'section': newTitle},
+              );
+            }
           }
         }
         if (_sectionColors.containsKey(oldTitle)) {
@@ -486,6 +501,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         _sectionIcons.putIfAbsent(section, () => Icons.folder_rounded);
       }
     }
+    
+    _checkedSections ??= Set.from(_sectionNames);
 
     // Restore custom expenses
     final prefs = await SharedPreferences.getInstance();
@@ -524,6 +541,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         });
       } catch (e) {
         debugPrint('Error loading day colors from dayConfigs: $e');
+      }
+    }
+
+    if (_searchCategories.isEmpty) {
+      final categories = await DatabaseService().getCategories();
+      if (mounted) {
+        setState(() {
+          _searchCategories = categories;
+        });
       }
     }
 
@@ -1396,10 +1422,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Padding(
+      builder: (context) => SingleChildScrollView(
+        child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1469,7 +1497,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildShareIconOption(Icons.link_rounded, 'Sao chép\nliên kết'),
-                _buildShareIconOption(Icons.message_rounded, 'Tin nhắn'),
                 _buildShareIconOption(Icons.ios_share_rounded, 'Khác'),
               ],
             ),
@@ -1484,6 +1511,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           ],
         ),
       ),
+      ), // Close SingleChildScrollView
     );
   }
 
@@ -1562,6 +1590,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showSearchOverlay() {
+    List<Map<String, dynamic>> overlaySearchResults = [];
+    bool isSearching = false;
+    String currentQuery = '';
+    Timer? debounce;
+    final dest = _itineraryData['destination'] ?? '';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1569,61 +1603,196 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => SizedBox(
-        height: MediaQuery.of(context).size.height * 0.9,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateOverlay) {
+          return SizedBox(
+            height: MediaQuery.of(context).size.height * 0.9,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Tìm kiếm theo tên hoặc địa chỉ',
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          onChanged: (val) {
+                            setStateOverlay(() {
+                               currentQuery = val;
+                            });
+                            if (debounce?.isActive ?? false) debounce!.cancel();
+                            debounce = Timer(const Duration(milliseconds: 500), () async {
+                              if (val.isEmpty) {
+                                setStateOverlay(() {
+                                  overlaySearchResults = [];
+                                  isSearching = false;
+                                });
+                                return;
+                              }
+                              setStateOverlay(() {
+                                isSearching = true;
+                              });
+                              final results = await DatabaseService().searchPlaces(
+                                destination: dest,
+                                query: val,
+                              );
+                              setStateOverlay(() {
+                                overlaySearchResults = results;
+                                isSearching = false;
+                              });
+                            });
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Tìm kiếm theo tên hoặc địa chỉ',
+                            prefixIcon: const Icon(Icons.search_rounded),
+                            filled: true,
+                            fillColor: Colors.grey.shade100,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  if (isSearching)
+                    const Center(child: CircularProgressIndicator())
+                  else if (currentQuery.isNotEmpty)
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: overlaySearchResults.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return ListTile(
+                              leading: const Icon(Icons.search_rounded),
+                              title: Text('Tìm kiếm: $currentQuery', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: const Text('Xem kết quả trên bản đồ'),
+                              onTap: () async {
+                                final query = currentQuery;
+                                Navigator.pop(context);
+                                setState(() {
+                                  _activeSearchQuery = query;
+                                  _isMapExpanded = true;
+                                  _isSheetHalf = false;
+                                });
+                                
+                                final results = await DatabaseService().searchPlaces(
+                                  destination: dest,
+                                  query: query,
+                                );
+                                
+                                setState(() {
+                                  _filteredMapPlaces = results;
+                                  if (results.isNotEmpty) {
+                                     final lat = (results.first['latitude'] as num).toDouble();
+                                     final lon = (results.first['longitude'] as num).toDouble();
+                                     _mapController.move(LatLng(lat, lon), 13.0);
+                                     _selectedMapPlace = results.first;
+                                  }
+                                });
+                              },
+                            );
+                          }
+                          
+                          final place = overlaySearchResults[index - 1];
+                          return ListTile(
+                            leading: const Icon(Icons.place_rounded),
+                            title: Text(place['name'] ?? ''),
+                            subtitle: Text(place['address'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () {
+                              setState(() {
+                                _activeSearchQuery = place['name'];
+                                _filteredMapPlaces = [place];
+                                _isMapExpanded = true;
+                                _isSheetHalf = false;
+                                if (place['latitude'] != null && place['longitude'] != null) {
+                                  _mapController.move(LatLng((place['latitude'] as num).toDouble(), (place['longitude'] as num).toDouble()), 15.0);
+                                }
+                              });
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+                    )
+                  else ...[
+                    const Text(
+                      'Tìm kiếm thường xuyên',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(context),
-                  ),
+                    const SizedBox(height: 16),
+                    if (_searchCategories.isEmpty)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _searchCategories.length,
+                          itemBuilder: (context, index) {
+                            final category = _searchCategories[index];
+                            final iconCode = category['iconCode'] as int?;
+                            IconData iconData = Icons.category_rounded;
+                            
+                            if (iconCode != null) {
+                              iconData = IconData(iconCode, fontFamily: 'MaterialIcons');
+                            } else {
+                              final iconString = category['icon'] as String?;
+                              if (iconString != null && iconString.isNotEmpty) {
+                                try {
+                                  if (iconString.startsWith('0x')) {
+                                    iconData = IconData(int.parse(iconString), fontFamily: 'MaterialIcons');
+                                  }
+                                } catch (_) {}
+                              }
+                            }
+
+                            return _buildSearchCategory(iconData, category['name'] ?? '');
+                          },
+                        ),
+                      ),
+                  ]
                 ],
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Tìm kiếm thường xuyên',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              _buildSearchCategory(Icons.restaurant_rounded, 'Ẩm thực'),
-              _buildSearchCategory(Icons.place_rounded, 'Điểm tham quan'),
-              _buildSearchCategory(Icons.local_gas_station_rounded, 'Trạm xăng'),
-              _buildSearchCategory(Icons.ev_station_rounded, 'Trạm sạc xe điện'),
-              _buildSearchCategory(Icons.hotel_rounded, 'Điểm dừng nghỉ'),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
 
   Widget _buildSearchCategory(IconData icon, String title) {
     return ListTile(
-      leading: Icon(icon, color: AppTheme.darkText),
-      title: Text(title, style: const TextStyle(color: AppTheme.darkText)),
-      contentPadding: EdgeInsets.zero,
-      onTap: () {
+      leading: Icon(icon),
+      title: Text(title),
+      onTap: () async {
         Navigator.pop(context);
+        setState(() {
+          _activeSearchQuery = title;
+          _isMapExpanded = true;
+          _isSheetHalf = false;
+        });
+        
+        final dest = _itineraryData['destination'] ?? '';
+        final results = await DatabaseService().searchPlaces(
+          destination: dest,
+          categoryName: title,
+        );
+        
+        setState(() {
+          _filteredMapPlaces = results;
+          if (results.isNotEmpty) {
+             final lat = (results.first['latitude'] as num).toDouble();
+             final lon = (results.first['longitude'] as num).toDouble();
+             _mapController.move(LatLng(lat, lon), 13.0);
+                                     _selectedMapPlace = results.first;
+                                  }
+        });
       },
     );
   }
@@ -1635,76 +1804,184 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Khám phá khu vực',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Khám phá khu vực',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 100,
+                    child: _searchCategories.isEmpty
+                        ? const Center(child: Text('Không có dữ liệu', style: TextStyle(color: Colors.grey)))
+                        : ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _searchCategories.length,
+                            itemBuilder: (context, index) {
+                              final cat = _searchCategories[index];
+                              return GestureDetector(
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  setState(() {
+                                    _activeSearchQuery = cat['name'];
+                                    _isMapExpanded = true;
+                                    _isSheetHalf = false;
+                                  });
+                                  final dest = _itineraryData['destination'] ?? '';
+                                  final results = await DatabaseService().searchPlaces(
+                                    destination: dest,
+                                    categoryName: cat['name'],
+                                  );
+                                  setState(() {
+                                    _filteredMapPlaces = results;
+                                    if (results.isNotEmpty) {
+                                      final lat = (results.first['latitude'] as num).toDouble();
+                                      final lon = (results.first['longitude'] as num).toDouble();
+                                      _mapController.move(LatLng(lat, lon), 13.0);
+                                      _selectedMapPlace = results.first;
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  width: 80,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  child: Column(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 28,
+                                        backgroundColor: Colors.grey.shade100,
+                                        child: Icon(
+                                          IconData(cat['iconCode'] ?? Icons.place.codePoint, fontFamily: 'MaterialIcons'),
+                                          color: AppTheme.subtitleText,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        cat['name'] ?? '',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 12, color: AppTheme.subtitleText),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Địa điểm đã lưu của bạn',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_sectionNames.isNotEmpty) ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('Tổng quan', style: TextStyle(color: Colors.grey)),
+                      ),
                     ),
-                    TextButton(
-                      onPressed: () {},
-                      child: const Text('Xem tất cả', style: TextStyle(color: AppTheme.primary)),
-                    ),
+                    ..._sectionNames.map((section) {
+                      final color = _sectionColors[section] ?? AppTheme.primary;
+                      return CheckboxListTile(
+                        secondary: Icon(Icons.location_on, color: color),
+                        title: Text(section, style: const TextStyle(color: AppTheme.darkText, fontWeight: FontWeight.w500)),
+                        value: _checkedSections?.contains(section) ?? true,
+                        activeColor: AppTheme.primary,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.trailing,
+                        visualDensity: VisualDensity.compact,
+                        onChanged: (val) {
+                          setSheetState(() {
+                            if (val == true) {
+                              _checkedSections?.add(section);
+                            } else {
+                              _checkedSections?.remove(section);
+                            }
+                          });
+                          setState(() {});
+                        },
+                      );
+                    }).toList(),
+                    const Divider(),
                   ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildExploreIcon(Icons.restaurant_rounded, 'Nhà hàng'),
-                    _buildExploreIcon(Icons.place_rounded, 'Điểm tham\nquan'),
-                    _buildExploreIcon(Icons.local_cafe_rounded, 'Quán cà phê'),
-                    _buildExploreIcon(Icons.icecream_rounded, 'Món tráng\nmiệng'),
-                    _buildExploreIcon(Icons.wine_bar_rounded, 'Thanh'),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const Divider(),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Địa điểm đã lưu của bạn',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Hành trình', style: TextStyle(color: Colors.grey)),
                     ),
-                    Checkbox(
-                      value: true,
-                      onChanged: (v) {},
-                      activeColor: AppTheme.primary,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text('Tổng quan', style: TextStyle(color: AppTheme.subtitleText)),
-                _buildSavedPlaceLayer('section 1', Colors.blue),
-                _buildSavedPlaceLayer('section 2', Colors.red),
-              ],
+                  ),
+                  if (_checkedDays != null)
+                    ...List.generate((_itineraryData['days'] as int?) ?? 1, (index) {
+                      final day = index + 1;
+                      final color = _dayColors[day - 1] ?? AppTheme.primary;
+                      return CheckboxListTile(
+                        secondary: Icon(Icons.location_on, color: color),
+                        title: Text('Ngày $day', style: const TextStyle(color: AppTheme.darkText, fontWeight: FontWeight.w500)),
+                        value: _checkedDays!.contains(day),
+                        activeColor: AppTheme.primary,
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.trailing,
+                        visualDensity: VisualDensity.compact,
+                        onChanged: (val) {
+                          setSheetState(() {
+                            if (val == true) {
+                              _checkedDays!.add(day);
+                            } else {
+                              _checkedDays!.remove(day);
+                            }
+                          });
+                          setState(() {});
+                        },
+                      );
+                    }),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    );
+    ).then((_) {
+      final int numDays = (_itineraryData['days'] as int?) ?? 1;
+      final bool hasFilter = (_checkedSections != null && _checkedSections!.length < _sectionNames.length) || 
+                             (_checkedDays != null && _checkedDays!.length < numDays);
+      if (hasFilter && mounted) {
+        setState(() {
+          _isMapExpanded = true;
+          _isSheetHalf = false;
+        });
+      }
+    });
   }
 
   Widget _buildExploreIcon(IconData icon, String label) {
@@ -1781,6 +2058,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         desiredAccuracy: LocationAccuracy.high,
       );
       if (mounted) {
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+        });
         _mapController.move(LatLng(position.latitude, position.longitude), 15.0);
       }
     } catch (e) {
@@ -1838,6 +2118,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       backgroundColor: AppTheme.background,
       body: Stack(
         children: [
+
           // 1. Background Map
           Positioned.fill(
             child: _mapCenter != null
@@ -1858,23 +2139,103 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       ),
                       MarkerLayer(
                         markers: (() {
-                          final isOverview = _tabController.index == 0;
-                          final currentPlaces = isOverview ? _savedPlaces : _details.where((d) => d['place'] != null).toList();
+                          final List<Marker> allMarkers = [];
+                          
+                          if (_activeSearchQuery != null) {
+                            allMarkers.addAll(_filteredMapPlaces.map((place) {
+                              if (place['latitude'] == null || place['longitude'] == null) return null;
+                              final lat = (place['latitude'] as num).toDouble();
+                              final lon = (place['longitude'] as num).toDouble();
+                              final isSelected = _selectedMapPlace != null && _selectedMapPlace!['id'] == place['id'];
+                              final markerSize = isSelected ? 56.0 : 32.0;
+
+                              return Marker(
+                                point: LatLng(lat, lon),
+                                width: markerSize,
+                                height: markerSize,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedMapPlace = place;
+                                    });
+                                  },
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black87,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: isSelected ? 3 : 2),
+                                      boxShadow: isSelected ? [
+                                        BoxShadow(
+                                          color: Colors.black87.withOpacity(0.5),
+                                          blurRadius: 8,
+                                          spreadRadius: 2,
+                                        )
+                                      ] : [],
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.location_on_rounded,
+                                        color: Colors.white,
+                                        size: isSelected ? 32 : 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).whereType<Marker>());
+                          }
+
+                          final currentPlaces = <Map<String, dynamic>>[];
+                          
+                          if (_activeSearchQuery == null) {
+                            for (var p in _savedPlaces) {
+                              final sectionName = p['section'] as String? ?? (_sectionNames.isNotEmpty ? _sectionNames.first : null);
+                              if (sectionName == null || _checkedSections == null || _checkedSections!.contains(sectionName)) {
+                                if (p['place'] != null) {
+                                  currentPlaces.add({
+                                    'type': 'overview',
+                                    'data': p,
+                                    'id': p['place']['id'],
+                                  });
+                                }
+                              }
+                            }
+                            
+                            for (var d in _details) {
+                              final day = d['day'] as int? ?? 1;
+                              if (d['place'] != null && (_checkedDays == null || _checkedDays!.contains(day))) {
+                                currentPlaces.add({
+                                  'type': 'itinerary',
+                                  'data': d,
+                                  'id': d['place']['id'],
+                                });
+                              }
+                            }
+                          }
+                          
                           final sortedPlaces = List<Map<String, dynamic>>.from(currentPlaces);
                           sortedPlaces.sort((a, b) {
-                            final isAFocused = a['id'] == _focusedPlaceId || (_selectedMapPlace != null && _selectedMapPlace!['id'] == a['id']);
-                            final isBFocused = b['id'] == _focusedPlaceId || (_selectedMapPlace != null && _selectedMapPlace!['id'] == b['id']);
+                            final isAFocused = a['id'] != null && (a['id'] == _focusedPlaceId || (_selectedMapPlace != null && _selectedMapPlace!['id'] == a['id']));
+                            final isBFocused = b['id'] != null && (b['id'] == _focusedPlaceId || (_selectedMapPlace != null && _selectedMapPlace!['id'] == b['id']));
+                            
                             if (isAFocused && !isBFocused) return 1;
                             if (!isAFocused && isBFocused) return -1;
-                            return 0;
+                            
+                            // Prioritize itinerary (drawn on top)
+                            final aTypeScore = a['type'] == 'overview' ? 0 : 1;
+                            final bTypeScore = b['type'] == 'overview' ? 0 : 1;
+                            return aTypeScore.compareTo(bTypeScore);
                           });
-                          return sortedPlaces.map((savedPlace) {
-                            final p = savedPlace['place'] as Map<String, dynamic>?;
-                            if (p == null || p['latitude'] == null || p['longitude'] == null) {
+                          
+                          allMarkers.addAll(sortedPlaces.map((wrapper) {
+                            final bool isOverview = wrapper['type'] == 'overview';
+                            final savedPlace = wrapper['data'];
+                            final place = savedPlace['place'];
+                            if (place == null || place['latitude'] == null || place['longitude'] == null) {
                               return null;
                             }
-                            final lat = (p['latitude'] as num).toDouble();
-                            final lon = (p['longitude'] as num).toDouble();
+                            final lat = (place['latitude'] as num).toDouble();
+                            final lon = (place['longitude'] as num).toDouble();
                             
                             int indexInSection;
                             Color color;
@@ -1882,14 +2243,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             
                             if (isOverview) {
                               final sectionName = savedPlace['section'] as String?;
-                              final sectionList = currentPlaces.where((d) => d['section'] == sectionName).toList();
+                              final sectionList = _savedPlaces.where((d) => d['section'] == sectionName).toList();
                               sectionList.sort((a, b) => (a['sortOrder'] as int? ?? 0).compareTo(b['sortOrder'] as int? ?? 0));
                               indexInSection = sectionList.indexWhere((d) => d['id'] == savedPlace['id']) + 1;
                               color = _sectionColors[sectionName] ?? AppTheme.primary;
                               icon = _sectionIcons[sectionName];
                             } else {
                               final day = savedPlace['day'] as int? ?? 1;
-                              final dayList = currentPlaces.where((d) => d['day'] == day).toList();
+                              final dayList = _details.where((d) => d['day'] == day).toList();
                               dayList.sort((a, b) => (a['sortOrder'] as int? ?? 0).compareTo(b['sortOrder'] as int? ?? 0));
                               indexInSection = dayList.indexWhere((d) => d['id'] == savedPlace['id']) + 1;
                               color = _dayColors[day - 1] ?? AppTheme.primary;
@@ -1897,7 +2258,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             }
                             
                             final bool isSheetMinimized = _isMapExpanded && !_isSheetHalf && _selectedMapPlace == null;
-                            final isFocused = !isSheetMinimized && ((savedPlace['id'] == _focusedPlaceId) || (_selectedMapPlace != null && _selectedMapPlace!['id'] == savedPlace['id']));
+                            final isFocused = !isSheetMinimized && ((place['id'] == _focusedPlaceId) || (_selectedMapPlace != null && _selectedMapPlace!['id'] == place['id']));
                           final double markerSize = isFocused ? 56.0 : 32.0;
 
                           return Marker(
@@ -1907,7 +2268,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  _selectedMapPlace = savedPlace;
+                                  _selectedMapPlace = place;
                                 });
                               },
                               child: Container(
@@ -1915,29 +2276,56 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 color: color,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: Colors.white, width: isFocused ? 3 : 2),
-                                boxShadow: [
+                                boxShadow: isFocused ? [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: isFocused ? 8 : 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                                    color: color.withOpacity(0.5),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  )
+                                ] : [],
                               ),
-                              alignment: Alignment.center,
-                              child: (icon == null || icon.codePoint == Icons.looks_one_rounded.codePoint)
-                                  ? Text(
-                                      '$indexInSection',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: isFocused ? 18 : 14,
+                              child: Center(
+                                child: icon != null
+                                    ? Icon(icon, color: Colors.white, size: isFocused ? 30 : 16)
+                                    : Text(
+                                        '$indexInSection',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: isFocused ? 24 : 12,
+                                        ),
                                       ),
-                                    )
-                                  : Icon(icon, color: Colors.white, size: isFocused ? 24 : 18),
+                              ),
                             ),
-                          ),
+                            ),
                           );
-                        }).whereType<Marker>().toList();
+                          }).whereType<Marker>());
+                          
+                          if (_currentLocation != null) {
+                            allMarkers.add(
+                              Marker(
+                                point: _currentLocation!,
+                                width: 24,
+                                height: 24,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 3),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.blue.withOpacity(0.4),
+                                        blurRadius: 8,
+                                        spreadRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          return allMarkers;
                         })(),
                       ),
                     ],
@@ -1946,6 +2334,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     child: CircularProgressIndicator(color: AppTheme.primary),
                   ),
           ),
+
 
           // 2. Map Action Buttons (Hidden when full screen)
           AnimatedPositioned(
@@ -1956,112 +2345,93 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Share & More Pill
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.transparent,
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.reply_rounded, // Similar to reply/share in image 1
-                            color: AppTheme.darkText,
-                            size: 20,
-                          ),
-                          onPressed: _showShareDialog,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.transparent,
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.more_horiz_rounded,
-                            color: AppTheme.darkText,
-                            size: 20,
-                          ),
-                          onPressed: _showMapSettingsSheet,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
                 
                 // Search Button
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.white,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.search_rounded,
-                      color: AppTheme.darkText,
-                      size: 22,
+                GestureDetector(
+                  onTap: _showSearchOverlay,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
                     ),
-                    onPressed: _showSearchOverlay,
+                    child: const Center(
+                      child: Icon(
+                        Icons.search_rounded,
+                        color: AppTheme.darkText,
+                        size: 16,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
                 
                 // Layers Button
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.white,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.layers_rounded,
-                      color: AppTheme.darkText,
-                      size: 22,
+                if (_activeSearchQuery == null) ...[
+                  GestureDetector(
+                    onTap: _showLayersSheet,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.layers_rounded,
+                          color: AppTheme.darkText,
+                          size: 16,
+                        ),
+                      ),
                     ),
-                    onPressed: _showLayersSheet,
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
 
                 // Hotel Button (Placeholder)
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.white,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.bed_rounded,
-                      color: AppTheme.darkText,
-                      size: 22,
+                GestureDetector(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Tính năng Khách sạn sẽ sớm ra mắt!')),
+                    );
+                  },
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
                     ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Tính năng Khách sạn sẽ sớm ra mắt!')),
-                      );
-                    },
+                    child: const Center(
+                      child: Icon(
+                        Icons.bed_rounded,
+                        color: AppTheme.darkText,
+                        size: 16,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
 
                 // Location Button
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Colors.white,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.near_me_rounded, // Location arrow
-                      color: AppTheme.darkText,
-                      size: 22,
+                GestureDetector(
+                  onTap: _goToMyLocation,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
                     ),
-                    onPressed: _goToMyLocation,
+                    child: const Center(
+                      child: Icon(
+                        Icons.near_me_rounded, // Location arrow
+                        color: AppTheme.darkText,
+                        size: 16,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -2151,6 +2521,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 curve: Curves.easeOutCubic,
                                 margin: EdgeInsets.only(
                                     left: 16, top: _isMapExpanded ? 8 : 0),
+                                width: 32,
+                                height: 32,
                                 decoration: BoxDecoration(
                                   color: !_isMapExpanded
                                       ? Colors.transparent
@@ -2167,21 +2539,31 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           ),
                                         ],
                                 ),
-                                child: IconButton(
-                                  iconSize: _isMapExpanded ? 20 : 24,
-                                  padding: _isMapExpanded ? const EdgeInsets.all(8) : const EdgeInsets.all(8),
-                                  constraints: _isMapExpanded ? const BoxConstraints(minWidth: 36, minHeight: 36) : const BoxConstraints(minWidth: 40, minHeight: 40),
-                                  icon: const Icon(
-                                    Icons.arrow_back_ios_new_rounded,
-                                    color: AppTheme.darkText,
-                                  ),
-                                  onPressed: () {
-                                    if (_isMapExpanded) {
+                                child: GestureDetector(
+                                  onTap: () {
+                                    if (_activeSearchQuery != null) {
+                                      setState(() {
+                                        _activeSearchQuery = null;
+                                        _filteredMapPlaces = [];
+                                        _selectedMapPlace = null;
+                                        _isMapExpanded = false;
+                                      });
+                                    } else if (_isMapExpanded) {
                                       setState(() => _isMapExpanded = false);
                                     } else {
                                       Navigator.pop(context);
                                     }
                                   },
+                                  child: Container(
+                                    color: Colors.transparent,
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.arrow_back_ios_new_rounded,
+                                        color: AppTheme.darkText,
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                               const Spacer(),
@@ -2199,26 +2581,63 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                              const Spacer(),
-                              if (!_isMapExpanded) ...[
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.share_rounded,
-                                    color: AppTheme.subtitleText,
-                                  ),
-                                  onPressed: () {},
+                                                            const Spacer(),
+                              
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeOutCubic,
+                                margin: EdgeInsets.only(right: 16, top: _isMapExpanded ? 8 : 0),
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: !_isMapExpanded ? Colors.transparent : Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: !_isMapExpanded ? [] : [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
                                 ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.more_vert_rounded,
-                                    color: AppTheme.subtitleText,
-                                  ),
-                                  onPressed: () {},
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    GestureDetector(
+                                      onTap: _showShareDialog,
+                                      child: Container(
+                                        width: 32,
+                                        color: Colors.transparent, // for hit test
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.shortcut_rounded,
+                                            color: AppTheme.darkText,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (_isMapExpanded)
+                                      Container(
+                                        width: 1,
+                                        height: 12,
+                                        color: Colors.grey.shade300,
+                                      ),
+                                    GestureDetector(
+                                      onTap: _showMapSettingsSheet,
+                                      child: Container(
+                                        width: 32,
+                                        color: Colors.transparent, // for hit test
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.more_horiz_rounded,
+                                            color: AppTheme.darkText,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ] else
-                                const SizedBox(
-                                  width: 48,
-                                ), // Balance for back button when expanded
+                              ),
                             ],
                           ),
                   ),
@@ -2332,6 +2751,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             }
                           }
                           _dragHeight = null;
+
+                          if (!_isMapExpanded || _isSheetHalf) {
+                            final int numDays = (_itineraryData['days'] as int?) ?? 1;
+                            if (_checkedSections != null) _checkedSections = Set.from(_sectionNames);
+                            if (_checkedDays != null) _checkedDays = Set.from(Iterable.generate(numDays, (i) => i + 1));
+                            
+                            if (_activeSearchQuery != null) {
+                              _activeSearchQuery = null;
+                              _filteredMapPlaces = [];
+                              _selectedMapPlace = null;
+                            }
+                          }
                         });
                         
                         if (!wasExpanded && _isMapExpanded) {
@@ -2547,6 +2978,44 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             ),
 
           if (_isMapExpanded && _selectedMapPlace != null) _buildMapPlaceBottomSheet(),
+          if (_activeSearchQuery != null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 16,
+              left: 16,
+              right: 16,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      const BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))
+                    ]
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.search_rounded, size: 20, color: AppTheme.primary),
+                      const SizedBox(width: 8),
+                      Text('Đang tìm kiếm: $_activeSearchQuery', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _activeSearchQuery = null;
+                            _filteredMapPlaces = [];
+                            _selectedMapPlace = null;
+                            _isMapExpanded = false;
+                          });
+                        },
+                        child: const Icon(Icons.close_rounded, size: 20, color: Colors.grey),
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
