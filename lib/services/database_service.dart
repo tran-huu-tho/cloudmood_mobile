@@ -243,6 +243,20 @@ class DatabaseService {
     }
   }
 
+  /// Fetches reviews for a specific place
+  Future<List<Map<String, dynamic>>> fetchPlaceReviews(int placeId) async {
+    try {
+      final response = await ApiClient.get('/reviews/place/$placeId');
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching place reviews: $e');
+      return [];
+    }
+  }
+
   /// Checks if a destination city is supported
   Future<bool> isDestinationSupported(String cityName) async {
     try {

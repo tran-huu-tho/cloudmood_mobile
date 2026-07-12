@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/database_service.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'place_detail_bottom_sheet.dart';
 
 class InlinePlaceWhiteCardExtension extends StatefulWidget {
   final Map<String, dynamic> detail;
@@ -435,9 +436,28 @@ class InlinePlaceBottomInfo extends StatelessWidget {
       } catch (_) {}
     }
     
-    // Fallback: If there are no subCategories, show the main category so the tag area isn't blank
-    if (subCategories.isEmpty && place['category'] != null && place['category']['name'] != null) {
-      subCategories = [place['category']['name']];
+    // Prepend category if available
+    if (place['category'] != null && place['category']['name'] != null) {
+      subCategories.insert(0, place['category']['name']);
+    }
+    
+    // Icon and Color from DB category
+    IconData? categoryIcon;
+    Color categoryColor = const Color(0xFF3B5998);
+    
+    if (place['category'] != null) {
+      final cat = place['category'];
+      if (cat['iconCode'] != null) {
+        categoryIcon = IconData(cat['iconCode'], fontFamily: 'MaterialIcons');
+      }
+      if (cat['id'] != null) {
+        final List<Color> colors = [
+          const Color(0xFF3B5998), const Color(0xFFE91E63), const Color(0xFF009688), 
+          const Color(0xFFFF9800), const Color(0xFF9C27B0), const Color(0xFF4CAF50),
+          const Color(0xFFF44336), const Color(0xFF673AB7), const Color(0xFF00BCD4)
+        ];
+        categoryColor = colors[(cat['id'] as num).toInt() % colors.length];
+      }
     }
     
     final String description = place['description'] ?? place['editorialSummary'] ?? '';
@@ -490,7 +510,9 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                 const SizedBox(width: 8),
                 _buildActionButton(Icons.directions_outlined, '', false, context),
                 const SizedBox(width: 8),
-                _buildActionButton(null, 'Giới thiệu', false, context),
+                _buildActionButton(null, 'Giới thiệu', false, context, onTap: () {
+                  PlaceDetailBottomSheet.show(context, place);
+                }),
                 const SizedBox(width: 8),
                 _buildActionButton(Icons.build, 'Hướng dẫn', false, context),
               ],
@@ -509,19 +531,23 @@ class InlinePlaceBottomInfo extends StatelessWidget {
           const SizedBox(height: 16),
           
           // Info Card
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
+          GestureDetector(
+            onTap: () {
+              PlaceDetailBottomSheet.show(context, place);
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -692,6 +718,7 @@ class InlinePlaceBottomInfo extends StatelessWidget {
               ],
             ),
           ),
+        ),
         ],
       ),
     );

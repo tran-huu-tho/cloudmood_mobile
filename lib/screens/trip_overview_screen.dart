@@ -16,6 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import '../widgets/inline_place_details.dart';
 import '../widgets/save_to_trip_bottom_sheet.dart';
+import '../widgets/place_detail_bottom_sheet.dart';
 import 'package:geolocator/geolocator.dart';
 
 class TripOverviewScreen extends StatefulWidget {
@@ -2146,7 +2147,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               if (place['latitude'] == null || place['longitude'] == null) return null;
                               final lat = (place['latitude'] as num).toDouble();
                               final lon = (place['longitude'] as num).toDouble();
-                              final isSelected = _selectedMapPlace != null && _selectedMapPlace!['id'] == place['id'];
+                              final isSelectedMapPlaceId = _selectedMapPlace != null ? (_selectedMapPlace!['place']?['id'] ?? _selectedMapPlace!['id']) : null;
+                              final isSelected = isSelectedMapPlaceId == place['id'];
                               final markerSize = isSelected ? 56.0 : 32.0;
 
                               return Marker(
@@ -2244,21 +2246,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             if (isOverview) {
                               final sectionName = savedPlace['section'] as String?;
                               final sectionList = _savedPlaces.where((d) => d['section'] == sectionName).toList();
-                              sectionList.sort((a, b) => (a['sortOrder'] as int? ?? 0).compareTo(b['sortOrder'] as int? ?? 0));
                               indexInSection = sectionList.indexWhere((d) => d['id'] == savedPlace['id']) + 1;
                               color = _sectionColors[sectionName] ?? AppTheme.primary;
-                              icon = _sectionIcons[sectionName];
+                              icon = null;
                             } else {
                               final day = savedPlace['day'] as int? ?? 1;
                               final dayList = _details.where((d) => d['day'] == day).toList();
-                              dayList.sort((a, b) => (a['sortOrder'] as int? ?? 0).compareTo(b['sortOrder'] as int? ?? 0));
                               indexInSection = dayList.indexWhere((d) => d['id'] == savedPlace['id']) + 1;
                               color = _dayColors[day - 1] ?? AppTheme.primary;
                               icon = null;
                             }
                             
                             final bool isSheetMinimized = _isMapExpanded && !_isSheetHalf && _selectedMapPlace == null;
-                            final isFocused = !isSheetMinimized && ((place['id'] == _focusedPlaceId) || (_selectedMapPlace != null && _selectedMapPlace!['id'] == place['id']));
+                            final isSelectedMapPlaceId = _selectedMapPlace != null ? (_selectedMapPlace!['place']?['id'] ?? _selectedMapPlace!['id']) : null;
+                            final isFocused = !isSheetMinimized && ((place['id'] == _focusedPlaceId) || (isSelectedMapPlaceId == place['id']));
                           final double markerSize = isFocused ? 56.0 : 32.0;
 
                           return Marker(
@@ -2268,7 +2269,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
-                                  _selectedMapPlace = place;
+                                  _selectedMapPlace = savedPlace;
                                 });
                               },
                               child: Container(
@@ -3299,17 +3300,55 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     
     String imageUrl = p['image'] ?? '';
 
-    // Determine the color and index for the circle
-    final sectionName = _selectedMapPlace!['section'] as String?;
-    final color = _sectionColors[sectionName] ?? AppTheme.primary;
-    final icon = _sectionIcons[sectionName];
+    // Determine the color and icon from category or section
+    IconData? finalIcon;
+    Color finalColor = const Color(0xFF3B5998);
+    int? indexInSection;
     
-    int indexInSection = 1;
+    final sectionName = _selectedMapPlace!['section'] as String?;
+    final day = _selectedMapPlace!['day'] as int?;
+
     if (sectionName != null) {
+      finalColor = _sectionColors[sectionName] ?? AppTheme.primary;
+      finalIcon = _sectionIcons[sectionName];
       final sectionList = _savedPlaces.where((d) => d['section'] == sectionName).toList();
       sectionList.sort((a, b) => (a['sortOrder'] as int? ?? 0).compareTo(b['sortOrder'] as int? ?? 0));
       indexInSection = sectionList.indexWhere((d) => d['id'] == _selectedMapPlace!['id']) + 1;
+    } else if (day != null) {
+      finalColor = _dayColors[day - 1] ?? AppTheme.primary;
+      final dayList = _details.where((d) => d['day'] == day).toList();
+      dayList.sort((a, b) => (a['sortOrder'] as int? ?? 0).compareTo(b['sortOrder'] as int? ?? 0));
+      indexInSection = dayList.indexWhere((d) => d['id'] == _selectedMapPlace!['id']) + 1;
+    } else {
+      if (p['category'] != null) {
+        final cat = p['category'];
+        if (cat['iconCode'] != null) {
+          finalIcon = IconData(cat['iconCode'], fontFamily: 'MaterialIcons');
+        }
+        if (cat['id'] != null) {
+          final List<Color> colors = [
+            const Color(0xFF3B5998), const Color(0xFFE91E63), const Color(0xFF009688), 
+            const Color(0xFFFF9800), const Color(0xFF9C27B0), const Color(0xFF4CAF50),
+            const Color(0xFFF44336), const Color(0xFF673AB7), const Color(0xFF00BCD4)
+          ];
+          finalColor = colors[(cat['id'] as num).toInt() % colors.length];
+        }
+      }
     }
+
+    final targetPlaceId = p['id'];
+    int savedCount = 0;
+    for (var d in _savedPlaces) {
+      if ((d['placeId'] ?? d['place']?['id']) == targetPlaceId && (d['section'] != null && d['section'].toString().isNotEmpty)) {
+        savedCount++;
+      }
+    }
+    for (var d in _details) {
+      if ((d['placeId'] ?? d['place']?['id']) == targetPlaceId && d['day'] != null) {
+        savedCount++;
+      }
+    }
+    bool isSavedToCurrentTrip = savedCount > 0;
 
     return Positioned(
       left: 16,
@@ -3335,16 +3374,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Index Circle
+                // Category or Section Circle
                 Container(
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: color,
+                    color: finalColor,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
-                  child: (icon == null || icon.codePoint == Icons.looks_one_rounded.codePoint)
+                  child: indexInSection != null && (finalIcon == null || finalIcon.codePoint == Icons.looks_one_rounded.codePoint)
                       ? Text(
                           '$indexInSection',
                           style: const TextStyle(
@@ -3354,7 +3393,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           ),
                         )
                       : Icon(
-                          icon,
+                          finalIcon ?? Icons.place,
                           color: Colors.white,
                           size: 14,
                         ),
@@ -3418,51 +3457,63 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 children: [
                   GestureDetector(
                     onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.white,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                        ),
-                        builder: (context) {
-                          return SaveToTripBottomSheet(
-                            place: _selectedMapPlace!['place'] ?? _selectedMapPlace!,
-                            onSaved: () {
-                              _loadData(); // refresh data if it was saved to the current trip
-                            },
-                          );
+                      SaveToTripBottomSheet.show(
+                        context,
+                        _selectedMapPlace!['place'] ?? _selectedMapPlace!,
+                        onSaved: () {
+                          _loadData(); // refresh data if it was saved to the current trip
+                        },
+                        initialItinerary: widget.itinerary,
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSavedToCurrentTrip ? Colors.grey[200] : AppTheme.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(isSavedToCurrentTrip ? Icons.bookmark : Icons.bookmark_border, color: isSavedToCurrentTrip ? Colors.black : Colors.white, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            isSavedToCurrentTrip ? 'Đã thêm vào $savedCount danh sách' : 'Thêm vào chuyến đi',
+                            style: TextStyle(color: isSavedToCurrentTrip ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                          if (isSavedToCurrentTrip) ...[
+                            const SizedBox(width: 4),
+                            const Icon(Icons.keyboard_arrow_down, color: Colors.black, size: 16),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      PlaceDetailBottomSheet.show(
+                        context, 
+                        p,
+                        icon: finalIcon,
+                        color: finalColor,
+                        text: indexInSection?.toString(),
+                        savedCount: savedCount,
+                        currentItinerary: widget.itinerary,
+                        onTripUpdated: () {
+                          _loadData();
                         },
                       );
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
+                        color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.bookmark_outline, color: Colors.white, size: 16),
-                          SizedBox(width: 4),
-                          Text(
-                            'Lưu',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                      child: const Text(
+                        'Chi tiết',
+                        style: TextStyle(color: AppTheme.darkText, fontWeight: FontWeight.bold),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      'Chi tiết',
-                      style: TextStyle(color: AppTheme.darkText, fontWeight: FontWeight.bold),
                     ),
                   ),
                   const SizedBox(width: 8),

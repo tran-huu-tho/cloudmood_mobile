@@ -7,8 +7,32 @@ import '../theme/app_theme.dart';
 class SaveToTripBottomSheet extends StatefulWidget {
   final Map<String, dynamic> place;
   final VoidCallback onSaved;
+  final Map<String, dynamic>? initialItinerary;
 
-  const SaveToTripBottomSheet({super.key, required this.place, required this.onSaved});
+  const SaveToTripBottomSheet({
+    super.key, 
+    required this.place, 
+    required this.onSaved,
+    this.initialItinerary,
+  });
+
+  static Future<void> show(BuildContext context, Map<String, dynamic> place, {required VoidCallback onSaved, Map<String, dynamic>? initialItinerary}) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SaveToTripBottomSheet(
+          place: place,
+          onSaved: onSaved,
+          initialItinerary: initialItinerary,
+        );
+      },
+    );
+  }
 
   @override
   State<SaveToTripBottomSheet> createState() => _SaveToTripBottomSheetState();
@@ -38,7 +62,11 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
   @override
   void initState() {
     super.initState();
-    _fetchItineraries();
+    if (widget.initialItinerary != null) {
+      _selectItinerary(widget.initialItinerary!);
+    } else {
+      _fetchItineraries();
+    }
   }
 
   Future<void> _fetchItineraries() async {
@@ -267,23 +295,37 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () {
-                    setState(() {
-                      _step = 1;
-                      _selectedItinerary = null;
-                      _tripDetails = null;
-                    });
-                  },
-                ),
+                if (widget.initialItinerary == null)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      setState(() {
+                        _step = 1;
+                        _selectedItinerary = null;
+                        _tripDetails = null;
+                      });
+                    },
+                  )
+                else
+                  const SizedBox(width: 48),
                 const Expanded(
                   child: Text(
-                    'Đã thêm vào chuyến đi',
+                    'Thêm vào plan',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -294,7 +336,7 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                 ),
                 TextButton(
                   onPressed: _saveAllChanges,
-                  child: const Text('Lưu', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+                  child: const Text('Hoàn thành', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.normal)),
                 ),
               ],
             ),
