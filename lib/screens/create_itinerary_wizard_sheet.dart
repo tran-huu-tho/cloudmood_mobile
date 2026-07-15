@@ -210,7 +210,10 @@ class _CreateItineraryWizardSheetState
       final url = Uri.parse(
         'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&addressdetails=1&limit=5',
       );
-      final response = await http.get(url, headers: {'User-Agent': 'CloudMoodApp/1.0'});
+      final response = await http.get(
+        url,
+        headers: {'User-Agent': 'CloudMoodApp/1.0'},
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
@@ -390,12 +393,12 @@ class _CreateItineraryWizardSheetState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(
-          content: Text('Đã xảy ra lỗi: $e'),
-          behavior: SnackBarBehavior.fixed,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã xảy ra lỗi: $e'),
+            behavior: SnackBarBehavior.fixed,
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -458,7 +461,9 @@ class _CreateItineraryWizardSheetState
                       value: (_currentStep + 1) / 4,
                       minHeight: 6,
                       backgroundColor: AppTheme.border,
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppTheme.primary,
+                      ),
                     ),
                   ),
                 ],

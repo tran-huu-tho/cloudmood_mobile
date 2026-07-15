@@ -24,7 +24,6 @@ void main() async {
 
   // Load environment variables from .env
 
-
   // Seed initial categories & places in Supabase if empty
   await DatabaseService().checkAndSeedData();
 
@@ -94,20 +93,23 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
   }
 
   void _showCreateMenuOverlay() {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierDismissible: true,
-        pageBuilder: (context, _, __) => const CreateMenuOverlay(animationValue: 1.0),
-        transitionsBuilder: (context, animation, _, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-      ),
-    ).then((result) {
-      if (result == 'create_itinerary') {
-        _openCreateItinerarySheet();
-      }
-    });
+    Navigator.of(context)
+        .push(
+          PageRouteBuilder(
+            opaque: false,
+            barrierDismissible: true,
+            pageBuilder: (context, _, _) =>
+                const CreateMenuOverlay(animationValue: 1.0),
+            transitionsBuilder: (context, animation, _, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
+        )
+        .then((result) {
+          if (result == 'create_itinerary') {
+            _openCreateItinerarySheet();
+          }
+        });
   }
 
   void _openCreateItinerarySheet() {
@@ -172,11 +174,31 @@ class _CloudmoodFloatingNav extends StatelessWidget {
   });
 
   static const _items = [
-    _NavItem(icon: Icons.home_rounded, activeIcon: Icons.home_rounded, label: 'Trang chủ'),
-    _NavItem(icon: Icons.hotel_outlined, activeIcon: Icons.hotel_rounded, label: 'Khách sạn'),
-    _NavItem(icon: Icons.add_circle_outline_rounded, activeIcon: Icons.add_circle_rounded, label: 'Tạo lịch'),
-    _NavItem(icon: Icons.local_offer_outlined, activeIcon: Icons.local_offer_rounded, label: 'Ưu đãi'),
-    _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Hồ sơ'),
+    _NavItem(
+      icon: Icons.home_rounded,
+      activeIcon: Icons.home_rounded,
+      label: 'Trang chủ',
+    ),
+    _NavItem(
+      icon: Icons.hotel_outlined,
+      activeIcon: Icons.hotel_rounded,
+      label: 'Khách sạn',
+    ),
+    _NavItem(
+      icon: Icons.add_circle_outline_rounded,
+      activeIcon: Icons.add_circle_rounded,
+      label: 'Tạo lịch',
+    ),
+    _NavItem(
+      icon: Icons.local_offer_outlined,
+      activeIcon: Icons.local_offer_rounded,
+      label: 'Ưu đãi',
+    ),
+    _NavItem(
+      icon: Icons.person_outline_rounded,
+      activeIcon: Icons.person_rounded,
+      label: 'Hồ sơ',
+    ),
   ];
 
   @override

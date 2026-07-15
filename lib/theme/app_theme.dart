@@ -62,11 +62,35 @@ class AppTheme {
 
   // ─── MaterialApp ThemeData ───────────────────────────────────────────────────
   static ThemeData get lightTheme {
+    final baseTheme = ThemeData(brightness: Brightness.light);
     return ThemeData(
       useMaterial3: true,
-      textTheme: GoogleFonts.robotoTextTheme(),
-      fontFamily: GoogleFonts.roboto().fontFamily,
+      fontFamily: 'SDK_SC_Web-Heavy',
+      textTheme: baseTheme.textTheme.copyWith(
+        displayLarge: baseTheme.textTheme.displayLarge?.copyWith(fontSize: 26),
+        displayMedium: baseTheme.textTheme.displayMedium?.copyWith(fontSize: 22),
+        displaySmall: baseTheme.textTheme.displaySmall?.copyWith(fontSize: 18),
+        headlineLarge: baseTheme.textTheme.headlineLarge?.copyWith(fontSize: 16),
+        headlineMedium: baseTheme.textTheme.headlineMedium?.copyWith(fontSize: 14),
+        headlineSmall: baseTheme.textTheme.headlineSmall?.copyWith(fontSize: 12.5),
+        titleLarge: baseTheme.textTheme.titleLarge?.copyWith(fontSize: 16.5),
+        titleMedium: baseTheme.textTheme.titleMedium?.copyWith(fontSize: 13.5),
+        titleSmall: baseTheme.textTheme.titleSmall?.copyWith(fontSize: 11.5),
+        bodyLarge: baseTheme.textTheme.bodyLarge?.copyWith(fontSize: 12.5),
+        bodyMedium: baseTheme.textTheme.bodyMedium?.copyWith(fontSize: 11.5),
+        bodySmall: baseTheme.textTheme.bodySmall?.copyWith(fontSize: 9.5),
+        labelLarge: baseTheme.textTheme.labelLarge?.copyWith(fontSize: 10.5),
+        labelMedium: baseTheme.textTheme.labelMedium?.copyWith(fontSize: 9.0),
+        labelSmall: baseTheme.textTheme.labelSmall?.copyWith(fontSize: 8.0),
+      ).apply(
+        fontFamily: 'SDK_SC_Web-Heavy',
+        bodyColor: darkText,
+        displayColor: darkText,
+      ),
       colorScheme: const ColorScheme(
+
+
+
         brightness: Brightness.light,
         primary: primary,
         onPrimary: Colors.white,
@@ -296,46 +320,46 @@ class AppTheme {
 
   // ─── Typography Tokens ───────────────────────────────────────────────────────
   static const TextStyle brandLogoStyle = TextStyle(
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: FontWeight.w800,
     color: primary,
     letterSpacing: -0.8,
   );
 
   static const TextStyle screenTitleStyle = TextStyle(
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: FontWeight.w800,
     color: darkText,
     letterSpacing: -0.8,
   );
 
   static const TextStyle sectionTitleStyle = TextStyle(
-    fontSize: 20,
+    fontSize: 14.5,
     fontWeight: FontWeight.w700,
     color: darkText,
     letterSpacing: -0.4,
   );
 
   static const TextStyle bodyBoldStyle = TextStyle(
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: FontWeight.w600,
     color: darkText,
   );
 
   static const TextStyle bodyMediumStyle = TextStyle(
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: FontWeight.w500,
     color: bodyText,
   );
 
   static const TextStyle captionStyle = TextStyle(
-    fontSize: 12,
+    fontSize: 9.5,
     fontWeight: FontWeight.w400,
     color: subtitleText,
   );
 
   static const TextStyle labelStyle = TextStyle(
-    fontSize: 11,
+    fontSize: 8.5,
     fontWeight: FontWeight.w700,
     color: subtitleText,
     letterSpacing: 0.8,

@@ -10,13 +10,18 @@ class SaveToTripBottomSheet extends StatefulWidget {
   final Map<String, dynamic>? initialItinerary;
 
   const SaveToTripBottomSheet({
-    super.key, 
-    required this.place, 
+    super.key,
+    required this.place,
     required this.onSaved,
     this.initialItinerary,
   });
 
-  static Future<void> show(BuildContext context, Map<String, dynamic> place, {required VoidCallback onSaved, Map<String, dynamic>? initialItinerary}) {
+  static Future<void> show(
+    BuildContext context,
+    Map<String, dynamic> place, {
+    required VoidCallback onSaved,
+    Map<String, dynamic>? initialItinerary,
+  }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -90,7 +95,7 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
       _isLoading = true;
       _step = 2;
     });
-    
+
     final details = await DatabaseService().fetchItineraryById(itinerary['id']);
     if (mounted) {
       final savedPlaces = details?['savedPlaces'] as List? ?? [];
@@ -100,7 +105,8 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
       _localSelectedSections.clear();
       _originalSections.clear();
       for (var d in savedPlaces) {
-        final pid = d['placeId'] ?? (d['place'] != null ? d['place']['id'] : null);
+        final pid =
+            d['placeId'] ?? (d['place'] != null ? d['place']['id'] : null);
         if (pid == targetPlaceId && d['section'] != null) {
           _localSelectedSections.add(d['section']);
           _originalSections[d['section']] = d['id'];
@@ -110,7 +116,8 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
       _localSelectedDays.clear();
       _originalDays.clear();
       for (var d in detailsList) {
-        final pid = d['placeId'] ?? (d['place'] != null ? d['place']['id'] : null);
+        final pid =
+            d['placeId'] ?? (d['place'] != null ? d['place']['id'] : null);
         if (pid == targetPlaceId && d['day'] != null) {
           _localSelectedDays.add(d['day']);
           _originalDays[d['day']] = d['id'];
@@ -130,7 +137,7 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
     }
     final startDate = DateTime.tryParse(startDateStr);
     if (startDate == null) return 'Ngày ${dayIndex + 1}';
-    
+
     final date = startDate.add(Duration(days: dayIndex));
     return DateFormat('EEEE, d MMMM', 'en_US').format(date);
   }
@@ -163,7 +170,9 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
 
     final originalSecNames = _originalSections.keys.toSet();
     final sectionsToAdd = _localSelectedSections.difference(originalSecNames);
-    final sectionsToRemove = originalSecNames.difference(_localSelectedSections);
+    final sectionsToRemove = originalSecNames.difference(
+      _localSelectedSections,
+    );
 
     final originalDayNums = _originalDays.keys.toSet();
     final daysToAdd = _localSelectedDays.difference(originalDayNums);
@@ -177,7 +186,9 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
     }
     for (var sec in sectionsToAdd) {
       int maxOrder = 0;
-      final sectionDetails = savedPlaces.where((d) => d['section'] == sec).toList();
+      final sectionDetails = savedPlaces
+          .where((d) => d['section'] == sec)
+          .toList();
       for (var d in sectionDetails) {
         final ord = d['sortOrder'] ?? 0;
         if (ord > maxOrder) maxOrder = ord;
@@ -213,7 +224,9 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
 
     widget.onSaved();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã cập nhật chuyến đi thành công!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã cập nhật chuyến đi thành công!')),
+      );
       Navigator.of(context).pop();
     }
   }
@@ -231,7 +244,9 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
 
     if (_step == 1) {
       return Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -257,7 +272,10 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                 itemBuilder: (context, index) {
                   final itin = _itineraries[index];
                   return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 4,
+                    ),
                     title: Text(
                       itin['name'] ?? 'Chuyến đi chưa đặt tên',
                       style: const TextStyle(
@@ -283,13 +301,15 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
         .where((s) => s != null && s.isNotEmpty)
         .toSet()
         .toList();
-        
+
     final numDays = (_tripDetails?['days'] as num?)?.toInt() ?? 1;
     final startDateStr = _tripDetails?['startDate'] as String?;
     final targetPlaceId = widget.place['id'] ?? widget.place['placeId'];
 
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.8,
+      ),
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -336,7 +356,13 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                 ),
                 TextButton(
                   onPressed: _saveAllChanges,
-                  child: const Text('Hoàn thành', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.normal)),
+                  child: const Text(
+                    'Hoàn thành',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -349,17 +375,28 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                 if (sections.isNotEmpty)
                   const Padding(
                     padding: EdgeInsets.only(left: 24, top: 8, bottom: 8),
-                    child: Text('Tổng quan', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.subtitleText)),
+                    child: Text(
+                      'Tổng quan',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.subtitleText,
+                      ),
+                    ),
                   ),
                 ...sections.asMap().entries.map((entry) {
                   final index = entry.key;
                   final sectionName = entry.value!;
                   final color = _markerColors[index % _markerColors.length];
-                  
-                  final isChecked = _localSelectedSections.contains(sectionName);
-                  
+
+                  final isChecked = _localSelectedSections.contains(
+                    sectionName,
+                  );
+
                   return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 0,
+                    ),
                     leading: Icon(Icons.location_on, color: color),
                     title: Text(
                       sectionName,
@@ -368,26 +405,37 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                         color: AppTheme.bodyText,
                       ),
                     ),
-                    trailing: isChecked ? const Icon(Icons.check, color: AppTheme.darkText) : null,
+                    trailing: isChecked
+                        ? const Icon(Icons.check, color: AppTheme.darkText)
+                        : null,
                     onTap: () => _toggleSectionLocal(sectionName),
                   );
                 }),
-                
+
                 if (numDays > 0)
                   const Padding(
                     padding: EdgeInsets.only(left: 24, top: 16, bottom: 8),
-                    child: Text('Hành trình', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.subtitleText)),
+                    child: Text(
+                      'Hành trình',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.subtitleText,
+                      ),
+                    ),
                   ),
                 ...List.generate(numDays, (i) {
                   final dayNum = i + 1;
                   final dayTitle = _formatDayDate(i, startDateStr);
                   final colorIdx = (sections.length + i) % _markerColors.length;
                   final color = _markerColors[colorIdx];
-                  
+
                   final isChecked = _localSelectedDays.contains(dayNum);
-                  
+
                   return ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 0,
+                    ),
                     leading: Icon(Icons.location_on, color: color),
                     title: Text(
                       dayTitle,
@@ -396,7 +444,9 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                         color: AppTheme.bodyText,
                       ),
                     ),
-                    trailing: isChecked ? const Icon(Icons.check, color: AppTheme.darkText) : null,
+                    trailing: isChecked
+                        ? const Icon(Icons.check, color: AppTheme.darkText)
+                        : null,
                     onTap: () => _toggleDayLocal(dayNum),
                   );
                 }),

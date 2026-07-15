@@ -103,8 +103,6 @@ class HeaderWidget extends StatelessWidget {
                   fit: BoxFit.cover,
                 ),
               ),
-              const SizedBox(width: 8),
-              const Text('cloudmood', style: AppTheme.brandLogoStyle),
             ],
           ),
           // Right

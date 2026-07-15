@@ -15,7 +15,7 @@ class PlaceDetailBottomSheet extends StatefulWidget {
   final VoidCallback? onTripUpdated;
 
   const PlaceDetailBottomSheet({
-    Key? key, 
+    super.key,
     required this.place,
     this.overrideIcon,
     this.overrideColor,
@@ -23,13 +23,13 @@ class PlaceDetailBottomSheet extends StatefulWidget {
     this.currentItinerary,
     this.savedCount = 0,
     this.onTripUpdated,
-  }) : super(key: key);
+  });
 
   static void show(
-    BuildContext context, 
+    BuildContext context,
     Map<String, dynamic> place, {
-    IconData? icon, 
-    Color? color, 
+    IconData? icon,
+    Color? color,
     String? text,
     Map<String, dynamic>? currentItinerary,
     int savedCount = 0,
@@ -66,7 +66,8 @@ class PlaceDetailBottomSheet extends StatefulWidget {
   State<PlaceDetailBottomSheet> createState() => _PlaceDetailBottomSheetState();
 }
 
-class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with SingleTickerProviderStateMixin {
+class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _reviews = [];
   bool _isLoadingReviews = true;
@@ -99,20 +100,26 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
 
   Future<void> _refreshSavedCount() async {
     if (widget.currentItinerary != null) {
-      final details = await DatabaseService().fetchItineraryById(widget.currentItinerary!['id']);
+      final details = await DatabaseService().fetchItineraryById(
+        widget.currentItinerary!['id'],
+      );
       if (mounted && details != null) {
         int count = 0;
         final targetId = widget.place['id'];
         final savedPlaces = details['savedPlaces'] as List? ?? [];
         final detailsList = details['details'] as List? ?? [];
-        
+
         for (var d in savedPlaces) {
-          if ((d['placeId'] ?? d['place']?['id']) == targetId && (d['section'] != null && d['section'].toString().isNotEmpty)) count++;
+          if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+              (d['section'] != null && d['section'].toString().isNotEmpty))
+            count++;
         }
         for (var d in detailsList) {
-          if ((d['placeId'] ?? d['place']?['id']) == targetId && d['day'] != null) count++;
+          if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+              d['day'] != null)
+            count++;
         }
-        
+
         setState(() {
           _localSavedCount = count;
         });
@@ -124,17 +131,25 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
   Widget build(BuildContext context) {
     IconData? categoryIcon = widget.overrideIcon;
     Color categoryColor = widget.overrideColor ?? const Color(0xFF3B5998);
-    
-    if (widget.overrideColor == null && widget.overrideIcon == null && widget.place['category'] != null) {
+
+    if (widget.overrideColor == null &&
+        widget.overrideIcon == null &&
+        widget.place['category'] != null) {
       final cat = widget.place['category'];
       if (cat['iconCode'] != null) {
         categoryIcon = IconData(cat['iconCode'], fontFamily: 'MaterialIcons');
       }
       if (cat['id'] != null) {
         final List<Color> colors = [
-          const Color(0xFF3B5998), const Color(0xFFE91E63), const Color(0xFF009688), 
-          const Color(0xFFFF9800), const Color(0xFF9C27B0), const Color(0xFF4CAF50),
-          const Color(0xFFF44336), const Color(0xFF673AB7), const Color(0xFF00BCD4)
+          const Color(0xFF3B5998),
+          const Color(0xFFE91E63),
+          const Color(0xFF009688),
+          const Color(0xFFFF9800),
+          const Color(0xFF9C27B0),
+          const Color(0xFF4CAF50),
+          const Color(0xFFF44336),
+          const Color(0xFF673AB7),
+          const Color(0xFF00BCD4),
         ];
         categoryColor = colors[(cat['id'] as num).toInt() % colors.length];
       }
@@ -154,9 +169,14 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
             ),
           ),
         ),
-          // Header
+        // Header
         Padding(
-          padding: const EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 12),
+          padding: const EdgeInsets.only(
+            top: 8,
+            left: 16,
+            right: 16,
+            bottom: 12,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -167,11 +187,19 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                   color: categoryColor,
                   shape: BoxShape.circle,
                   boxShadow: [
-                    BoxShadow(color: categoryColor.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2)),
+                    BoxShadow(
+                      color: categoryColor.withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
                   ],
                 ),
                 alignment: Alignment.center,
-                child: widget.overrideText != null && (categoryIcon == null || categoryIcon.codePoint == Icons.looks_one_rounded.codePoint)
+                child:
+                    widget.overrideText != null &&
+                        (categoryIcon == null ||
+                            categoryIcon.codePoint ==
+                                Icons.looks_one_rounded.codePoint)
                     ? Text(
                         widget.overrideText!,
                         style: const TextStyle(
@@ -191,10 +219,10 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                 child: Text(
                   widget.place['name'] ?? '',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 22,
-                        letterSpacing: -0.5,
-                      ),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 22,
+                    letterSpacing: -0.5,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -206,7 +234,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                 child: IconButton(
                   padding: const EdgeInsets.all(6),
                   constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.close, color: Colors.black54, size: 20),
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.black54,
+                    size: 20,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -221,8 +253,14 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           indicatorColor: AppTheme.primary,
           indicatorWeight: 3,
           indicatorSize: TabBarIndicatorSize.tab,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 15,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
+          ),
           dividerColor: Colors.grey[200],
           tabs: const [
             Tab(text: 'Giới thiệu'),
@@ -248,39 +286,67 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
   }
 
   Widget _buildIntroTab() {
-    final String description = widget.place['description'] ?? widget.place['editorialSummary'] ?? '';
+    final String description =
+        widget.place['description'] ?? widget.place['editorialSummary'] ?? '';
     final double rating = (widget.place['rating'] as num?)?.toDouble() ?? 0.0;
-    final int userRatingCount = (widget.place['userRatingCount'] as num?)?.toInt() ?? 0;
+    final int userRatingCount =
+        (widget.place['userRatingCount'] as num?)?.toInt() ?? 0;
     final String address = widget.place['address'] ?? '';
 
-    final String? phone = widget.place['internationalPhoneNumber'] ?? widget.place['nationalPhoneNumber'] ?? widget.place['phone'] ?? widget.place['phoneNumber'];
-    final String? website = widget.place['websiteUri'] ?? widget.place['website'];
-    
+    final String? phone =
+        widget.place['internationalPhoneNumber'] ??
+        widget.place['nationalPhoneNumber'] ??
+        widget.place['phone'] ??
+        widget.place['phoneNumber'];
+    final String? website =
+        widget.place['websiteUri'] ?? widget.place['website'];
+
     String? openingHours;
-    final hoursRaw = widget.place['regularOpeningHours'] ?? widget.place['openingHours'];
+    final hoursRaw =
+        widget.place['regularOpeningHours'] ?? widget.place['openingHours'];
     if (hoursRaw != null) {
       if (hoursRaw is Map) {
-        if (hoursRaw['weekday_text'] != null && hoursRaw['weekday_text'] is List && hoursRaw['weekday_text'].isNotEmpty) {
+        if (hoursRaw['weekday_text'] != null &&
+            hoursRaw['weekday_text'] is List &&
+            hoursRaw['weekday_text'].isNotEmpty) {
           openingHours = hoursRaw['weekday_text'].first.toString();
           final parts = openingHours.split(RegExp(r':\s+'));
           if (parts.length > 1) {
             openingHours = 'Mở cửa: ${parts.sublist(1).join(': ')}';
           }
         } else {
-          final weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-          final viWeekdays = ['Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy', 'Chủ nhật'];
-          
+          final weekdays = [
+            'monday',
+            'tuesday',
+            'wednesday',
+            'thursday',
+            'friday',
+            'saturday',
+            'sunday',
+          ];
+          final viWeekdays = [
+            'Thứ hai',
+            'Thứ ba',
+            'Thứ tư',
+            'Thứ năm',
+            'Thứ sáu',
+            'Thứ bảy',
+            'Chủ nhật',
+          ];
+
           final todayIdx = DateTime.now().weekday - 1;
           final todayKey = weekdays[todayIdx];
           final viToday = viWeekdays[todayIdx];
-          
+
           List<dynamic>? times = hoursRaw[todayKey] as List<dynamic>?;
           if (times != null && times.length >= 2) {
             openingHours = '$viToday: ${times[0]} - ${times[1]}';
           } else {
             // fallback if today is not available
-            if (hoursRaw['monday'] != null && (hoursRaw['monday'] as List).length >= 2) {
-              openingHours = 'Thứ hai: ${hoursRaw['monday'][0]} - ${hoursRaw['monday'][1]}';
+            if (hoursRaw['monday'] != null &&
+                (hoursRaw['monday'] as List).length >= 2) {
+              openingHours =
+                  'Thứ hai: ${hoursRaw['monday'][0]} - ${hoursRaw['monday'][1]}';
             }
           }
         }
@@ -294,13 +360,19 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
     if (cat != null && cat['name'] != null) {
       subCategories.add(cat['name']);
     }
-    final rawSub = widget.place['subCategories'] ?? widget.place['subcategories'] ?? widget.place['sub_categories'];
+    final rawSub =
+        widget.place['subCategories'] ??
+        widget.place['subcategories'] ??
+        widget.place['sub_categories'];
     if (rawSub is List) subCategories.addAll(rawSub);
 
     String? imageUrl;
-    if (widget.place['image'] != null && widget.place['image'].toString().isNotEmpty) {
+    if (widget.place['image'] != null &&
+        widget.place['image'].toString().isNotEmpty) {
       imageUrl = widget.place['image'];
-    } else if (widget.place['photos'] != null && widget.place['photos'] is List && widget.place['photos'].isNotEmpty) {
+    } else if (widget.place['photos'] != null &&
+        widget.place['photos'] is List &&
+        widget.place['photos'].isNotEmpty) {
       final p = widget.place['photos'][0];
       if (p is Map) {
         imageUrl = p['urlOriginal'] ?? p['urlThumbnail'] ?? p['url'];
@@ -322,7 +394,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                 Expanded(
                   child: Text(
                     'Từ web: $description',
-                    style: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black87),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.6,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
                 if (imageUrl != null) ...[
@@ -331,7 +407,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 4)),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
                       ],
                     ),
                     child: ClipRRect(
@@ -341,32 +421,61 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                         width: 90,
                         height: 90,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
                       ),
                     ),
                   ),
-                ]
+                ],
               ],
             ),
           const SizedBox(height: 16),
           // Action Buttons row 1 (Save, Mark visited)
           Row(
             children: [
-              _localSavedCount > 0 
-                ? _buildActionButton(Icons.bookmark, 'Đã thêm vào $_localSavedCount danh sách', Colors.grey[200]!, Colors.black, suffixIcon: Icons.keyboard_arrow_down, onTap: () async {
-                    if (widget.currentItinerary != null) {
-                      await SaveToTripBottomSheet.show(context, widget.place, onSaved: widget.onTripUpdated ?? () {}, initialItinerary: widget.currentItinerary);
-                      _refreshSavedCount();
-                    }
-                  })
-                : _buildActionButton(Icons.bookmark_border, 'Thêm vào chuyến đi', AppTheme.primary, Colors.white, onTap: () async {
-                    if (widget.currentItinerary != null) {
-                      await SaveToTripBottomSheet.show(context, widget.place, onSaved: widget.onTripUpdated ?? () {}, initialItinerary: widget.currentItinerary);
-                      _refreshSavedCount();
-                    }
-                  }),
+              _localSavedCount > 0
+                  ? _buildActionButton(
+                      Icons.bookmark,
+                      'Đã thêm vào $_localSavedCount danh sách',
+                      Colors.grey[200]!,
+                      Colors.black,
+                      suffixIcon: Icons.keyboard_arrow_down,
+                      onTap: () async {
+                        if (widget.currentItinerary != null) {
+                          await SaveToTripBottomSheet.show(
+                            context,
+                            widget.place,
+                            onSaved: widget.onTripUpdated ?? () {},
+                            initialItinerary: widget.currentItinerary,
+                          );
+                          _refreshSavedCount();
+                        }
+                      },
+                    )
+                  : _buildActionButton(
+                      Icons.bookmark_border,
+                      'Thêm vào chuyến đi',
+                      AppTheme.primary,
+                      Colors.white,
+                      onTap: () async {
+                        if (widget.currentItinerary != null) {
+                          await SaveToTripBottomSheet.show(
+                            context,
+                            widget.place,
+                            onSaved: widget.onTripUpdated ?? () {},
+                            initialItinerary: widget.currentItinerary,
+                          );
+                          _refreshSavedCount();
+                        }
+                      },
+                    ),
               const SizedBox(width: 8),
-              _buildActionButton(Icons.check, 'Đánh dấu ghé thăm', Colors.white, Colors.black, borderColor: Colors.grey[300]),
+              _buildActionButton(
+                Icons.check,
+                'Đánh dấu ghé thăm',
+                Colors.white,
+                Colors.black,
+                borderColor: Colors.grey[300],
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -375,9 +484,20 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildActionButton(Icons.search, 'Hỏi AI', Colors.red[50]!, Colors.red),
+                _buildActionButton(
+                  Icons.search,
+                  'Hỏi AI',
+                  Colors.red[50]!,
+                  Colors.red,
+                ),
                 const SizedBox(width: 8),
-                _buildActionButton(Icons.person, 'Hướng dẫn viên du lịch', Colors.white, Colors.black, borderColor: Colors.grey[300]),
+                _buildActionButton(
+                  Icons.person,
+                  'Hướng dẫn viên du lịch',
+                  Colors.white,
+                  Colors.black,
+                  borderColor: Colors.grey[300],
+                ),
               ],
             ),
           ),
@@ -386,9 +506,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: [
-                ...subCategories.map((t) => _buildTag(t.toString())),
-              ],
+              children: [...subCategories.map((t) => _buildTag(t.toString()))],
             ),
           ),
           const SizedBox(height: 16),
@@ -397,20 +515,46 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
             children: [
               const Icon(Icons.star_rounded, color: Colors.orange, size: 22),
               const SizedBox(width: 8),
-              Text('$rating ($userRatingCount)', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              Text(
+                '$rating ($userRatingCount)',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
               const SizedBox(width: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: Image.asset('assets/images/tripadvisor.jpg', width: 18, height: 18, fit: BoxFit.contain, errorBuilder: (_,__,___) => const Icon(Icons.trip_origin, color: Colors.green, size: 18)),
+                child: Image.asset(
+                  'assets/images/tripadvisor.jpg',
+                  width: 18,
+                  height: 18,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => const Icon(
+                    Icons.trip_origin,
+                    color: Colors.green,
+                    size: 18,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.local_fire_department_rounded, color: Colors.orange[300], size: 22),
+              Icon(
+                Icons.local_fire_department_rounded,
+                color: Colors.orange[300],
+                size: 22,
+              ),
               const SizedBox(width: 10),
-              const Text('Được đề cập trong 6 danh sách khác', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500)),
+              const Text(
+                'Được đề cập trong 6 danh sách khác',
+                style: TextStyle(
+                  color: Colors.blue,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -421,21 +565,23 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
               Expanded(
                 child: GestureDetector(
                   onTap: () async {
-                    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.place['name'] ?? address)}');
+                    final url = Uri.parse(
+                      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.place['name'] ?? address)}',
+                    );
                     if (await canLaunchUrl(url)) await launchUrl(url);
                   },
                   child: Text(
                     address,
-                    style: const TextStyle(
-                      color: Colors.blue,
-                    ),
+                    style: const TextStyle(color: Colors.blue),
                   ),
                 ),
               ),
               GestureDetector(
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: address));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã sao chép địa chỉ')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Đã sao chép địa chỉ')),
+                  );
                 },
                 child: const Icon(Icons.copy, color: Colors.grey, size: 16),
               ),
@@ -465,9 +611,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                     },
                     child: Text(
                       website,
-                      style: const TextStyle(
-                        color: Colors.blue,
-                      ),
+                      style: const TextStyle(color: Colors.blue),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -488,31 +632,56 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           ],
           const SizedBox(height: 24),
           // Open in
-          const Text('Mở trong:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text(
+            'Mở trong:',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _buildOpenInImageButton('assets/images/chi-duong.png', 'Chỉ đường', () async {
-                final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address)}');
-                if (await canLaunchUrl(url)) await launchUrl(url);
-              }),
-              _buildOpenInImageButton('assets/images/googlemap.png', 'Google Maps', () async {
-                final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.place['name'] ?? address)}');
-                if (await canLaunchUrl(url)) await launchUrl(url);
-              }),
-              _buildOpenInImageButton('assets/images/tripadvisor.jpg', 'Tripadvisor', () async {
-                final String? urlString = widget.place['tripadvisorUrl'];
-                if (urlString != null && urlString.isNotEmpty) {
-                  final url = Uri.parse(urlString);
+              _buildOpenInImageButton(
+                'assets/images/chi-duong.png',
+                'Chỉ đường',
+                () async {
+                  final url = Uri.parse(
+                    'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address)}',
+                  );
                   if (await canLaunchUrl(url)) await launchUrl(url);
-                }
-              }),
-              _buildOpenInImageButton('assets/images/google.png', 'Google', () async {
-                final url = Uri.parse('https://www.google.com/search?q=${Uri.encodeComponent(widget.place['name'] ?? '')}');
-                if (await canLaunchUrl(url)) await launchUrl(url);
-              }),
+                },
+              ),
+              _buildOpenInImageButton(
+                'assets/images/googlemap.png',
+                'Google Maps',
+                () async {
+                  final url = Uri.parse(
+                    'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.place['name'] ?? address)}',
+                  );
+                  if (await canLaunchUrl(url)) await launchUrl(url);
+                },
+              ),
+              _buildOpenInImageButton(
+                'assets/images/tripadvisor.jpg',
+                'Tripadvisor',
+                () async {
+                  final String? urlString = widget.place['tripadvisorUrl'];
+                  if (urlString != null && urlString.isNotEmpty) {
+                    final url = Uri.parse(urlString);
+                    if (await canLaunchUrl(url)) await launchUrl(url);
+                  }
+                },
+              ),
+              _buildOpenInImageButton(
+                'assets/images/google.png',
+                'Google',
+                () async {
+                  final url = Uri.parse(
+                    'https://www.google.com/search?q=${Uri.encodeComponent(widget.place['name'] ?? '')}',
+                  );
+                  if (await canLaunchUrl(url)) await launchUrl(url);
+                },
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -531,32 +700,66 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Tại sao bạn nên đi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E1E1E))),
+                const Text(
+                  'Tại sao bạn nên đi',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF1E1E1E),
+                  ),
+                ),
                 const SizedBox(height: 12),
-                _buildNumberedListItem('1', 'Trải nghiệm một chuyến tham quan giàu văn hóa tại một ngôi đền Trung Quốc được bảo tồn tuyệt đẹp'),
-                _buildNumberedListItem('2', 'Chiêm ngưỡng sự kết hợp độc đáo giữa các phong cách kiến trúc Trung Quốc và Việt Nam'),
-                _buildNumberedListItem('3', 'Tìm hiểu về lịch sử, tôn giáo và truyền thống của Việt Nam thông qua các chạm khắc tinh xảo và họa tiết truyền thống.'),
+                _buildNumberedListItem(
+                  '1',
+                  'Trải nghiệm một chuyến tham quan giàu văn hóa tại một ngôi đền Trung Quốc được bảo tồn tuyệt đẹp',
+                ),
+                _buildNumberedListItem(
+                  '2',
+                  'Chiêm ngưỡng sự kết hợp độc đáo giữa các phong cách kiến trúc Trung Quốc và Việt Nam',
+                ),
+                _buildNumberedListItem(
+                  '3',
+                  'Tìm hiểu về lịch sử, tôn giáo và truyền thống của Việt Nam thông qua các chạm khắc tinh xảo và họa tiết truyền thống.',
+                ),
               ],
             ),
           ),
           const SizedBox(height: 24),
           // Things to know
-          const Text('Những điều cần biết trước khi đi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text(
+            'Những điều cần biết trước khi đi',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 12),
-          _buildIconListItem(Icons.lightbulb_outline, 'Hãy ghé thăm trong các lễ hội trăng tròn hoặc ngày Tết để có trải nghiệm nhập vai khi đền rất đông đúc.'),
-          _buildIconListItem(Icons.lightbulb_outline, 'Mua trầm hương xoắn ốc để may mắn như được các du khách khuyên dùng'),
-          _buildIconListItem(Icons.lightbulb_outline, 'Khi quyên góp tại chùa, hãy nhớ ấn nút để thanh toán bằng thẻ.'),
-          _buildIconListItem(Icons.lightbulb_outline, 'Mặc trang phục lịch sự khi vào những không gian linh thiêng như Chùa Ông Cần Thơ'),
+          _buildIconListItem(
+            Icons.lightbulb_outline,
+            'Hãy ghé thăm trong các lễ hội trăng tròn hoặc ngày Tết để có trải nghiệm nhập vai khi đền rất đông đúc.',
+          ),
+          _buildIconListItem(
+            Icons.lightbulb_outline,
+            'Mua trầm hương xoắn ốc để may mắn như được các du khách khuyên dùng',
+          ),
+          _buildIconListItem(
+            Icons.lightbulb_outline,
+            'Khi quyên góp tại chùa, hãy nhớ ấn nút để thanh toán bằng thẻ.',
+          ),
+          _buildIconListItem(
+            Icons.lightbulb_outline,
+            'Mặc trang phục lịch sự khi vào những không gian linh thiêng như Chùa Ông Cần Thơ',
+          ),
           const SizedBox(height: 24),
           // Highlighted Reviews
-          const Text('Đánh giá nổi bật', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text(
+            'Đánh giá nổi bật',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 12),
           if (_isLoadingReviews)
             const Center(child: CircularProgressIndicator())
           else if (_reviews.isEmpty)
             const Text('Chưa có đánh giá nào')
           else
-            ..._reviews.take(2).map((r) => _buildReviewCard(r)).toList(),
+            ..._reviews.take(2).map((r) => _buildReviewCard(r)),
           if (_reviews.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -568,18 +771,32 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                   backgroundColor: Colors.grey[200],
                   foregroundColor: Colors.black,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
                 child: const Text('Xem tất cả đánh giá'),
               ),
             ),
           const SizedBox(height: 24),
           // Mentioned in articles
-          const Text('Được đề cập trong các bài viết', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text(
+            'Được đề cập trong các bài viết',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 12),
-          _buildArticleCard('Top things to do in Can Tho', 'assets/images/tripadvisor.jpg'),
-          _buildArticleCard('10 Must-See Attractions in Can Tho, Vietnam for 2024', 'assets/images/googlemap.png'),
-          _buildArticleCard('Top things to do in Vietnam', 'assets/images/googlemap.png'),
+          _buildArticleCard(
+            'Top things to do in Can Tho',
+            'assets/images/tripadvisor.jpg',
+          ),
+          _buildArticleCard(
+            '10 Must-See Attractions in Can Tho, Vietnam for 2024',
+            'assets/images/googlemap.png',
+          ),
+          _buildArticleCard(
+            'Top things to do in Vietnam',
+            'assets/images/googlemap.png',
+          ),
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: ElevatedButton(
@@ -588,7 +805,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                 backgroundColor: Colors.grey[200],
                 foregroundColor: Colors.black,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
               child: const Text('Xem tất cả các đề cập'),
             ),
@@ -601,9 +820,13 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
 
   Widget _buildReviewsTab() {
     final double rating = (widget.place['rating'] as num?)?.toDouble() ?? 4.2;
-    final int userRatingCount = (widget.place['userRatingCount'] as num?)?.toInt() ?? 156;
-    final String summary = widget.place['editorialSummary'] ?? widget.place['description'] ?? 'Đây là một địa điểm tuyệt vời với nhiều nét độc đáo. Khách tham quan đánh giá cao sự kết hợp kiến trúc lâu đời và không gian thanh bình tại đây.';
-    
+    final int userRatingCount =
+        (widget.place['userRatingCount'] as num?)?.toInt() ?? 156;
+    final String summary =
+        widget.place['editorialSummary'] ??
+        widget.place['description'] ??
+        'Đây là một địa điểm tuyệt vời với nhiều nét độc đáo. Khách tham quan đánh giá cao sự kết hợp kiến trúc lâu đời và không gian thanh bình tại đây.';
+
     // Simulate rating distribution
     int count5 = (userRatingCount * 0.65).toInt();
     int count4 = (userRatingCount * 0.20).toInt();
@@ -622,15 +845,23 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
         children: [
           const Text(
             'Tóm tắt đánh giá AI',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             summary,
-            style: const TextStyle(fontSize: 14, height: 1.5, color: AppTheme.darkText),
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: AppTheme.darkText,
+            ),
           ),
           const SizedBox(height: 24),
-          
+
           // Tripadvisor Rating Card
           Container(
             padding: const EdgeInsets.all(20),
@@ -642,7 +873,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
               ),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
-                BoxShadow(color: const Color(0xFF2B3246).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6)),
+                BoxShadow(
+                  color: const Color(0xFF2B3246).withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
               ],
             ),
             child: Row(
@@ -651,7 +886,12 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                   children: [
                     Text(
                       rating.toStringAsFixed(1),
-                      style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white, height: 1),
+                      style: const TextStyle(
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        height: 1,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -666,25 +906,49 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        rating >= 4.5 ? 'Tuyệt vời' : (rating >= 4.0 ? 'Rất tốt' : (rating >= 3.0 ? 'Khá tốt' : 'Trung bình')),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        rating >= 4.5
+                            ? 'Tuyệt vời'
+                            : (rating >= 4.0
+                                  ? 'Rất tốt'
+                                  : (rating >= 3.0 ? 'Khá tốt' : 'Trung bình')),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '$userRatingCount đánh giá',
-                        style: const TextStyle(fontSize: 13, color: Colors.white70),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.white70,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(4),
-                            child: Image.asset('assets/images/tripadvisor.jpg', width: 16, height: 16, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.circle, size: 16, color: Colors.green)),
+                            child: Image.asset(
+                              'assets/images/tripadvisor.jpg',
+                              width: 16,
+                              height: 16,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const Icon(
+                                Icons.circle,
+                                size: 16,
+                                color: Colors.green,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 6),
                           const Text(
                             'Từ Tripadvisor',
-                            style: TextStyle(fontSize: 13, color: Colors.white70),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white70,
+                            ),
                           ),
                         ],
                       ),
@@ -697,12 +961,37 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           const SizedBox(height: 24),
 
           // Rating Bars
-          _buildRatingBar('5 sao', count5, userRatingCount, const Color(0xFFF9A826)),
-          _buildRatingBar('4 sao', count4, userRatingCount, const Color(0xFFF9A826)),
-          _buildRatingBar('3 sao', count3, userRatingCount, const Color(0xFFF9A826)),
-          _buildRatingBar('2 sao', count2, userRatingCount, const Color(0xFFE0E0E0)),
-          _buildRatingBar('1 sao', count1, userRatingCount, const Color(0xFFE0E0E0)),
-          
+          _buildRatingBar(
+            '5 sao',
+            count5,
+            userRatingCount,
+            const Color(0xFFF9A826),
+          ),
+          _buildRatingBar(
+            '4 sao',
+            count4,
+            userRatingCount,
+            const Color(0xFFF9A826),
+          ),
+          _buildRatingBar(
+            '3 sao',
+            count3,
+            userRatingCount,
+            const Color(0xFFF9A826),
+          ),
+          _buildRatingBar(
+            '2 sao',
+            count2,
+            userRatingCount,
+            const Color(0xFFE0E0E0),
+          ),
+          _buildRatingBar(
+            '1 sao',
+            count1,
+            userRatingCount,
+            const Color(0xFFE0E0E0),
+          ),
+
           const SizedBox(height: 24),
           const Divider(),
           const SizedBox(height: 16),
@@ -711,10 +1000,18 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           if (_isLoadingReviews)
             const Center(child: CircularProgressIndicator())
           else if (_reviews.isEmpty)
-            const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Text('Chưa có đánh giá nào', style: TextStyle(color: Colors.grey))))
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  'Chưa có đánh giá nào',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            )
           else
-            ..._reviews.map((r) => _buildReviewCard(r)).toList(),
-            
+            ..._reviews.map((r) => _buildReviewCard(r)),
+
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -728,9 +1025,18 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
               },
               icon: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.asset('assets/images/tripadvisor.jpg', width: 24, height: 24, errorBuilder: (_,__,___) => const Icon(Icons.open_in_browser, size: 24)),
+                child: Image.asset(
+                  'assets/images/tripadvisor.jpg',
+                  width: 24,
+                  height: 24,
+                  errorBuilder: (_, _, _) =>
+                      const Icon(Icons.open_in_browser, size: 24),
+                ),
               ),
-              label: const Text('Đánh giá trên Tripadvisor', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              label: const Text(
+                'Đánh giá trên Tripadvisor',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF3F4F6),
                 foregroundColor: AppTheme.darkText,
@@ -758,7 +1064,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
             width: 45,
             child: Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.darkText),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: AppTheme.darkText,
+              ),
             ),
           ),
           Expanded(
@@ -824,7 +1134,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           child: Image.network(
             photoUrl,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+            errorBuilder: (_, _, _) => Container(
               color: Colors.grey[200],
               child: const Icon(Icons.broken_image, color: Colors.grey),
             ),
@@ -834,7 +1144,15 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
     );
   }
 
-  Widget _buildActionButton(IconData icon, String label, Color bgColor, Color textColor, {Color? borderColor, VoidCallback? onTap, IconData? suffixIcon}) {
+  Widget _buildActionButton(
+    IconData icon,
+    String label,
+    Color bgColor,
+    Color textColor, {
+    Color? borderColor,
+    VoidCallback? onTap,
+    IconData? suffixIcon,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -852,7 +1170,15 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
             children: [
               Icon(icon, size: 18, color: textColor),
               if (label.isNotEmpty) const SizedBox(width: 6),
-              if (label.isNotEmpty) Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 13)),
+              if (label.isNotEmpty)
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
               if (suffixIcon != null) ...[
                 const SizedBox(width: 4),
                 Icon(suffixIcon, size: 18, color: textColor),
@@ -873,11 +1199,23 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.grey[200]!),
       ),
-      child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87)),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: Colors.black87,
+        ),
+      ),
     );
   }
 
-  Widget _buildOpenInButton(IconData icon, String label, Color iconColor, VoidCallback onTap) {
+  Widget _buildOpenInButton(
+    IconData icon,
+    String label,
+    Color iconColor,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
@@ -888,7 +1226,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Row(
@@ -896,14 +1238,21 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           children: [
             Icon(icon, size: 16, color: iconColor),
             const SizedBox(width: 6),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildOpenInImageButton(String imagePath, String label, VoidCallback onTap) {
+  Widget _buildOpenInImageButton(
+    String imagePath,
+    String label,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(24),
@@ -914,15 +1263,28 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(imagePath, width: 16, height: 16, fit: BoxFit.contain, errorBuilder: (_,__,___) => const Icon(Icons.link, size: 16)),
+            Image.asset(
+              imagePath,
+              width: 16,
+              height: 16,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const Icon(Icons.link, size: 16),
+            ),
             const SizedBox(width: 6),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ],
         ),
       ),
@@ -935,9 +1297,21 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(number, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFB8A9E6))),
+          Text(
+            number,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFFB8A9E6),
+            ),
+          ),
           const SizedBox(width: 16),
-          Expanded(child: Padding(padding: const EdgeInsets.only(top: 4), child: Text(text, style: const TextStyle(height: 1.4)))),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(text, style: const TextStyle(height: 1.4)),
+            ),
+          ),
         ],
       ),
     );
@@ -959,8 +1333,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
 
   Widget _buildReviewCard(Map<String, dynamic> review) {
     final String authorName = review['authorName'] ?? 'Người dùng Tripadvisor';
-    final String? authorPhoto = review['authorAvatar'] ?? review['authorPhotoUrl'] ?? review['profilePhotoUrl'];
-    
+    final String? authorPhoto =
+        review['authorAvatar'] ??
+        review['authorPhotoUrl'] ??
+        review['profilePhotoUrl'];
+
     String dateString = 'Nổi bật';
     if (review['createdAt'] != null) {
       try {
@@ -979,7 +1356,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -990,11 +1371,18 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
               CircleAvatar(
                 radius: 16,
                 backgroundColor: Colors.grey[200],
-                backgroundImage: authorPhoto != null && authorPhoto.isNotEmpty ? NetworkImage(authorPhoto) : null,
+                backgroundImage: authorPhoto != null && authorPhoto.isNotEmpty
+                    ? NetworkImage(authorPhoto)
+                    : null,
                 child: authorPhoto == null || authorPhoto.isEmpty
                     ? Text(
-                        authorName.isNotEmpty ? authorName[0].toUpperCase() : 'U',
-                        style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold),
+                        authorName.isNotEmpty
+                            ? authorName[0].toUpperCase()
+                            : 'U',
+                        style: const TextStyle(
+                          color: Colors.black54,
+                          fontWeight: FontWeight.bold,
+                        ),
                       )
                     : null,
               ),
@@ -1005,7 +1393,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                   children: [
                     Text(
                       authorName,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.darkText),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: AppTheme.darkText,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1014,7 +1406,10 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                       children: [
                         Text(
                           '$dateString ',
-                          style: const TextStyle(fontSize: 13, color: Colors.grey),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
                         ),
                         const Text(
                           'từ Tripadvisor ',
@@ -1022,7 +1417,13 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
                         ),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
-                          child: Image.asset('assets/images/tripadvisor.jpg', width: 14, height: 14, fit: BoxFit.cover, errorBuilder: (_,__,___) => const SizedBox()),
+                          child: Image.asset(
+                            'assets/images/tripadvisor.jpg',
+                            width: 14,
+                            height: 14,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const SizedBox(),
+                          ),
                         ),
                       ],
                     ),
@@ -1034,7 +1435,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           const SizedBox(height: 12),
           Text(
             review['comment'] ?? '',
-            style: const TextStyle(color: Colors.black87, height: 1.5, fontSize: 14),
+            style: const TextStyle(
+              color: Colors.black87,
+              height: 1.5,
+              fontSize: 14,
+            ),
           ),
         ],
       ),
@@ -1055,7 +1460,10 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet> with Si
           CircleAvatar(
             radius: 12,
             backgroundColor: Colors.transparent,
-            child: Image.asset(imagePath, errorBuilder: (_,__,___) => const Icon(Icons.article, size: 16)),
+            child: Image.asset(
+              imagePath,
+              errorBuilder: (_, _, _) => const Icon(Icons.article, size: 16),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(child: Text(title, style: const TextStyle(fontSize: 14))),

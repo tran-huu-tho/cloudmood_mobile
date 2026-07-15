@@ -7,6 +7,7 @@ import '../services/database_service.dart';
 import '../models/user.dart';
 import '../widgets/avatar_image.dart';
 import 'login_screen.dart';
+import 'register_screen.dart';
 import 'create_itinerary_wizard_sheet.dart';
 import 'trip_overview_screen.dart';
 
@@ -651,7 +652,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (context) =>
-                                        const CloudmoodLoginScreen(),
+                                        const CloudmoodRegisterScreen(),
                                   ),
                                 );
                               },

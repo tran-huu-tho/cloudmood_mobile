@@ -10,7 +10,8 @@ class ItineraryStyleSheet extends StatefulWidget {
   final Function(
     List<Map<String, dynamic>> newDetails,
     Map<int, Color> newColors,
-  ) onSaved;
+  )
+  onSaved;
 
   const ItineraryStyleSheet({
     super.key,
@@ -49,11 +50,25 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
   late List<Map<String, dynamic>> _details;
   late Map<int, Color> _dayColors;
   late String _activeDayLabel;
-  List<ItineraryFlatItem> _flattenedItems = [];
+  final List<ItineraryFlatItem> _flattenedItems = [];
 
   final List<Color> _colors = [
-    Colors.green, Colors.tealAccent, Colors.lightBlue, Colors.blue, Colors.deepPurple, Colors.pinkAccent, Colors.orange, Colors.orangeAccent,
-    Colors.green[800]!, Colors.teal[800]!, Colors.blue[800]!, Colors.indigo[800]!, Colors.purple[800]!, Colors.pink[800]!, Colors.brown, Colors.brown[700]!,
+    Colors.green,
+    Colors.tealAccent,
+    Colors.lightBlue,
+    Colors.blue,
+    Colors.deepPurple,
+    Colors.pinkAccent,
+    Colors.orange,
+    Colors.orangeAccent,
+    Colors.green[800]!,
+    Colors.teal[800]!,
+    Colors.blue[800]!,
+    Colors.indigo[800]!,
+    Colors.purple[800]!,
+    Colors.pink[800]!,
+    Colors.brown,
+    Colors.brown[700]!,
   ];
 
   Color _selectedColor = Colors.indigoAccent;
@@ -65,8 +80,9 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
     _daysList = List.generate(widget.daysCount, (i) => 'Ngày ${i + 1}');
     _details = List.from(widget.details);
     _dayColors = Map.from(widget.dayColors);
-    
-    if (widget.initialDayIndex >= 0 && widget.initialDayIndex < _daysList.length) {
+
+    if (widget.initialDayIndex >= 0 &&
+        widget.initialDayIndex < _daysList.length) {
       _activeDayLabel = _daysList[widget.initialDayIndex];
     } else {
       _activeDayLabel = _daysList.isNotEmpty ? _daysList.first : 'Ngày 1';
@@ -81,16 +97,18 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
   void _buildFlattenedItems() {
     _flattenedItems.clear();
     for (var dayLabel in _daysList) {
-      _flattenedItems.add(ItineraryFlatItem(
-        id: 'header_$dayLabel',
-        type: 'header',
-        title: dayLabel,
-        dayLabel: dayLabel,
-        rawData: {},
-      ));
+      _flattenedItems.add(
+        ItineraryFlatItem(
+          id: 'header_$dayLabel',
+          type: 'header',
+          title: dayLabel,
+          dayLabel: dayLabel,
+          rawData: {},
+        ),
+      );
 
       final int dayIdx = int.parse(dayLabel.replaceAll('Ngày ', ''));
-      
+
       // Items for this day (from _details)
       final items = _details.where((d) => d['day'] == dayIdx).toList();
       for (var d in items) {
@@ -103,22 +121,26 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
           } else {
             displayTitle = text.isEmpty ? 'Ghi chú' : text;
           }
-          _flattenedItems.add(ItineraryFlatItem(
-            id: 'note_${d['id']}',
-            type: 'note',
-            title: displayTitle,
-            dayLabel: dayLabel,
-            rawData: d,
-          ));
+          _flattenedItems.add(
+            ItineraryFlatItem(
+              id: 'note_${d['id']}',
+              type: 'note',
+              title: displayTitle,
+              dayLabel: dayLabel,
+              rawData: d,
+            ),
+          );
         } else {
           final pName = d['place']?['name'] ?? 'Địa điểm';
-          _flattenedItems.add(ItineraryFlatItem(
-            id: 'place_${d['id']}',
-            type: 'place',
-            title: pName,
-            dayLabel: dayLabel,
-            rawData: d,
-          ));
+          _flattenedItems.add(
+            ItineraryFlatItem(
+              id: 'place_${d['id']}',
+              type: 'place',
+              title: pName,
+              dayLabel: dayLabel,
+              rawData: d,
+            ),
+          );
         }
       }
     }
@@ -142,10 +164,13 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
           currentSortOrder = 0;
         } else {
           if (currentDayLabel != null) {
-            final int dayIdx = int.parse(currentDayLabel.replaceAll('Ngày ', ''));
+            final int dayIdx = int.parse(
+              currentDayLabel.replaceAll('Ngày ', ''),
+            );
             final raw = Map<String, dynamic>.from(item.rawData);
             raw['sortOrder'] = currentSortOrder++;
-            raw['day'] = dayIdx; // Works for both places and notes since both use 'day' column now!
+            raw['day'] =
+                dayIdx; // Works for both places and notes since both use 'day' column now!
             newDetails.add(raw);
           }
         }
@@ -227,7 +252,13 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
               ),
               TextButton(
                 onPressed: _handleSave,
-                child: const Text('Hoàn thành', style: TextStyle(color: AppTheme.subtitleText, fontWeight: FontWeight.normal)),
+                child: const Text(
+                  'Hoàn thành',
+                  style: TextStyle(
+                    color: AppTheme.subtitleText,
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
               ),
             ],
           ),
@@ -246,17 +277,29 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                     child: Container(
                       margin: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
+                        color: _selectedTabIndex == 0
+                            ? Colors.white
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(6),
                         boxShadow: _selectedTabIndex == 0
-                            ? [const BoxShadow(color: Colors.black12, blurRadius: 4)]
+                            ? [
+                                const BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 4,
+                                ),
+                              ]
                             : null,
                       ),
                       alignment: Alignment.center,
-                      child: Text('Ngày', style: TextStyle(
-                        fontWeight: _selectedTabIndex == 0 ? FontWeight.bold : FontWeight.normal,
-                        color: AppTheme.darkText,
-                      )),
+                      child: Text(
+                        'Ngày',
+                        style: TextStyle(
+                          fontWeight: _selectedTabIndex == 0
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -266,17 +309,29 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                     child: Container(
                       margin: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
+                        color: _selectedTabIndex == 1
+                            ? Colors.white
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(6),
                         boxShadow: _selectedTabIndex == 1
-                            ? [const BoxShadow(color: Colors.black12, blurRadius: 4)]
+                            ? [
+                                const BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 4,
+                                ),
+                              ]
                             : null,
                       ),
                       alignment: Alignment.center,
-                      child: Text('Địa điểm', style: TextStyle(
-                        fontWeight: _selectedTabIndex == 1 ? FontWeight.bold : FontWeight.normal,
-                        color: AppTheme.darkText,
-                      )),
+                      child: Text(
+                        'Địa điểm',
+                        style: TextStyle(
+                          fontWeight: _selectedTabIndex == 1
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -307,9 +362,11 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                         final index = entry.key;
                         final dayLabel = entry.value;
                         final isSelected = dayLabel == _activeDayLabel;
-                        
-                        final oldDayIdx = int.parse(dayLabel.replaceAll('Ngày ', '')) - 1;
-                        final displayColor = _dayColors[oldDayIdx] ?? AppTheme.primary;
+
+                        final oldDayIdx =
+                            int.parse(dayLabel.replaceAll('Ngày ', '')) - 1;
+                        final displayColor =
+                            _dayColors[oldDayIdx] ?? AppTheme.primary;
 
                         return GestureDetector(
                           key: ValueKey('tab0_$dayLabel'),
@@ -323,24 +380,34 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: isSelected ? _selectedColor.withOpacity(0.1) : Colors.grey[50],
+                              color: isSelected
+                                  ? _selectedColor.withValues(alpha: 0.1)
+                                  : Colors.grey[50],
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: isSelected ? _selectedColor.withOpacity(0.3) : Colors.transparent,
+                                color: isSelected
+                                    ? _selectedColor.withValues(alpha: 0.3)
+                                    : Colors.transparent,
                               ),
                             ),
                             child: Row(
                               children: [
                                 CircleAvatar(
                                   backgroundColor: displayColor,
-                                  child: const Icon(Icons.calendar_today_rounded, color: Colors.white, size: 20),
+                                  child: const Icon(
+                                    Icons.calendar_today_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     dayLabel,
                                     style: TextStyle(
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
                                       fontSize: 16,
                                       color: AppTheme.darkText,
                                     ),
@@ -348,7 +415,10 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                                 ),
                                 ReorderableDragStartListener(
                                   index: index,
-                                  child: const Icon(Icons.drag_indicator, color: AppTheme.subtitleText),
+                                  child: const Icon(
+                                    Icons.drag_indicator,
+                                    color: AppTheme.subtitleText,
+                                  ),
                                 ),
                               ],
                             ),
@@ -357,25 +427,45 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-                    const Text('Màu sắc', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const Text(
+                      'Màu sắc',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 12,
                       runSpacing: 12,
-                      children: _colors.map((c) => GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedColor = c;
-                            final activeDayIdx = int.parse(_activeDayLabel.replaceAll('Ngày ', '')) - 1;
-                            _dayColors[activeDayIdx] = c;
-                          });
-                        },
-                        child: CircleAvatar(
-                          radius: 18,
-                          backgroundColor: c,
-                          child: _selectedColor.value == c.value ? const Icon(Icons.check, color: Colors.white, size: 20) : null,
-                        ),
-                      )).toList(),
+                      children: _colors
+                          .map(
+                            (c) => GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedColor = c;
+                                  final activeDayIdx =
+                                      int.parse(
+                                        _activeDayLabel.replaceAll('Ngày ', ''),
+                                      ) -
+                                      1;
+                                  _dayColors[activeDayIdx] = c;
+                                });
+                              },
+                              child: CircleAvatar(
+                                radius: 18,
+                                backgroundColor: c,
+                                child: _selectedColor.toARGB32() == c.toARGB32()
+                                    ? const Icon(
+                                        Icons.check,
+                                        color: Colors.white,
+                                        size: 20,
+                                      )
+                                    : null,
+                              ),
+                            ),
+                          )
+                          .toList(),
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -399,7 +489,11 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                       padding: const EdgeInsets.only(top: 16, bottom: 8),
                       child: Text(
                         item.title,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.darkText),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppTheme.darkText,
+                        ),
                       ),
                     );
                   } else {
@@ -414,7 +508,9 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                       child: Row(
                         children: [
                           Icon(
-                            item.type == 'place' ? Icons.location_on_rounded : Icons.description_outlined,
+                            item.type == 'place'
+                                ? Icons.location_on_rounded
+                                : Icons.description_outlined,
                             color: AppTheme.subtitleText,
                             size: 18,
                           ),
@@ -424,12 +520,20 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                               item.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 14, color: AppTheme.darkText, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.darkText,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                           ReorderableDragStartListener(
                             index: index,
-                            child: const Icon(Icons.drag_indicator, color: AppTheme.subtitleText, size: 20),
+                            child: const Icon(
+                              Icons.drag_indicator,
+                              color: AppTheme.subtitleText,
+                              size: 20,
+                            ),
                           ),
                         ],
                       ),
