@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
@@ -54,28 +55,262 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
     super.dispose();
   }
 
+  // Show OTP Verification Sheet
+  void _showOtpVerificationSheet(String email) {
+    final otpController = TextEditingController();
+    bool isVerifying = false;
+    String? otpError;
+    int cooldownSeconds = 45;
+    Timer? cooldownTimer;
+
+    void startCooldown(StateSetter setModalState) {
+      cooldownSeconds = 45;
+      cooldownTimer?.cancel();
+      cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (cooldownSeconds > 0) {
+          setModalState(() {
+            cooldownSeconds--;
+          });
+        } else {
+          cooldownTimer?.cancel();
+        }
+      });
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // Start the timer on initial load of the sheet
+            if (cooldownTimer == null) {
+              startCooldown(setModalState);
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    topRight: Radius.circular(28),
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Handle line
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Icon(
+                      Icons.mark_email_read_rounded,
+                      color: AppTheme.primary,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Xác thực Email',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Chúng tôi đã gửi mã xác thực gồm 6 chữ số tới email:',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.subtitleText, fontSize: 13),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      email,
+                      style: const TextStyle(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // OTP Text Field
+                    TextField(
+                      controller: otpController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 8,
+                        color: AppTheme.darkText,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '000000',
+                        hintStyle: TextStyle(
+                          color: AppTheme.hintText.withOpacity(0.5),
+                          letterSpacing: 8,
+                        ),
+                        counterText: '',
+                        errorText: otpError,
+                        filled: true,
+                        fillColor: AppTheme.surfaceVariant,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (val) {
+                        if (otpError != null) {
+                          setModalState(() => otpError = null);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: isVerifying ? null : () => Navigator.of(context).pop(),
+                            child: const Text('Hủy'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1E293B),
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: isVerifying
+                                ? null
+                                : () async {
+                                    final code = otpController.text.trim();
+                                    if (code.length != 6) {
+                                      setModalState(() {
+                                        otpError = 'Vui lòng nhập đúng 6 chữ số.';
+                                      });
+                                      return;
+                                    }
+
+                                    setModalState(() => isVerifying = true);
+                                    final res = await _authService.verifyRegisterCode(
+                                      email: email,
+                                      fullName: _nameController.text.trim(),
+                                      password: _passwordController.text,
+                                      code: code,
+                                    );
+                                    setModalState(() => isVerifying = false);
+
+                                    if (res['success'] as bool) {
+                                      if (mounted) {
+                                        Navigator.of(context).pop(); // dismiss sheet
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(res['message'] as String),
+                                            backgroundColor: AppTheme.green,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                        Navigator.of(context).pop(); // dismiss register page
+                                      }
+                                    } else {
+                                      setModalState(() {
+                                        otpError = res['message'] as String;
+                                      });
+                                    }
+                                  },
+                            child: isVerifying
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Xác nhận'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Resend button
+                    TextButton(
+                      onPressed: (isVerifying || cooldownSeconds > 0)
+                          ? null
+                          : () async {
+                              startCooldown(setModalState);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Đang gửi lại mã xác thực...'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                              await _authService.sendRegisterCode(email: email);
+                            },
+                      child: Text(
+                        cooldownSeconds > 0 ? 'Gửi lại mã (${cooldownSeconds}s)' : 'Gửi lại mã',
+                        style: TextStyle(
+                          color: cooldownSeconds > 0 ? AppTheme.subtitleText : AppTheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      cooldownTimer?.cancel();
+    });
+  }
+
   // Handle register submission
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    final response = await _authService.register(
-      fullName: _nameController.text.trim(),
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
+    final email = _emailController.text.trim();
+    final response = await _authService.sendRegisterCode(
+      email: email,
     );
     setState(() => _isLoading = false);
 
     if (mounted) {
       if (response['success'] as bool) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] as String),
-            backgroundColor: AppTheme.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Navigator.of(context).pop();
+        _showOtpVerificationSheet(email);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -332,8 +567,14 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                                 if (value == null || value.isEmpty) {
                                   return 'Vui lòng nhập mật khẩu.';
                                 }
-                                if (value.length < 6) {
-                                  return 'Mật khẩu phải chứa ít nhất 6 ký tự.';
+                                if (value.length < 8) {
+                                  return 'Mật khẩu phải có ít nhất 8 ký tự.';
+                                }
+                                if (!value.contains(RegExp(r'[A-Z]'))) {
+                                  return 'Mật khẩu phải có ít nhất 1 chữ viết hoa.';
+                                }
+                                if (!value.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) {
+                                  return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt.';
                                 }
                                 return null;
                               },
@@ -388,38 +629,6 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 14),
-
-                            // Remember me checkbox
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: Checkbox(
-                                    value: _rememberMe,
-                                    activeColor: const Color(0xFF1E293B),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    side: BorderSide(
-                                      color: Colors.black.withOpacity(0.2),
-                                      width: 1.5,
-                                    ),
-                                    onChanged: (value) => setState(() => _rememberMe = value ?? false),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Ghi nhớ đăng nhập',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: AppTheme.subtitleText,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
                             const SizedBox(height: 24),
 
                             // Sign Up Button
@@ -454,123 +663,6 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                                         ),
                                       ),
                               ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Or login with divider
-                            Row(
-                              children: [
-                                Expanded(child: Divider(color: Colors.black.withOpacity(0.06), thickness: 1.5)),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  child: Text(
-                                    'Hoặc đăng ký bằng',
-                                    style: TextStyle(
-                                      color: Colors.black.withOpacity(0.35),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(child: Divider(color: Colors.black.withOpacity(0.06), thickness: 1.5)),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Social login buttons
-                            Row(
-                              children: [
-                                // Google Button
-                                Expanded(
-                                  child: SizedBox(
-                                    height: 52,
-                                    child: OutlinedButton(
-                                      style: OutlinedButton.styleFrom(
-                                        backgroundColor: Colors.white,
-                                        foregroundColor: AppTheme.darkText,
-                                        side: BorderSide(color: Colors.black.withOpacity(0.06), width: 1.5),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                      ),
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Đăng ký bằng Google sẽ sớm ra mắt!'),
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
-                                      },
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Image.asset(
-                                            'assets/images/google.png',
-                                            height: 20,
-                                            errorBuilder: (c, e, s) => Image.network(
-                                              'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
-                                              height: 20,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          const Text(
-                                            'Google',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                              fontFamily: 'SDK_SC_Web-Heavy',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                // Facebook Button
-                                Expanded(
-                                  child: SizedBox(
-                                    height: 52,
-                                    child: OutlinedButton(
-                                      style: OutlinedButton.styleFrom(
-                                        backgroundColor: Colors.white,
-                                        foregroundColor: AppTheme.darkText,
-                                        side: BorderSide(color: Colors.black.withOpacity(0.06), width: 1.5),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                      ),
-                                      onPressed: () {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Đăng ký bằng Facebook sẽ sớm ra mắt!'),
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
-                                      },
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(
-                                            Icons.facebook,
-                                            color: Color(0xFF1877F2),
-                                            size: 22,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          const Text(
-                                            'Facebook',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                              fontFamily: 'SDK_SC_Web-Heavy',
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ),
                             const SizedBox(height: 36),
 

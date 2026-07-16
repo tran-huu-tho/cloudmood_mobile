@@ -380,7 +380,13 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                     ),
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Nhập mật khẩu mới.';
-                      if (v.length < 6) return 'Ít nhất 6 ký tự.';
+                      if (v.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự.';
+                      if (!v.contains(RegExp(r'[A-Z]'))) {
+                        return 'Mật khẩu phải có ít nhất 1 chữ viết hoa.';
+                      }
+                      if (!v.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) {
+                        return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt.';
+                      }
                       return null;
                     },
                   ),
@@ -887,6 +893,21 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     widget.user.fullName,
                     widget.user.avatar ?? '',
                   ),
+                ),
+                IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.logout_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                  onPressed: widget.onLogout,
                 ),
                 const SizedBox(width: 8),
               ],

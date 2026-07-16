@@ -46,6 +46,95 @@ class AuthService {
     }
   }
 
+  // Send 6-digit verification code to register email
+  Future<Map<String, dynamic>> sendRegisterCode({required String email}) async {
+    try {
+      final response = await ApiClient.post('/auth/register/send-code', body: {
+        'email': email,
+      });
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (data['success'] == true) {
+          return {'success': true, 'message': data['message'] ?? 'Mã xác thực đã được gửi!'};
+        }
+      }
+      return {'success': false, 'message': data['message'] ?? 'Gửi mã xác thực thất bại.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối máy chủ: $e'};
+    }
+  }
+
+  // Verify 6-digit registration code to create account
+  Future<Map<String, dynamic>> verifyRegisterCode({
+    required String email,
+    required String fullName,
+    required String password,
+    required String code,
+  }) async {
+    try {
+      final response = await ApiClient.post('/auth/register/verify-code', body: {
+        'email': email,
+        'fullName': fullName,
+        'password': password,
+        'code': code,
+      });
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (data['success'] == true) {
+          final profile = UserModel.fromMap(data['user']);
+          currentUser.value = profile;
+          await _saveLocalSession(profile, data['token']);
+          return {'success': true, 'message': 'Đăng ký tài khoản thành công!'};
+        }
+      }
+      return {'success': false, 'message': data['message'] ?? 'Xác thực mã thất bại.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối máy chủ: $e'};
+    }
+  }
+
+  // Send 6-digit verification code for forgot password
+  Future<Map<String, dynamic>> sendForgotPasswordCode({required String email}) async {
+    try {
+      final response = await ApiClient.post('/auth/forgot-password/send-code', body: {
+        'email': email,
+      });
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (data['success'] == true) {
+          return {'success': true, 'message': data['message'] ?? 'Mã xác thực đã được gửi!'};
+        }
+      }
+      return {'success': false, 'message': data['message'] ?? 'Gửi mã xác thực thất bại.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối máy chủ: $e'};
+    }
+  }
+
+  // Reset password using email, code, and new password
+  Future<Map<String, dynamic>> resetForgotPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await ApiClient.post('/auth/forgot-password/reset', body: {
+        'email': email,
+        'code': code,
+        'newPassword': newPassword,
+      });
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (data['success'] == true) {
+          return {'success': true, 'message': data['message'] ?? 'Đặt lại mật khẩu thành công!'};
+        }
+      }
+      return {'success': false, 'message': data['message'] ?? 'Đổi mật khẩu thất bại.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối máy chủ: $e'};
+    }
+  }
+
   // Login with email and password
   Future<Map<String, dynamic>> login({
     required String email,
@@ -73,8 +162,65 @@ class AuthService {
   }
 
   // Google Sign-In
-  Future<Map<String, dynamic>> loginWithGoogle() async {
-    return {'success': false, 'message': 'Google Sign-In hiện chưa được hỗ trợ.'};
+  Future<Map<String, dynamic>> loginWithGoogle({
+    required String email,
+    required String fullName,
+    String? avatarUrl,
+    String? token,
+  }) async {
+    try {
+      final response = await ApiClient.post('/auth/social-login', body: {
+        'email': email,
+        'fullName': fullName,
+        if (avatarUrl != null) 'avatarUrl': avatarUrl,
+        'provider': 'google.com',
+        'token': token ?? 'mock-google-token-${DateTime.now().millisecondsSinceEpoch}',
+      });
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (data['success'] == true) {
+          final profile = UserModel.fromMap(data['user']);
+          currentUser.value = profile;
+          await _saveLocalSession(profile, data['token']);
+          return {'success': true, 'message': data['message'] ?? 'Đăng nhập Google thành công!'};
+        }
+      }
+      return {'success': false, 'message': data['message'] ?? 'Đăng nhập Google thất bại.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối máy chủ: $e'};
+    }
+  }
+
+  // Facebook Sign-In
+  Future<Map<String, dynamic>> loginWithFacebook({
+    required String email,
+    required String fullName,
+    String? avatarUrl,
+    String? token,
+  }) async {
+    try {
+      final response = await ApiClient.post('/auth/social-login', body: {
+        'email': email,
+        'fullName': fullName,
+        if (avatarUrl != null) 'avatarUrl': avatarUrl,
+        'provider': 'facebook.com',
+        'token': token ?? 'mock-facebook-token-${DateTime.now().millisecondsSinceEpoch}',
+      });
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (data['success'] == true) {
+          final profile = UserModel.fromMap(data['user']);
+          currentUser.value = profile;
+          await _saveLocalSession(profile, data['token']);
+          return {'success': true, 'message': data['message'] ?? 'Đăng nhập Facebook thành công!'};
+        }
+      }
+      return {'success': false, 'message': data['message'] ?? 'Đăng nhập Facebook thất bại.'};
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối máy chủ: $e'};
+    }
   }
 
   // Update user profile
