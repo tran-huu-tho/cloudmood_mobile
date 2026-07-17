@@ -1192,14 +1192,7 @@ class CreateMenuOverlay extends StatelessWidget {
                                 actionText: 'Viết cẩm nang →',
                                 actionColor: AppTheme.accent,
                                 onTap: () {
-                                  Navigator.of(context).pop();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Mở màn hình soạn thảo cẩm nang du lịch...',
-                                      ),
-                                    ),
-                                  );
+                                  Navigator.of(context).pop('create_guide');
                                 },
                               ),
                             ],

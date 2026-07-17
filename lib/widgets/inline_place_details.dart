@@ -6,8 +6,11 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/database_service.dart';
+import '../utils/time_utils.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'place_detail_bottom_sheet.dart';
+import 'expandable_opening_hours.dart';
 
 class InlinePlaceWhiteCardExtension extends StatefulWidget {
   final Map<String, dynamic> detail;
@@ -528,44 +531,7 @@ class InlinePlaceBottomInfo extends StatelessWidget {
 
     String hoursText = '';
     if (place['openingHours'] != null) {
-      dynamic hoursRaw = place['openingHours'];
-      if (hoursRaw is String) {
-        try {
-          hoursRaw = jsonDecode(hoursRaw);
-        } catch (_) {}
-      }
-      if (hoursRaw is Map) {
-        if (hoursRaw['weekday_text'] != null &&
-            hoursRaw['weekday_text'] is List &&
-            hoursRaw['weekday_text'].isNotEmpty) {
-          hoursText = hoursRaw['weekday_text'].first.toString();
-        } else {
-          final weekdays = [
-            'monday',
-            'tuesday',
-            'wednesday',
-            'thursday',
-            'friday',
-            'saturday',
-            'sunday',
-          ];
-          final todayIdx = DateTime.now().weekday - 1;
-          final todayKey = weekdays[todayIdx];
-          List<dynamic>? times = hoursRaw[todayKey] as List<dynamic>?;
-          if (times == null || times.length < 2) {
-            times =
-                hoursRaw['monday'] as List<dynamic>? ??
-                hoursRaw['sunday'] as List<dynamic>?;
-          }
-          if (times != null && times.length >= 2) {
-            hoursText = 'Hôm nay: ${times[0]} - ${times[1]}';
-          } else {
-            hoursText = 'Giờ mở cửa (Dữ liệu không chuẩn)';
-          }
-        }
-      } else {
-        hoursText = hoursRaw.toString().replaceAll('\n', ' ');
-      }
+      hoursText = TimeUtils.getOpeningHoursText(place['openingHours']);
     }
 
     return Padding(
@@ -600,9 +566,6 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                   'Giới thiệu',
                   false,
                   context,
-                  onTap: () {
-                    PlaceDetailBottomSheet.show(context, place);
-                  },
                 ),
                 const SizedBox(width: 8),
                 _buildActionButton(Icons.build, 'Hướng dẫn', false, context),
@@ -622,11 +585,7 @@ class InlinePlaceBottomInfo extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Info Card
-          GestureDetector(
-            onTap: () {
-              PlaceDetailBottomSheet.show(context, place);
-            },
-            child: Container(
+          Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -737,30 +696,10 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                               'Mọi người thường dành $duration ở đây',
                               context,
                             ),
-                          if (duration.isNotEmpty && hoursText.isNotEmpty)
+                          if (duration.isNotEmpty && place['openingHours'] != null)
                             const SizedBox(height: 12),
-                          if (hoursText.isNotEmpty)
-                            _buildInfoRow(
-                              Icons.access_time_rounded,
-                              '',
-                              context,
-                              customChild: RichText(
-                                text: TextSpan(
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: AppTheme.darkText,
-                                        height: 1.4,
-                                      ),
-                                  children: [
-                                    TextSpan(text: '$hoursText '),
-                                    const TextSpan(
-                                      text: 'Hiển thị các ngày khác',
-                                      style: TextStyle(color: AppTheme.primary),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                          if (place['openingHours'] != null)
+                            ExpandableOpeningHours(hoursData: place['openingHours']),
                         ],
                       ),
                     ),
@@ -801,7 +740,7 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                                     );
                                   },
                                   child: const Icon(
-                                    Icons.copy_all,
+                                    Icons.copy,
                                     size: 16,
                                     color: AppTheme.subtitleText,
                                   ),
@@ -850,7 +789,6 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                 ],
               ),
             ),
-          ),
         ],
       ),
     );

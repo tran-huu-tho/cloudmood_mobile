@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/database_service.dart';
+import '../utils/time_utils.dart';
 import 'save_to_trip_bottom_sheet.dart';
+import 'expandable_opening_hours.dart';
 
 class PlaceDetailBottomSheet extends StatefulWidget {
   final Map<String, dynamic> place;
@@ -302,57 +304,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
         widget.place['websiteUri'] ?? widget.place['website'];
 
     String? openingHours;
-    final hoursRaw =
-        widget.place['regularOpeningHours'] ?? widget.place['openingHours'];
+    final hoursRaw = widget.place['regularOpeningHours'] ?? widget.place['openingHours'];
     if (hoursRaw != null) {
-      if (hoursRaw is Map) {
-        if (hoursRaw['weekday_text'] != null &&
-            hoursRaw['weekday_text'] is List &&
-            hoursRaw['weekday_text'].isNotEmpty) {
-          openingHours = hoursRaw['weekday_text'].first.toString();
-          final parts = openingHours.split(RegExp(r':\s+'));
-          if (parts.length > 1) {
-            openingHours = 'Mở cửa: ${parts.sublist(1).join(': ')}';
-          }
-        } else {
-          final weekdays = [
-            'monday',
-            'tuesday',
-            'wednesday',
-            'thursday',
-            'friday',
-            'saturday',
-            'sunday',
-          ];
-          final viWeekdays = [
-            'Thứ hai',
-            'Thứ ba',
-            'Thứ tư',
-            'Thứ năm',
-            'Thứ sáu',
-            'Thứ bảy',
-            'Chủ nhật',
-          ];
-
-          final todayIdx = DateTime.now().weekday - 1;
-          final todayKey = weekdays[todayIdx];
-          final viToday = viWeekdays[todayIdx];
-
-          List<dynamic>? times = hoursRaw[todayKey] as List<dynamic>?;
-          if (times != null && times.length >= 2) {
-            openingHours = '$viToday: ${times[0]} - ${times[1]}';
-          } else {
-            // fallback if today is not available
-            if (hoursRaw['monday'] != null &&
-                (hoursRaw['monday'] as List).length >= 2) {
-              openingHours =
-                  'Thứ hai: ${hoursRaw['monday'][0]} - ${hoursRaw['monday'][1]}';
-            }
-          }
-        }
-      } else {
-        openingHours = hoursRaw.toString().replaceAll('\n', ' ');
-      }
+      openingHours = TimeUtils.getOpeningHoursText(hoursRaw);
     }
 
     List<dynamic> subCategories = [];
@@ -393,7 +347,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
               children: [
                 Expanded(
                   child: Text(
-                    'Từ web: $description',
+                    'Mô tả: $description',
                     style: const TextStyle(
                       fontSize: 15,
                       height: 1.6,
@@ -430,53 +384,56 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
             ),
           const SizedBox(height: 16),
           // Action Buttons row 1 (Save, Mark visited)
-          Row(
-            children: [
-              _localSavedCount > 0
-                  ? _buildActionButton(
-                      Icons.bookmark,
-                      'Đã thêm vào $_localSavedCount danh sách',
-                      Colors.grey[200]!,
-                      Colors.black,
-                      suffixIcon: Icons.keyboard_arrow_down,
-                      onTap: () async {
-                        if (widget.currentItinerary != null) {
-                          await SaveToTripBottomSheet.show(
-                            context,
-                            widget.place,
-                            onSaved: widget.onTripUpdated ?? () {},
-                            initialItinerary: widget.currentItinerary,
-                          );
-                          _refreshSavedCount();
-                        }
-                      },
-                    )
-                  : _buildActionButton(
-                      Icons.bookmark_border,
-                      'Thêm vào chuyến đi',
-                      AppTheme.primary,
-                      Colors.white,
-                      onTap: () async {
-                        if (widget.currentItinerary != null) {
-                          await SaveToTripBottomSheet.show(
-                            context,
-                            widget.place,
-                            onSaved: widget.onTripUpdated ?? () {},
-                            initialItinerary: widget.currentItinerary,
-                          );
-                          _refreshSavedCount();
-                        }
-                      },
-                    ),
-              const SizedBox(width: 8),
-              _buildActionButton(
-                Icons.check,
-                'Đánh dấu ghé thăm',
-                Colors.white,
-                Colors.black,
-                borderColor: Colors.grey[300],
-              ),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _localSavedCount > 0
+                    ? _buildActionButton(
+                        Icons.bookmark,
+                        'Đã thêm vào $_localSavedCount danh sách',
+                        Colors.grey[200]!,
+                        Colors.black,
+                        suffixIcon: Icons.keyboard_arrow_down,
+                        onTap: () async {
+                          if (widget.currentItinerary != null) {
+                            await SaveToTripBottomSheet.show(
+                              context,
+                              widget.place,
+                              onSaved: widget.onTripUpdated ?? () {},
+                              initialItinerary: widget.currentItinerary,
+                            );
+                            _refreshSavedCount();
+                          }
+                        },
+                      )
+                    : _buildActionButton(
+                        Icons.bookmark_border,
+                        'Thêm vào chuyến đi',
+                        AppTheme.primary,
+                        Colors.white,
+                        onTap: () async {
+                          if (widget.currentItinerary != null) {
+                            await SaveToTripBottomSheet.show(
+                              context,
+                              widget.place,
+                              onSaved: widget.onTripUpdated ?? () {},
+                              initialItinerary: widget.currentItinerary,
+                            );
+                            _refreshSavedCount();
+                          }
+                        },
+                      ),
+                const SizedBox(width: 8),
+                _buildActionButton(
+                  Icons.check,
+                  'Đánh dấu ghé thăm',
+                  Colors.white,
+                  Colors.black,
+                  borderColor: Colors.grey[300],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           // Action Buttons row 2 (AI, Guide, etc)
@@ -620,15 +577,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
               ],
             ),
           ],
-          if (openingHours != null && openingHours.isNotEmpty) ...[
+          if (widget.place['openingHours'] != null || widget.place['regularOpeningHours'] != null) ...[
             const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.access_time, color: Colors.grey, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text(openingHours)),
-              ],
-            ),
+            ExpandableOpeningHours(hoursData: widget.place['regularOpeningHours'] ?? widget.place['openingHours']),
           ],
           const SizedBox(height: 24),
           // Open in
@@ -822,10 +773,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     final double rating = (widget.place['rating'] as num?)?.toDouble() ?? 4.2;
     final int userRatingCount =
         (widget.place['userRatingCount'] as num?)?.toInt() ?? 156;
-    final String summary =
-        widget.place['editorialSummary'] ??
-        widget.place['description'] ??
-        'Đây là một địa điểm tuyệt vời với nhiều nét độc đáo. Khách tham quan đánh giá cao sự kết hợp kiến trúc lâu đời và không gian thanh bình tại đây.';
+
 
     // Simulate rating distribution
     int count5 = (userRatingCount * 0.65).toInt();
@@ -843,24 +791,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Tóm tắt đánh giá AI',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkText,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            summary,
-            style: const TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: AppTheme.darkText,
-            ),
-          ),
-          const SizedBox(height: 24),
+
 
           // Tripadvisor Rating Card
           Container(

@@ -95,9 +95,9 @@ class DatabaseService {
   }
 
   /// Fetches all itineraries created by the user
-  Future<List<Map<String, dynamic>>> fetchUserItineraries(int userId) async {
+  Future<List<Map<String, dynamic>>> fetchUserItineraries(int userId, {bool isGuide = false}) async {
     try {
-      final response = await ApiClient.get('/itineraries');
+      final response = await ApiClient.get('/itineraries?isGuide=$isGuide');
       if (response.statusCode == 200) {
         return List<Map<String, dynamic>>.from(jsonDecode(response.body));
       }
@@ -120,6 +120,7 @@ class DatabaseService {
     required String pace,
     required List<String> categories,
     required List<String> amenities,
+    bool isGuide = false,
   }) async {
     try {
       final data = {
@@ -132,6 +133,7 @@ class DatabaseService {
         'pace': pace,
         'categories': categories,
         'amenities': amenities,
+        'isGuide': isGuide,
       };
       
       final response = await ApiClient.post('/itineraries', body: data);
@@ -522,6 +524,22 @@ class DatabaseService {
     // Assuming backend will handle it or we fetch then post. 
     // This is a simplified version.
     return true; 
+  }
+
+  /// Creates a new ExplorePost (e.g. for User Guides)
+  Future<Map<String, dynamic>?> createExplorePost(Map<String, dynamic> data) async {
+    try {
+      final response = await ApiClient.post('/explore', body: data);
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        debugPrint('Failed to create ExplorePost: ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Error creating ExplorePost: $e');
+      return null;
+    }
   }
 
   /// Fetches checklist templates

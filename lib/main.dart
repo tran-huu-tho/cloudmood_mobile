@@ -9,6 +9,7 @@ import 'screens/hotel_screen.dart';
 import 'screens/deals_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/create_itinerary_wizard_sheet.dart';
+import 'screens/create_guide_wizard_sheet.dart';
 import 'screens/trip_overview_screen.dart';
 import 'services/database_service.dart';
 import 'services/auth_service.dart';
@@ -119,6 +120,8 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
         .then((result) {
           if (result == 'create_itinerary') {
             _openCreateItinerarySheet();
+          } else if (result == 'create_guide') {
+            _openCreateGuideSheet();
           }
         });
   }
@@ -149,6 +152,44 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return CreateItineraryWizardSheet(userId: user.id);
+      },
+    ).then((result) {
+      if (result != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => TripOverviewScreen(itinerary: result),
+          ),
+        );
+      }
+    });
+  }
+
+  void _openCreateGuideSheet() {
+    final user = AuthService().currentUser.value;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Vui lòng đăng nhập để tạo hướng dẫn!'),
+          backgroundColor: AppTheme.primary,
+          behavior: SnackBarBehavior.fixed,
+          action: SnackBarAction(
+            label: 'Đăng nhập',
+            textColor: Colors.white,
+            onPressed: () {
+              setState(() => _currentIndex = 4);
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return CreateGuideWizardSheet(userId: user.id);
       },
     ).then((result) {
       if (result != null && mounted) {
