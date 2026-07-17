@@ -129,7 +129,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     _itineraryData = widget.itinerary;
     final int numDays = (_itineraryData['days'] as int?) ?? 1;
     _checkedDays = Set.from(Iterable.generate(numDays, (i) => i + 1));
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _loadData();
   }
 
@@ -157,7 +157,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     String finalTitle = newTitle.trim();
     int counter = 1;
-    while (_sectionNames.any((sec) => sec.toLowerCase() == finalTitle.toLowerCase() && sec != oldTitle)) {
+    while (_sectionNames.any(
+      (sec) => sec.toLowerCase() == finalTitle.toLowerCase() && sec != oldTitle,
+    )) {
       finalTitle = '${newTitle.trim()} $counter';
       counter++;
     }
@@ -428,7 +430,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     setState(() => _isLoadingExplore = true);
     final String dest = _itineraryData['destination'] ?? '';
     try {
-      final response = await http.get(Uri.parse('http://localhost:3000/explore?destination=${Uri.encodeComponent(dest)}'));
+      final response = await http.get(
+        Uri.parse(
+          'http://localhost:3000/explore?destination=${Uri.encodeComponent(dest)}',
+        ),
+      );
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         if (mounted) {
@@ -1334,8 +1340,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     int counter = 1;
     String baseName = 'Danh sách mới';
     String newName = baseName;
-    
-    while (_sectionNames.any((sec) => sec.toLowerCase() == newName.toLowerCase())) {
+
+    while (_sectionNames.any(
+      (sec) => sec.toLowerCase() == newName.toLowerCase(),
+    )) {
       counter++;
       newName = '$baseName $counter';
     }
@@ -1359,13 +1367,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
       _sectionColors[newName] = newColor;
       _sectionIcons[newName] = Icons.looks_one_rounded;
-      
+
       _editingSection = newName;
       _sectionTitleController.text = newName;
     });
-    
+
     _syncSectionsToDatabase();
-    
+
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
         _sectionTitleFocusNode.requestFocus();
@@ -2288,14 +2296,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           ),
           tabs: const [
             Tab(text: 'Tổng quan'),
-            Tab(text: 'Hành trình'),
             Tab(text: 'Khám phá'),
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [Icon(Icons.attach_money_rounded, size: 16)],
-              ),
-            ),
           ],
         ),
       ),
@@ -2340,13 +2341,26 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           final List<Marker> allMarkers = [];
 
                           if (_activeSearchQuery != null) {
-                            final sortedFiltered = List<Map<String, dynamic>>.from(_filteredMapPlaces);
+                            final sortedFiltered =
+                                List<Map<String, dynamic>>.from(
+                                  _filteredMapPlaces,
+                                );
                             sortedFiltered.sort((a, b) {
-                              final isSelectedMapPlaceId = _selectedMapPlace != null
-                                  ? (_selectedMapPlace!['place']?['id'] ?? _selectedMapPlace!['id'])
+                              final isSelectedMapPlaceId =
+                                  _selectedMapPlace != null
+                                  ? (_selectedMapPlace!['place']?['id'] ??
+                                        _selectedMapPlace!['id'])
                                   : null;
-                              final isA = a['id'] != null && (a['id'] == _focusedPlaceId || (isSelectedMapPlaceId != null && isSelectedMapPlaceId == a['id']));
-                              final isB = b['id'] != null && (b['id'] == _focusedPlaceId || (isSelectedMapPlaceId != null && isSelectedMapPlaceId == b['id']));
+                              final isA =
+                                  a['id'] != null &&
+                                  (a['id'] == _focusedPlaceId ||
+                                      (isSelectedMapPlaceId != null &&
+                                          isSelectedMapPlaceId == a['id']));
+                              final isB =
+                                  b['id'] != null &&
+                                  (b['id'] == _focusedPlaceId ||
+                                      (isSelectedMapPlaceId != null &&
+                                          isSelectedMapPlaceId == b['id']));
                               if (isA && !isB) return 1;
                               if (!isA && isB) return -1;
                               return 0;
@@ -2568,7 +2582,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           : [],
                                     ),
                                     child: Center(
-                                      child: (icon == null || icon.codePoint == Icons.looks_one_rounded.codePoint)
+                                      child:
+                                          (icon == null ||
+                                              icon.codePoint ==
+                                                  Icons
+                                                      .looks_one_rounded
+                                                      .codePoint)
                                           ? Text(
                                               '$indexInSection',
                                               style: TextStyle(
@@ -2864,22 +2883,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   ),
                                 ),
                               ),
-                              const Spacer(),
-                              if (!_isMapExpanded)
-                                Flexible(
-                                  flex: 3,
-                                  child: Text(
-                                    'Chuyến đi đến $destination',
-                                    style: const TextStyle(
-                                      color: AppTheme.darkText,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              const Spacer(),
+                              Expanded(
+                                child: !_isMapExpanded
+                                    ? Text(
+                                        _itineraryData['title'] as String? ?? 'Hướng dẫn',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: AppTheme.darkText,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      )
+                                    : const SizedBox(),
+                              ),
 
                               AnimatedContainer(
                                 duration: const Duration(milliseconds: 300),
@@ -3138,14 +3156,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                                 tabs: const [
                                   Tab(text: 'Tổng quan'),
-                                  Tab(text: 'Hành trình'),
                                   Tab(text: 'Khám phá'),
-                                  Tab(
-                                    icon: Icon(
-                                      Icons.attach_money_rounded,
-                                      size: 16,
-                                    ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -3170,9 +3181,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             controller: _tabController,
                                             children: [
                                               _buildOverviewTab(),
-                                              _buildItineraryTab(),
                                               _buildExploreTab(),
-                                              _buildExpensesTab(),
                                             ],
                                           );
                                         },
@@ -3227,10 +3236,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         FloatingActionButton(
                                           heroTag: 'add_btn',
                                           onPressed: () async {
-                                            if (_tabController.index == 3) {
-                                              _showAddExpenseDialog();
-                                            } else if (_tabController.index ==
-                                                2) {
+                                            if (_tabController.index == 1) {
                                               _showPremiumNotification(
                                                 title: 'Hướng dẫn',
                                                 message:
@@ -3239,34 +3245,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                     Icons.info_outline_rounded,
                                                 color: AppTheme.primary,
                                               );
-                                            } else if (_tabController.index ==
-                                                1) {
-                                              final currentDays =
-                                                  (_itineraryData['days']
-                                                          as num?)
-                                                      ?.toInt() ??
-                                                  1;
-                                              final success =
-                                                  await DatabaseService()
-                                                      .updateItinerary(
-                                                        _itineraryData['id']
-                                                            as int,
-                                                        {
-                                                          'days':
-                                                              currentDays + 1,
-                                                        },
-                                                      );
-                                              if (success) {
-                                                _showPremiumNotification(
-                                                  title: 'Đã thêm ngày',
-                                                  message:
-                                                      'Đã thêm Ngày ${currentDays + 1} vào lịch trình.',
-                                                  icon: Icons
-                                                      .calendar_today_rounded,
-                                                  color: AppTheme.green,
-                                                );
-                                                await _loadData();
-                                              }
                                             } else {
                                               _createNewSection();
                                             }
@@ -5641,8 +5619,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                               child: Text(
                                                 extraInfo,
                                                 style: TextStyle(
-                                                  color: extraInfo.toLowerCase().contains('đóng cửa') ? Colors.red : AppTheme.subtitleText,
-                                                  fontWeight: extraInfo.toLowerCase().contains('đóng cửa') ? FontWeight.w600 : FontWeight.normal,
+                                                  color:
+                                                      extraInfo
+                                                          .toLowerCase()
+                                                          .contains('đóng cửa')
+                                                      ? Colors.red
+                                                      : AppTheme.subtitleText,
+                                                  fontWeight:
+                                                      extraInfo
+                                                          .toLowerCase()
+                                                          .contains('đóng cửa')
+                                                      ? FontWeight.w600
+                                                      : FontWeight.normal,
                                                   fontSize: 11,
                                                 ),
                                                 maxLines: 1,
@@ -6199,11 +6187,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 _editingSection = section;
                                 _sectionTitleController.text = section;
                               });
-                              Future.delayed(const Duration(milliseconds: 100), () {
-                                if (mounted) {
-                                  _sectionTitleFocusNode.requestFocus();
-                                }
-                              });
+                              Future.delayed(
+                                const Duration(milliseconds: 100),
+                                () {
+                                  if (mounted) {
+                                    _sectionTitleFocusNode.requestFocus();
+                                  }
+                                },
+                              );
                             },
                             child: Text(
                               section,
@@ -7068,8 +7059,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                 Text(
                                                   extraInfo,
                                                   style: TextStyle(
-                                                    color: extraInfo.toLowerCase().contains('đóng cửa') ? Colors.red : AppTheme.subtitleText,
-                                                    fontWeight: extraInfo.toLowerCase().contains('đóng cửa') ? FontWeight.w600 : FontWeight.normal,
+                                                    color:
+                                                        extraInfo
+                                                            .toLowerCase()
+                                                            .contains(
+                                                              'đóng cửa',
+                                                            )
+                                                        ? Colors.red
+                                                        : AppTheme.subtitleText,
+                                                    fontWeight:
+                                                        extraInfo
+                                                            .toLowerCase()
+                                                            .contains(
+                                                              'đóng cửa',
+                                                            )
+                                                        ? FontWeight.w600
+                                                        : FontWeight.normal,
                                                     fontSize: 11,
                                                   ),
                                                 ),
@@ -7700,7 +7705,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               children: [
                 // Search Bar
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(12),
@@ -7726,7 +7734,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             ),
           ),
         ),
-        
+
         // Posts List
         if (_explorePosts.isEmpty)
           const SliverToBoxAdapter(
@@ -7741,26 +7749,23 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final post = _explorePosts[index];
-                  return ExplorePostCard(
-                    post: post,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ExplorePostDetailScreen(
-                            postId: post['id'] as int,
-                            title: post['title'] ?? 'Chi tiết',
-                          ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final post = _explorePosts[index];
+                return ExplorePostCard(
+                  post: post,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ExplorePostDetailScreen(
+                          postId: post['id'] as int,
+                          title: post['title'] ?? 'Chi tiết',
                         ),
-                      );
-                    },
-                  );
-                },
-                childCount: _explorePosts.length,
-              ),
+                      ),
+                    );
+                  },
+                );
+              }, childCount: _explorePosts.length),
             ),
           ),
       ],

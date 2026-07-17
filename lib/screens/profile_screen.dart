@@ -22,72 +22,72 @@ Future<XFile?> _selectImage(BuildContext context) async {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppTheme.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Thay đổi ảnh đại diện',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.darkText,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.camera_alt_rounded,
-                  color: AppTheme.primary,
+                  color: AppTheme.border,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              title: const Text(
-                'Chụp ảnh mới',
+              const SizedBox(height: 20),
+              const Text(
+                'Thay đổi ảnh đại diện',
                 style: TextStyle(
-                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
                   color: AppTheme.darkText,
                 ),
               ),
-              onTap: () => Navigator.of(context).pop(ImageSource.camera),
-            ),
-            const Divider(color: AppTheme.border, height: 1),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppTheme.lightAmber,
-                  shape: BoxShape.circle,
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: AppTheme.primary,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.photo_library_rounded,
-                  color: AppTheme.amber,
+                title: const Text(
+                  'Chụp ảnh mới',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.darkText,
+                  ),
                 ),
+                onTap: () => Navigator.of(context).pop(ImageSource.camera),
               ),
-              title: const Text(
-                'Chọn từ thư viện',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.darkText,
+              const Divider(color: AppTheme.border, height: 1),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.lightAmber,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_rounded,
+                    color: AppTheme.amber,
+                  ),
                 ),
+                title: const Text(
+                  'Chọn từ thư viện',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+                onTap: () => Navigator.of(context).pop(ImageSource.gallery),
               ),
-              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       );
     },
@@ -380,7 +380,8 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                     ),
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Nhập mật khẩu mới.';
-                      if (v.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự.';
+                      if (v.length < 8)
+                        return 'Mật khẩu phải có ít nhất 8 ký tự.';
                       if (!v.contains(RegExp(r'[A-Z]'))) {
                         return 'Mật khẩu phải có ít nhất 1 chữ viết hoa.';
                       }
@@ -716,7 +717,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _itineraries = [];
-  List<Map<String, dynamic>> _reviews = [];
+  List<Map<String, dynamic>> _guides = [];
   bool _isLoading = true;
 
   @override
@@ -740,13 +741,18 @@ class _ProfileDashboardState extends State<ProfileDashboard>
 
     final itineraries = await DatabaseService().fetchUserItineraries(
       widget.user.id,
+      isGuide: false,
     );
-    final reviews = await DatabaseService().fetchUserReviews(widget.user.id);
+
+    final guides = await DatabaseService().fetchUserItineraries(
+      widget.user.id,
+      isGuide: true,
+    );
 
     if (!mounted) return;
     setState(() {
       _itineraries = itineraries;
-      _reviews = reviews;
+      _guides = guides;
       _isLoading = false;
     });
   }
@@ -799,17 +805,6 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     }
   }
 
-  int get _totalBudget {
-    int sum = 0;
-    for (var itin in _itineraries) {
-      final b = itin['budget'];
-      if (b != null) {
-        sum += (b is num) ? b.toInt() : (int.tryParse(b.toString()) ?? 0);
-      }
-    }
-    return sum;
-  }
-
   String _formatBudget(int budget) {
     if (budget >= 1000000) {
       double m = budget / 1000000.0;
@@ -838,21 +833,6 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         );
       }
     });
-  }
-
-  Widget _buildStarRating(double rating) {
-    List<Widget> stars = [];
-    int fullStars = rating.floor();
-    for (int i = 0; i < 5; i++) {
-      stars.add(
-        Icon(
-          i < fullStars ? Icons.star_rounded : Icons.star_border_rounded,
-          color: i < fullStars ? AppTheme.amber : AppTheme.border,
-          size: 14,
-        ),
-      );
-    }
-    return Row(children: stars);
   }
 
   @override
@@ -1028,43 +1008,6 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               ),
             ),
 
-            // ── Stats Row ──────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 16,
-                ),
-                decoration: AppTheme.premiumCardDecoration(),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildStat(
-                      '${_itineraries.length}',
-                      'Hành trình',
-                      Icons.map_rounded,
-                      AppTheme.primary,
-                    ),
-                    _buildVertDivider(),
-                    _buildStat(
-                      _formatBudget(_totalBudget),
-                      'Tổng ngân sách',
-                      Icons.payments_rounded,
-                      AppTheme.green,
-                    ),
-                    _buildVertDivider(),
-                    _buildStat(
-                      '${_reviews.length}',
-                      'Đánh giá',
-                      Icons.star_rounded,
-                      AppTheme.amber,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
             // ── Tab bar ────────────────────────────────────────────
             SliverPersistentHeader(
               pinned: true,
@@ -1086,7 +1029,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                   ),
                   tabs: const [
                     Tab(text: 'Lịch trình'),
-                    Tab(text: 'Đánh giá'),
+                    Tab(text: 'Hướng dẫn'),
                     Tab(text: 'Cài đặt'),
                   ],
                 ),
@@ -1099,52 +1042,14 @@ class _ProfileDashboardState extends State<ProfileDashboard>
           children: [
             // ── Tab 1: Itineraries ────────────────────────────────
             _buildItineraryTab(),
-            // ── Tab 2: Reviews ────────────────────────────────────
-            _buildReviewsTab(),
+            // ── Tab 2: Guides ────────────────────────────────────
+            _buildGuidesTab(),
             // ── Tab 3: Settings ───────────────────────────────────
             _buildSettingsTab(joinDate),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildStat(String value, String label, IconData icon, Color color) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withAlpha(20),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.darkText,
-            ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              color: AppTheme.subtitleText,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVertDivider() {
-    return Container(width: 1, height: 50, color: AppTheme.border);
   }
 
   Widget _buildItineraryTab() {
@@ -1360,14 +1265,14 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     );
   }
 
-  Widget _buildReviewsTab() {
+  Widget _buildGuidesTab() {
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: AppTheme.primary),
       );
     }
 
-    if (_reviews.isEmpty) {
+    if (_guides.isEmpty) {
       return Center(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -1381,14 +1286,14 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.star_outline_rounded,
+                  Icons.menu_book_rounded,
                   size: 48,
                   color: AppTheme.amber,
                 ),
               ),
               const SizedBox(height: 16),
               const Text(
-                'Chưa có đánh giá nào',
+                'Chưa có hướng dẫn nào',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -1397,7 +1302,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               ),
               const SizedBox(height: 8),
               const Text(
-                'Hãy chia sẻ trải nghiệm của bạn!',
+                'Hãy tạo hướng dẫn chuyến đi của riêng bạn!',
                 style: TextStyle(color: AppTheme.subtitleText, fontSize: 13),
               ),
             ],
@@ -1408,45 +1313,109 @@ class _ProfileDashboardState extends State<ProfileDashboard>
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
-      itemCount: _reviews.length,
+      itemCount: _guides.length,
       itemBuilder: (context, index) {
-        final review = _reviews[index];
-        final double rating = (review['rating'] as num?)?.toDouble() ?? 0.0;
-        return Container(
-          margin: const EdgeInsets.only(bottom: 14),
-          padding: const EdgeInsets.all(16),
-          decoration: AppTheme.premiumCardDecoration(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      review['place_name'] as String? ?? 'Địa điểm',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.darkText,
-                      ),
+        final guide = _guides[index];
+        final sections = (guide['sections'] as List?)?.length ?? 0;
+        final savedPlaces = (guide['savedPlaces'] as List?)?.length ?? 0;
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => TripOverviewScreen(itinerary: guide),
+              ),
+            );
+          },
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(16),
+            decoration: AppTheme.premiumCardDecoration(),
+            child: Row(
+              children: [
+                // Icon thumbnail
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: LinearGradient(
+                      colors: [AppTheme.amber.withAlpha(200), AppTheme.amber],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
-                  _buildStarRating(rating),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                review['comment'] as String? ?? '',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.bodyText,
-                  height: 1.4,
+                  child: const Icon(
+                    Icons.menu_book_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                 ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        guide['title'] as String? ?? 'Hướng dẫn',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_rounded,
+                            size: 12,
+                            color: AppTheme.subtitleText,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              guide['destination'] as String? ??
+                                  'Chưa xác định',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.subtitleText,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _buildTripChip(
+                            '$savedPlaces địa điểm',
+                            Icons.place_rounded,
+                            AppTheme.lightAmber,
+                            AppTheme.amber,
+                          ),
+                          const SizedBox(width: 6),
+                          _buildTripChip(
+                            '$sections mục',
+                            Icons.list_alt_rounded,
+                            AppTheme.primaryContainer,
+                            AppTheme.primary,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.subtitleText,
+                ),
+              ],
+            ),
           ),
         );
       },
