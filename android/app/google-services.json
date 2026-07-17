@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "798468966090",
+    "project_id": "cloudmood-91d62",
+    "storage_bucket": "cloudmood-91d62.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:798468966090:android:c94666d567c43b078e5633",
+        "android_client_info": {
+          "package_name": "com.company.cloudmood"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "798468966090-2v9lvviriltqc2ck8117s5919b2gk6ci.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.company.cloudmood",
+            "certificate_hash": "527d17a93ad94d0be0bf042be50474b4147577ba"
+          }
+        },
+        {
+          "client_id": "798468966090-ipq61378j4f09cnsrkrv1mq4bldku934.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfI6pI3sq1kLiRn06eh0h23-TYD8S5-cM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "798468966090-ipq61378j4f09cnsrkrv1mq4bldku934.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

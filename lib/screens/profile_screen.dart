@@ -415,7 +415,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
                 'Hủy',
-                style: TextStyle(color: AppTheme.subtitleText),
+                style: TextStyle(color: AppTheme.subtitleText, fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold),
               ),
             ),
             FilledButton(
@@ -426,8 +426,8 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                 ),
                 minimumSize: Size.zero,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
+                  horizontal: 32,
+                  vertical: 12,
                 ),
               ),
               onPressed: () async {
@@ -448,7 +448,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                   );
                 }
               },
-              child: const Text('Đổi mật khẩu'),
+              child: const Text('Đổi mật khẩu', style: TextStyle(fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -488,7 +488,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
                 'Hủy',
-                style: TextStyle(color: AppTheme.subtitleText),
+                style: TextStyle(color: AppTheme.subtitleText, fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold),
               ),
             ),
             FilledButton(
@@ -499,8 +499,8 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                 ),
                 minimumSize: Size.zero,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
+                  horizontal: 32,
+                  vertical: 12,
                 ),
               ),
               onPressed: () {
@@ -513,7 +513,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                   ),
                 );
               },
-              child: const Text('Đăng xuất'),
+              child: const Text('Đăng xuất', style: TextStyle(fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold)),
             ),
           ],
         );

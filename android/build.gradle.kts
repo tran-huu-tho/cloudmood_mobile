@@ -30,6 +30,20 @@ subprojects {
     }
 }
 
+subprojects {
+    val project = this
+    if (project.name != "app" && !project.state.executed) {
+        project.afterEvaluate {
+            val extension = project.extensions.findByName("android") as? com.android.build.gradle.BaseExtension
+            if (extension != null) {
+                extension.compileSdkVersion(36)
+            }
+        }
+    }
+}
+
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+

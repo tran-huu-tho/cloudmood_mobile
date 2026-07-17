@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cloudmood</string>
+    <string name="facebook_app_id">3145996625791025</string>
+    <string name="fb_login_protocol_scheme">fb3145996625791025</string>
+    <string name="facebook_client_token">7101fd70823e5281877fca21a37167d3</string>
+</resources>

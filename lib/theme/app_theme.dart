@@ -141,6 +141,7 @@ class AppTheme {
             fontSize: 16,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.2,
+            fontFamily: 'SDK_SC_Web-Heavy',
           ),
         ),
       ),
@@ -155,6 +156,15 @@ class AppTheme {
           textStyle: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
+            fontFamily: 'SDK_SC_Web-Heavy',
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          textStyle: const TextStyle(
+            fontFamily: 'SDK_SC_Web-Heavy',
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/hotel_screen.dart';
@@ -26,6 +28,15 @@ void main() async {
 
   // Seed initial categories & places in Supabase if empty
   await DatabaseService().checkAndSeedData();
+
+  if (kIsWeb) {
+    await FacebookAuth.instance.webAndDesktopInitialize(
+      appId: '3145996625791025',
+      cookie: true,
+      xfbml: true,
+      version: 'v19.0',
+    );
+  }
 
   runApp(const MyApp());
 }

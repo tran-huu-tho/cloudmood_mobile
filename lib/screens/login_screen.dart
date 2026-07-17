@@ -67,8 +67,8 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
     if (mounted) {
       if (response['success'] as bool) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] as String),
+          const SnackBar(
+            content: Text('Đăng nhập thành công'),
             backgroundColor: AppTheme.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -91,6 +91,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
     setState(() => _isLoading = true);
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
+        clientId: '798468966090-ipq61378j4f09cnsrkrv1mq4bldku934.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
       );
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
@@ -107,7 +108,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(response['message'] as String),
+              content: Text(response['success'] as bool ? 'Đăng nhập thành công' : response['message'] as String),
               backgroundColor: response['success'] as bool ? AppTheme.green : AppTheme.red,
               behavior: SnackBarBehavior.floating,
             ),
@@ -118,9 +119,20 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
         }
       }
     } catch (e) {
-      debugPrint('Google Native Sign-In failed: $e. Falling back to simulator.');
+      final errorStr = e.toString();
+      debugPrint('Google Native Sign-In failed: $errorStr');
+      if (errorStr.contains('popup_closed') || errorStr.contains('cancelled')) {
+        // Silent on user cancellation
+        return;
+      }
       if (mounted) {
-        _showSocialLoginBottomSheet(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi đăng nhập Google: $e'),
+            backgroundColor: AppTheme.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -150,7 +162,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(response['message'] as String),
+              content: Text(response['success'] as bool ? 'Đăng nhập thành công' : response['message'] as String),
               backgroundColor: response['success'] as bool ? AppTheme.green : AppTheme.red,
               behavior: SnackBarBehavior.floating,
             ),
@@ -159,307 +171,32 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
             Navigator.of(context).pop();
           }
         }
+      } else if (result.status == LoginStatus.cancelled) {
+        // Silent on user cancellation
+        return;
       } else {
-        throw Exception('Facebook login status: ${result.status}');
+        throw Exception('Facebook login status: ${result.status}, message: ${result.message}');
       }
     } catch (e) {
-      debugPrint('Facebook Native Sign-In failed: $e. Falling back to simulator.');
+      final errorStr = e.toString();
+      debugPrint('Facebook Native Sign-In failed: $errorStr');
+      if (errorStr.contains('cancelled') || errorStr.contains('popup_closed')) {
+        return;
+      }
       if (mounted) {
-        _showSocialLoginBottomSheet(false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi đăng nhập Facebook: $e'),
+            backgroundColor: AppTheme.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  // Social Login Bottom Sheet Simulation
-  void _showSocialLoginBottomSheet(bool isGoogle) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        bool isSheetLoading = false;
-        bool isCustomInput = false;
-        final sheetEmailCtrl = TextEditingController();
-        final sheetNameCtrl = TextEditingController();
-        final sheetFormKey = GlobalKey<FormState>();
-
-        final defaultAccounts = isGoogle
-            ? [
-                {'name': 'Nguyễn Minh Triết', 'email': 'triet.minh@gmail.com', 'avatar': 'https://i.pravatar.cc/150?img=33'},
-                {'name': 'Lê Hoàng Nam', 'email': 'nam.le99@gmail.com', 'avatar': 'https://i.pravatar.cc/150?img=12'},
-                {'name': 'Phạm Thanh Thảo', 'email': 'thao.pham@gmail.com', 'avatar': 'https://i.pravatar.cc/150?img=47'},
-              ]
-            : [
-                {'name': 'Trần Quốc Huy', 'email': 'huy.tran.fb@gmail.com', 'avatar': 'https://i.pravatar.cc/150?img=60'},
-                {'name': 'Nguyễn Hải Đường', 'email': 'duong.hai@gmail.com', 'avatar': 'https://i.pravatar.cc/150?img=59'},
-              ];
-
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            Future<void> executeSocialLogin(String email, String name, String avatar) async {
-              setModalState(() => isSheetLoading = true);
-              
-              final response = isGoogle 
-                  ? await _authService.loginWithGoogle(email: email, fullName: name, avatarUrl: avatar)
-                  : await _authService.loginWithFacebook(email: email, fullName: name, avatarUrl: avatar);
-
-              setModalState(() => isSheetLoading = false);
-
-              if (mounted) {
-                Navigator.of(context).pop(); // Close bottom sheet
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(response['message'] as String),
-                    backgroundColor: response['success'] as bool ? AppTheme.green : AppTheme.red,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-                if (response['success'] as bool) {
-                  Navigator.of(this.context).pop(); // Close login screen
-                }
-              }
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 48,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          isGoogle
-                              ? Image.network(
-                                  'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
-                                  height: 24,
-                                )
-                              : const Icon(
-                                  Icons.facebook,
-                                  color: Color(0xFF1877F2),
-                                  size: 26,
-                                ),
-                          const SizedBox(width: 12),
-                          Text(
-                            isGoogle ? 'Đăng nhập với Google' : 'Đăng nhập với Facebook',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.darkText,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 30, thickness: 1),
-                      if (isSheetLoading) ...[
-                        const SizedBox(height: 40),
-                        const Center(
-                          child: CircularProgressIndicator(
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Center(
-                          child: Text(
-                            isGoogle ? 'Đang xác thực tài khoản Google...' : 'Đang kết nối tài khoản Facebook...',
-                            style: const TextStyle(color: AppTheme.subtitleText),
-                          ),
-                        ),
-                        const SizedBox(height: 40),
-                      ] else if (!isCustomInput) ...[
-                        const Text(
-                          'Chọn tài khoản để tiếp tục',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.subtitleText,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...defaultAccounts.map((acc) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: InkWell(
-                              onTap: () => executeSocialLogin(acc['email']!, acc['name']!, acc['avatar']!),
-                              borderRadius: BorderRadius.circular(16),
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.black.withOpacity(0.06)),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundImage: NetworkImage(acc['avatar']!),
-                                      radius: 20,
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            acc['name']!,
-                                            style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppTheme.darkText,
-                                            ),
-                                          ),
-                                          Text(
-                                            acc['email']!,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              color: AppTheme.subtitleText,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 14,
-                                      color: Colors.grey,
-                                    )
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        const SizedBox(height: 12),
-                        Center(
-                          child: TextButton.icon(
-                            onPressed: () {
-                              setModalState(() {
-                                isCustomInput = true;
-                              });
-                            },
-                            icon: const Icon(Icons.add_circle_outline, color: AppTheme.primary, size: 20),
-                            label: const Text(
-                              'Sử dụng tài khoản khác',
-                              style: TextStyle(
-                                color: AppTheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ] else ...[
-                        Form(
-                          key: sheetFormKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Nhập thông tin tài khoản thử nghiệm:',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.subtitleText,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: sheetNameCtrl,
-                                decoration: InputDecoration(
-                                  labelText: 'Họ và tên',
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                  prefixIcon: const Icon(Icons.person),
-                                ),
-                                validator: (val) => val == null || val.trim().isEmpty ? 'Vui lòng nhập họ tên.' : null,
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: sheetEmailCtrl,
-                                decoration: InputDecoration(
-                                  labelText: 'Email',
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                  prefixIcon: const Icon(Icons.email),
-                                ),
-                                validator: (val) {
-                                  if (val == null || val.trim().isEmpty) return 'Vui lòng nhập email.';
-                                  if (!val.contains('@')) return 'Email không hợp lệ.';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 20),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: () {
-                                        setModalState(() {
-                                          isCustomInput = false;
-                                        });
-                                      },
-                                      style: OutlinedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
-                                      ),
-                                      child: const Text('Quay lại'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        if (sheetFormKey.currentState!.validate()) {
-                                          executeSocialLogin(
-                                            sheetEmailCtrl.text.trim(),
-                                            sheetNameCtrl.text.trim(),
-                                            'https://i.pravatar.cc/150?img=15',
-                                          );
-                                        }
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.darkText,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
-                                      ),
-                                      child: const Text('Đăng nhập'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   @override
@@ -814,9 +551,10 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                                           Image.asset(
                                             'assets/images/google.png',
                                             height: 20,
-                                            errorBuilder: (c, e, s) => Image.network(
-                                              'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1024px-Google_%22G%22_logo.svg.png',
-                                              height: 20,
+                                            errorBuilder: (c, e, s) => const Icon(
+                                              Icons.g_mobiledata,
+                                              color: Colors.red,
+                                              size: 24,
                                             ),
                                           ),
                                           const SizedBox(width: 8),
