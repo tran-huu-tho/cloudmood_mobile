@@ -430,53 +430,56 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
             ),
           const SizedBox(height: 16),
           // Action Buttons row 1 (Save, Mark visited)
-          Row(
-            children: [
-              _localSavedCount > 0
-                  ? _buildActionButton(
-                      Icons.bookmark,
-                      'Đã thêm vào $_localSavedCount danh sách',
-                      Colors.grey[200]!,
-                      Colors.black,
-                      suffixIcon: Icons.keyboard_arrow_down,
-                      onTap: () async {
-                        if (widget.currentItinerary != null) {
-                          await SaveToTripBottomSheet.show(
-                            context,
-                            widget.place,
-                            onSaved: widget.onTripUpdated ?? () {},
-                            initialItinerary: widget.currentItinerary,
-                          );
-                          _refreshSavedCount();
-                        }
-                      },
-                    )
-                  : _buildActionButton(
-                      Icons.bookmark_border,
-                      'Thêm vào chuyến đi',
-                      AppTheme.primary,
-                      Colors.white,
-                      onTap: () async {
-                        if (widget.currentItinerary != null) {
-                          await SaveToTripBottomSheet.show(
-                            context,
-                            widget.place,
-                            onSaved: widget.onTripUpdated ?? () {},
-                            initialItinerary: widget.currentItinerary,
-                          );
-                          _refreshSavedCount();
-                        }
-                      },
-                    ),
-              const SizedBox(width: 8),
-              _buildActionButton(
-                Icons.check,
-                'Đánh dấu ghé thăm',
-                Colors.white,
-                Colors.black,
-                borderColor: Colors.grey[300],
-              ),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _localSavedCount > 0
+                    ? _buildActionButton(
+                        Icons.bookmark,
+                        'Đã thêm vào $_localSavedCount danh sách',
+                        Colors.grey[200]!,
+                        Colors.black,
+                        suffixIcon: Icons.keyboard_arrow_down,
+                        onTap: () async {
+                          if (widget.currentItinerary != null) {
+                            await SaveToTripBottomSheet.show(
+                              context,
+                              widget.place,
+                              onSaved: widget.onTripUpdated ?? () {},
+                              initialItinerary: widget.currentItinerary,
+                            );
+                            _refreshSavedCount();
+                          }
+                        },
+                      )
+                    : _buildActionButton(
+                        Icons.bookmark_border,
+                        'Thêm vào chuyến đi',
+                        AppTheme.primary,
+                        Colors.white,
+                        onTap: () async {
+                          if (widget.currentItinerary != null) {
+                            await SaveToTripBottomSheet.show(
+                              context,
+                              widget.place,
+                              onSaved: widget.onTripUpdated ?? () {},
+                              initialItinerary: widget.currentItinerary,
+                            );
+                            _refreshSavedCount();
+                          }
+                        },
+                      ),
+                const SizedBox(width: 8),
+                _buildActionButton(
+                  Icons.check,
+                  'Đánh dấu ghé thăm',
+                  Colors.white,
+                  Colors.black,
+                  borderColor: Colors.grey[300],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           // Action Buttons row 2 (AI, Guide, etc)

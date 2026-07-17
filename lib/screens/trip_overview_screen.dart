@@ -148,6 +148,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       });
       return;
     }
+
+    String finalTitle = newTitle.trim();
+    int counter = 1;
+    while (_sectionNames.any((sec) => sec.toLowerCase() == finalTitle.toLowerCase() && sec != oldTitle)) {
+      finalTitle = '${newTitle.trim()} $counter';
+      counter++;
+    }
+    newTitle = finalTitle;
+
     setState(() {
       final index = _sectionNames.indexOf(oldTitle);
       if (index != -1) {
@@ -1293,91 +1302,46 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _createNewSection() {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'Tạo danh sách mới',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: TextField(
-            controller: controller,
-            decoration: AppTheme.inputDecoration(
-              hintText: 'Nhập tên tiêu đề (vd: Ăn uống, Khách sạn)',
-              prefixIcon: Icons.edit_rounded,
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Hủy',
-                style: TextStyle(color: AppTheme.subtitleText),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () {
-                final name = controller.text.trim();
-                if (name.isNotEmpty) {
-                  final exists = _sectionNames.any(
-                    (sec) => sec.toLowerCase() == name.toLowerCase(),
-                  );
-                  if (exists) {
-                    _showPremiumNotification(
-                      title: 'Cảnh báo',
-                      message: 'Tiêu đề này đã tồn tại. Vui lòng đặt tên khác!',
-                      icon: Icons.warning_amber_rounded,
-                      color: Colors.redAccent,
-                    );
-                    return;
-                  }
-                  setState(() {
-                    _sectionNames.add(name);
-                    _searchControllers[name] = TextEditingController();
-                    _searchResults[name] = [];
+    int counter = 1;
+    String baseName = 'Danh sách mới';
+    String newName = baseName;
+    
+    while (_sectionNames.any((sec) => sec.toLowerCase() == newName.toLowerCase())) {
+      counter++;
+      newName = '$baseName $counter';
+    }
 
-                    final usedColors = _sectionColors.values.toSet();
-                    Color? newColor;
-                    for (var c in _availableColors) {
-                      if (!usedColors.contains(c)) {
-                        newColor = c;
-                        break;
-                      }
-                    }
-                    if (newColor == null) {
-                      final idx =
-                          _sectionNames.length % _availableColors.length;
-                      newColor = _availableColors[idx];
-                    }
-                    _sectionColors[name] = newColor;
-                    _sectionIcons[name] = Icons.looks_one_rounded;
-                  });
-                  _syncSectionsToDatabase();
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text(
-                'Tạo',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+    setState(() {
+      _sectionNames.add(newName);
+      _searchControllers[newName] = TextEditingController();
+      _searchResults[newName] = [];
+
+      final usedColors = _sectionColors.values.toSet();
+      Color? newColor;
+      for (var c in _availableColors) {
+        if (!usedColors.contains(c)) {
+          newColor = c;
+          break;
+        }
+      }
+      if (newColor == null) {
+        final idx = _sectionNames.length % _availableColors.length;
+        newColor = _availableColors[idx];
+      }
+      _sectionColors[newName] = newColor;
+      _sectionIcons[newName] = Icons.looks_one_rounded;
+      
+      _editingSection = newName;
+      _sectionTitleController.text = newName;
+    });
+    
+    _syncSectionsToDatabase();
+    
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _sectionTitleFocusNode.requestFocus();
+      }
+    });
   }
 
   // Custom Expense Adder Dialog
@@ -2347,8 +2311,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           final List<Marker> allMarkers = [];
 
                           if (_activeSearchQuery != null) {
+                            final sortedFiltered = List<Map<String, dynamic>>.from(_filteredMapPlaces);
+                            sortedFiltered.sort((a, b) {
+                              final isSelectedMapPlaceId = _selectedMapPlace != null
+                                  ? (_selectedMapPlace!['place']?['id'] ?? _selectedMapPlace!['id'])
+                                  : null;
+                              final isA = a['id'] != null && (a['id'] == _focusedPlaceId || (isSelectedMapPlaceId != null && isSelectedMapPlaceId == a['id']));
+                              final isB = b['id'] != null && (b['id'] == _focusedPlaceId || (isSelectedMapPlaceId != null && isSelectedMapPlaceId == b['id']));
+                              if (isA && !isB) return 1;
+                              if (!isA && isB) return -1;
+                              return 0;
+                            });
+
                             allMarkers.addAll(
-                              _filteredMapPlaces.map((place) {
+                              sortedFiltered.map((place) {
                                 if (place['latitude'] == null ||
                                     place['longitude'] == null) {
                                   return null;
@@ -5866,8 +5842,37 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            itemCount: _sectionNames.length,
+            itemCount: _sectionNames.length + 1,
             itemBuilder: (context, index) {
+              if (index == _sectionNames.length) {
+                return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          elevation: 2,
+                        ),
+                        icon: const Icon(Icons.add, size: 20),
+                        label: const Text(
+                          'Danh sách mới',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: _createNewSection,
+                      ),
+                    ],
+                  ),
+                );
+              }
               final section = _sectionNames[index];
               final searchController = _searchControllers[section]!;
               final searchResultsList = _searchResults[section] ?? [];
@@ -6057,12 +6062,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   color: AppTheme.darkText,
                                 ),
                                 SizedBox(width: 12),
-                                Text(
-                                  'Thay đổi màu sắc hoặc biểu tượng',
-                                  style: TextStyle(
-                                    color: AppTheme.darkText,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
+                                Expanded(
+                                  child: Text(
+                                    'Thay đổi màu sắc hoặc biểu tượng',
+                                    style: TextStyle(
+                                      color: AppTheme.darkText,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 2,
                                   ),
                                 ),
                               ],
@@ -6101,12 +6109,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   color: AppTheme.darkText,
                                 ),
                                 SizedBox(width: 12),
-                                Text(
-                                  'Thu gọn tất cả các phần',
-                                  style: TextStyle(
-                                    color: AppTheme.darkText,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
+                                Expanded(
+                                  child: Text(
+                                    'Thu gọn tất cả các phần',
+                                    style: TextStyle(
+                                      color: AppTheme.darkText,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 2,
                                   ),
                                 ),
                               ],
@@ -6183,14 +6194,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               _sectionTitleController.text,
                             ),
                           )
-                        : Text(
-                            section,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: index == 0
-                                  ? AppTheme.darkText
-                                  : AppTheme.subtitleText,
+                        : GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _editingSection = section;
+                                _sectionTitleController.text = section;
+                              });
+                              Future.delayed(const Duration(milliseconds: 100), () {
+                                if (mounted) {
+                                  _sectionTitleFocusNode.requestFocus();
+                                }
+                              });
+                            },
+                            child: Text(
+                              section,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: index == 0
+                                    ? AppTheme.darkText
+                                    : AppTheme.subtitleText,
+                              ),
                             ),
                           ),
                     children: [
@@ -6531,34 +6555,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 ),
               );
             },
-          ),
-        ),
-        // Bottom New List button
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  elevation: 2,
-                ),
-                icon: const Icon(Icons.add, size: 20),
-                label: const Text(
-                  'Danh sách mới',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                onPressed: _createNewSection,
-              ),
-            ],
           ),
         ),
       ],
