@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'guide_overview_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
@@ -1323,7 +1324,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => TripOverviewScreen(itinerary: guide),
+                builder: (context) => GuideOverviewScreen(itinerary: guide),
               ),
             );
           },

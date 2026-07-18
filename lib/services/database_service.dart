@@ -51,16 +51,9 @@ class DatabaseService {
   /// Fetches places based on destination city
   Future<List<Map<String, dynamic>>> fetchPlacesByDestination(String destination) async {
     try {
-      // Temporary implementation: fetch all places and filter locally
-      final response = await ApiClient.get('/places');
+      final response = await ApiClient.get('/places/search?destination=${Uri.encodeComponent(destination)}');
       if (response.statusCode == 200) {
-        final List<dynamic> allPlaces = jsonDecode(response.body);
-        return allPlaces
-            .map((e) => Map<String, dynamic>.from(e))
-            .where((place) => 
-                (place['address'] as String).toLowerCase().contains(destination.toLowerCase()) ||
-                (place['name'] as String).toLowerCase().contains(destination.toLowerCase()))
-            .toList();
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
       }
       return [];
     } catch (e) {
@@ -396,6 +389,7 @@ class DatabaseService {
     required String colorCode,
     required int iconCode,
     int sortOrder = 0,
+    String sectionType = 'LIST',
   }) async {
     try {
       final response = await ApiClient.post('/itineraries/sections', body: {
@@ -404,6 +398,7 @@ class DatabaseService {
         'colorCode': colorCode,
         'iconCode': iconCode,
         'sortOrder': sortOrder,
+        'sectionType': sectionType,
       });
       if (response.statusCode == 201 || response.statusCode == 200) {
         refreshTrigger.value++;
