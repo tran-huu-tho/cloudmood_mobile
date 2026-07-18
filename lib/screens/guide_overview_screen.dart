@@ -5759,6 +5759,54 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
     );
   }
 
+  void _editSectionSubtitle(String section, String? currentSubtitle) {
+    final TextEditingController controller = TextEditingController(text: currentSubtitle ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Thêm/Chỉnh sửa tiêu đề phụ'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Nhập tiêu đề phụ...',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+          maxLines: null,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newSubtitle = controller.text.trim();
+              setState(() {
+                final savedSections = _itineraryData['sections'] as List<dynamic>?;
+                final sectionData = savedSections?.firstWhere(
+                  (s) => s['name'] == section,
+                  orElse: () => null,
+                );
+                if (sectionData != null) {
+                  sectionData['subTitle'] = newSubtitle;
+                }
+              });
+              _syncSectionsToDatabase();
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ================= TAB 1: TỔNG QUAN =================
   Widget _buildOverviewTab() {
     return Column(
@@ -5844,7 +5892,16 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                     ),
                     iconColor: AppTheme.darkText,
                     collapsedIconColor: AppTheme.subtitleText,
-                    leading: _isSelectionMode
+                    trailing: const SizedBox.shrink(),
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _isSelectionMode
                         ? Checkbox(
                             value: _selectedSections.contains(section),
                             onChanged: (val) {
@@ -5879,408 +5936,399 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                             Icons.keyboard_arrow_down_rounded,
                             color: AppTheme.darkText,
                           ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceVariant,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Theme(
-                            data: Theme.of(context).copyWith(
-                              splashColor: Colors.transparent,
-                              highlightColor: Colors.transparent,
                             ),
-                            child: PopupMenuButton<String>(
-                              offset: const Offset(0, 40),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              color: Colors.white,
-                              elevation: 4,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      _sectionTypes[section] == 'ITINERARY'
-                                          ? 'Hành trình'
-                                          : 'Danh sách',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: AppTheme.darkText,
-                                        fontWeight: FontWeight.w600,
+                            Expanded(
+                              child: _editingSection == section
+                                ? TextField(
+                                    controller: _sectionTitleController,
+                                    focusNode: _sectionTitleFocusNode,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: index == 0
+                                          ? AppTheme.darkText
+                                          : AppTheme.subtitleText,
+                                    ),
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      border: InputBorder.none,
+                                    ),
+                                    onSubmitted: (newValue) =>
+                                        _saveSectionTitle(section, newValue),
+                                    onTapOutside: (_) => _saveSectionTitle(
+                                      section,
+                                      _sectionTitleController.text,
+                                    ),
+                                  )
+                                : GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _editingSection = section;
+                                        _sectionTitleController.text = section;
+                                      });
+                                      Future.delayed(const Duration(milliseconds: 100), () {
+                                        if (mounted) {
+                                          _sectionTitleFocusNode.requestFocus();
+                                        }
+                                      });
+                                    },
+                                    child: Text(
+                                      section,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: index == 0
+                                            ? AppTheme.darkText
+                                            : AppTheme.subtitleText,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
-                                    const Icon(
-                                      Icons.arrow_drop_down_rounded,
-                                      size: 20,
-                                      color: AppTheme.darkText,
+                                  ),
+                            ),
+                            const SizedBox(width: 8),
+                            // RIGHT TOP COLUMN (Dropdown)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceVariant,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Theme(
+                                    data: Theme.of(context).copyWith(
+                                      splashColor: Colors.transparent,
+                                      highlightColor: Colors.transparent,
                                     ),
-                                  ],
+                                    child: PopupMenuButton<String>(
+                                      offset: const Offset(0, 40),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      color: Colors.white,
+                                      elevation: 4,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              _sectionTypes[section] == 'ITINERARY'
+                                                  ? 'Hành trình'
+                                                  : 'Danh sách',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: AppTheme.darkText,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            const Icon(
+                                              Icons.arrow_drop_down_rounded,
+                                              size: 20,
+                                              color: AppTheme.darkText,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      onSelected: (value) {
+                                        setState(() {
+                                          _sectionTypes[section] = value;
+                                        });
+                                        _syncSectionsToDatabase();
+                                      },
+                                      itemBuilder: (context) => [
+                                        PopupMenuItem(
+                                          value: 'LIST',
+                                          height: 48,
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.format_list_bulleted_rounded,
+                                                size: 20,
+                                                color: AppTheme.darkText,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              const Text(
+                                                'Danh sách',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                              ),
+                                              if (_sectionTypes[section] != 'ITINERARY')
+                                                const Spacer(),
+                                              if (_sectionTypes[section] != 'ITINERARY')
+                                                const Icon(
+                                                  Icons.check_rounded,
+                                                  size: 20,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'ITINERARY',
+                                          height: 48,
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.calendar_month_rounded,
+                                                size: 20,
+                                                color: AppTheme.darkText,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              const Text(
+                                                'Hành trình',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                              ),
+                                              if (_sectionTypes[section] == 'ITINERARY')
+                                                const Spacer(),
+                                              if (_sectionTypes[section] == 'ITINERARY')
+                                                const Icon(
+                                                  Icons.check_rounded,
+                                                  size: 20,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              onSelected: (value) {
-                                setState(() {
-                                  _sectionTypes[section] = value;
-                                });
-                                _syncSectionsToDatabase();
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'LIST',
-                                  height: 48,
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.format_list_bulleted_rounded,
+                                const SizedBox(width: 4),
+                                Theme(
+                                  data: Theme.of(context).copyWith(
+                                    splashColor: Colors.transparent,
+                                    highlightColor: Colors.transparent,
+                                  ),
+                                  child: PopupMenuButton<String>(
+                                    offset: const Offset(0, 40),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    color: Colors.white,
+                                    elevation: 4,
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Icon(
+                                        Icons.more_horiz_rounded,
                                         size: 20,
                                         color: AppTheme.darkText,
                                       ),
-                                      const SizedBox(width: 12),
-                                      const Text(
-                                        'Danh sách',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: AppTheme.darkText,
+                                    ),
+                                    onSelected: (value) {
+                                      // TODO: Handle menu actions
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        height: 48,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.edit_rounded,
+                                              size: 20,
+                                              color: AppTheme.darkText,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text(
+                                              'Sửa tên',
+                                              style: TextStyle(
+                                                color: AppTheme.darkText,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      if (_sectionTypes[section] != 'ITINERARY')
-                                        const Spacer(),
-                                      if (_sectionTypes[section] != 'ITINERARY')
-                                        const Icon(
-                                          Icons.check_rounded,
-                                          size: 20,
-                                          color: AppTheme.darkText,
+                                      const PopupMenuItem(
+                                        value: 'color',
+                                        height: 48,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.palette_rounded,
+                                              size: 20,
+                                              color: AppTheme.darkText,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                'Thay đổi màu sắc hoặc biểu tượng',
+                                                style: TextStyle(
+                                                  color: AppTheme.darkText,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                maxLines: 2,
+                                              ),
+                                            ),
+                                          ],
                                         ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'select_all',
+                                        height: 48,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.check_box_outlined,
+                                              size: 20,
+                                              color: AppTheme.darkText,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text(
+                                              'Chọn tất cả',
+                                              style: TextStyle(
+                                                color: AppTheme.darkText,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'add_note',
+                                        height: 48,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.note_add_rounded,
+                                              size: 20,
+                                              color: AppTheme.darkText,
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text(
+                                              'Thêm ghi chú',
+                                              style: TextStyle(
+                                                color: AppTheme.darkText,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuDivider(),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        height: 48,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.delete_outline_rounded,
+                                              size: 20,
+                                              color: AppTheme.red,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Text(
+                                              'Xóa mục',
+                                              style: TextStyle(
+                                                color: AppTheme.red,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
-                                PopupMenuItem(
-                                  value: 'ITINERARY',
-                                  height: 48,
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.calendar_month_rounded,
-                                        size: 20,
-                                        color: AppTheme.darkText,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      const Text(
-                                        'Hành trình',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: AppTheme.darkText,
-                                        ),
-                                      ),
-                                      if (_sectionTypes[section] == 'ITINERARY')
-                                        const Spacer(),
-                                      if (_sectionTypes[section] == 'ITINERARY')
-                                        const Icon(
-                                          Icons.check_rounded,
-                                          size: 20,
-                                          color: AppTheme.darkText,
-                                        ),
-                                    ],
-                                  ),
-                                ),
                               ],
                             ),
-                          ),
+                          ],
                         ),
-                        Theme(
-                          data: Theme.of(context).copyWith(
-                            splashColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                          ),
-                          child: PopupMenuButton<String>(
-                            icon: const Icon(
-                              Icons.more_horiz_rounded,
-                              color: AppTheme.subtitleText,
-                            ),
-                            offset: const Offset(0, 40),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        color: Colors.white,
-                        elevation: 4,
-                        onSelected: (value) {
-                          if (value == 'edit') {
-                            setState(() {
-                              _editingSection = section;
-                              _sectionTitleController.text = section;
-                            });
-                            _sectionTitleFocusNode.requestFocus();
-                          } else if (value == 'color') {
-                            _showSectionStyleSheet(context, section);
-                          } else if (value == 'reorder') {
-                            _showSectionStyleSheet(
-                              context,
-                              section,
-                              initialTabIndex: 1,
-                            );
-                          } else if (value == 'collapse') {
-                            for (var controller
-                                in _expansionControllers.values) {
-                              if (controller.isExpanded) {
-                                controller.collapse();
-                              }
-                            }
-                          } else if (value == 'delete') {
-                            setState(() {
-                              _sectionNames.remove(section);
-                              _sectionColors.remove(section);
-                              _sectionIcons.remove(section);
-                              _savedPlaces.removeWhere(
-                                (place) => place['section'] == section,
-                              );
-                              _expansionControllers.remove(section);
-                            });
-                            final itId = _itineraryData['id'] as int;
-                            DatabaseService().deleteItinerarySection(
-                              itId,
-                              section,
-                            );
-                            DatabaseService().deleteSavedPlacesBySection(
-                              itId,
-                              section,
-                            );
-                            _syncSectionsToDatabase();
-                          } else if (value == 'select_all') {
-                            setState(() {
-                              _isSelectionMode = true;
-                              _selectedSections.add(section);
-                              for (var place in _savedPlaces) {
-                                if (place['section'] == section &&
-                                    place['id'] != null) {
-                                  _selectedItemIds.add(place['id'] as int);
-                                }
-                              }
-                            });
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Tính năng đang phát triển ($value)',
-                                ),
-                                duration: const Duration(seconds: 1),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          const PopupMenuItem(
-                            value: 'edit',
-                            height: 48,
+                        // BOTTOM ROW
+                        if ((subTitle != null && subTitle.isNotEmpty) || _sectionTypes[section] == 'ITINERARY')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
                             child: Row(
-                              children: [
-                                Icon(
-                                  Icons.edit_rounded,
-                                  size: 20,
-                                  color: AppTheme.darkText,
-                                ),
-                                SizedBox(width: 12),
-                                Text(
-                                  'Chỉnh sửa tiêu đề',
-                                  style: TextStyle(
-                                    color: AppTheme.darkText,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'color',
-                            height: 48,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.palette_rounded,
-                                  size: 20,
-                                  color: AppTheme.darkText,
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Thay đổi màu sắc hoặc biểu tượng',
-                                    style: TextStyle(
-                                      color: AppTheme.darkText,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    maxLines: 2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'select_all',
-                            height: 48,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.check_box_outlined,
-                                  size: 20,
-                                  color: AppTheme.darkText,
-                                ),
-                                SizedBox(width: 12),
-                                Text(
-                                  'Chọn tất cả',
-                                  style: TextStyle(
-                                    color: AppTheme.darkText,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'collapse',
-                            height: 48,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.close_fullscreen_rounded,
-                                  size: 20,
-                                  color: AppTheme.darkText,
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Thu gọn tất cả các phần',
-                                    style: TextStyle(
-                                      color: AppTheme.darkText,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    maxLines: 2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'delete',
-                            height: 48,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.delete_outline_rounded,
-                                  size: 20,
-                                  color: AppTheme.darkText,
-                                ),
-                                SizedBox(width: 12),
-                                Text(
-                                  'Xóa phần',
-                                  style: TextStyle(
-                                    color: AppTheme.darkText,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuDivider(),
-                          const PopupMenuItem(
-                            value: 'reorder',
-                            height: 48,
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.menu_rounded,
-                                  size: 20,
-                                  color: AppTheme.darkText,
-                                ),
-                                SizedBox(width: 12),
-                                Text(
-                                  'Sắp xếp lại các phần',
-                                  style: TextStyle(
-                                    color: AppTheme.darkText,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                    title: _editingSection == section
-                        ? TextField(
-                            controller: _sectionTitleController,
-                            focusNode: _sectionTitleFocusNode,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: index == 0
-                                  ? AppTheme.darkText
-                                  : AppTheme.subtitleText,
-                            ),
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                              border: InputBorder.none,
-                            ),
-                            onSubmitted: (newValue) =>
-                                _saveSectionTitle(section, newValue),
-                            onTapOutside: (_) => _saveSectionTitle(
-                              section,
-                              _sectionTitleController.text,
-                            ),
-                          )
-                        : GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _editingSection = section;
-                                _sectionTitleController.text = section;
-                              });
-                              Future.delayed(const Duration(milliseconds: 100), () {
-                                if (mounted) {
-                                  _sectionTitleFocusNode.requestFocus();
-                                }
-                              });
-                            },
-                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  section,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    color: index == 0
-                                        ? AppTheme.darkText
-                                        : AppTheme.subtitleText,
-                                  ),
-                                ),
-                                if (subTitle != null && subTitle.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 4.0),
+                                const SizedBox(width: 32),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => _editSectionSubtitle(section, subTitle),
                                     child: Text(
-                                      subTitle,
-                                      style: const TextStyle(
+                                      (subTitle != null && subTitle.isNotEmpty)
+                                          ? subTitle
+                                          : 'Thêm tiêu đề phụ',
+                                      style: TextStyle(
                                         fontSize: 13,
-                                        color: AppTheme.subtitleText,
+                                        color: (subTitle != null && subTitle.isNotEmpty) 
+                                            ? AppTheme.subtitleText 
+                                            : Colors.grey[400],
                                         fontStyle: FontStyle.italic,
                                       ),
                                     ),
                                   ),
+                                ),
+                                if (_sectionTypes[section] == 'ITINERARY')
+                                  Builder(
+                                    builder: (context) {
+                                      int totalDuration = 0;
+                                      double totalDistance = 0;
+                                      final placesOnly = sectionDetails.where((d) => d['placeId'] != null && d['place'] != null).toList();
+                                      if (placesOnly.length >= 2) {
+                                        for (int i = 0; i < placesOnly.length - 1; i++) {
+                                          final p1 = Map<String, dynamic>.from(placesOnly[i]['place'] as Map);
+                                          final p2 = Map<String, dynamic>.from(placesOnly[i + 1]['place'] as Map);
+                                          final travelInfo = _getMockTravelInfo(p1, p2);
+                                          totalDuration += travelInfo['duration'] as int;
+                                          totalDistance += double.tryParse((travelInfo['distance'] as String).replaceAll(',', '.')) ?? 0.0;
+                                        }
+                                      }
+                                      
+                                      if (placesOnly.isEmpty) return const SizedBox.shrink();
+                                      
+                                      return Padding(
+                                        padding: const EdgeInsets.only(top: 6.0, right: 4.0),
+                                        child: InkWell(
+                                          onTap: () {
+                                            // TODO: Tối ưu lộ trình
+                                          },
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 2.0),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.end,
+                                              children: [
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.alt_route_rounded, size: 14, color: Color(0xFF5C5CFF)),
+                                                    const SizedBox(width: 4),
+                                                    const Text(
+                                                      'Tối ưu lộ trình', 
+                                                      style: TextStyle(color: Color(0xFF5C5CFF), fontSize: 11, fontWeight: FontWeight.bold)
+                                                    ),
+                                                  ],
+                                                ),
+                                                if (placesOnly.length >= 2)
+                                                  Text(
+                                                    '$totalDuration phút, ${totalDistance.toStringAsFixed(1).replaceAll('.', ',')} km',
+                                                    style: const TextStyle(fontSize: 10, color: AppTheme.subtitleText),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  ),
                               ],
                             ),
                           ),
+                      ],
+                    ),
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(
@@ -6388,29 +6436,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                           }
                                         }
                                         if (prevPlaceRaw != null) {
-                                          final travelInfo = _getMockTravelInfo(prevPlaceRaw, sectionDetails[sIdx + 1]['place'] as Map<String, dynamic>);
-                                          final duration = travelInfo['duration'];
-                                          final distance = travelInfo['distance'];
-                                          
-                                          travelSeparator = Padding(
-                                            padding: const EdgeInsets.only(left: 8.0, top: 8.0, bottom: 8.0),
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.directions_car_filled_rounded, size: 16, color: AppTheme.subtitleText),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    '$distance km • $duration phút (Lái xe)',
-                                                    style: const TextStyle(
-                                                      color: AppTheme.subtitleText,
-                                                      fontSize: 12,
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                          travelSeparator = _buildTravelSeparator(
+                                            Map<String, dynamic>.from(prevPlaceRaw),
+                                            Map<String, dynamic>.from(sectionDetails[sIdx + 1]['place'] as Map<String, dynamic>),
                                           );
                                         }
                                       }
@@ -7029,49 +7057,297 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          const Icon(
-            Icons.directions_car_filled_rounded,
-            color: Colors.grey,
-            size: 16,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '$duration phút từ ${p1['name'] ?? ''} · $distance km',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          GestureDetector(
+            onTap: () => _showTransportModeSheet(),
+            child: Row(
+              children: [
+                Icon(Icons.directions_run_rounded, color: Colors.grey[600], size: 16),
+                const SizedBox(width: 4),
+                Text(
+                  '$duration phút • $distance km',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+                const SizedBox(width: 2),
+                Icon(Icons.arrow_drop_down_rounded, color: Colors.grey[600], size: 16),
+              ],
             ),
           ),
+          const SizedBox(width: 8),
           GestureDetector(
-            onTap: () {
-              _showPremiumNotification(
-                title: 'Chỉ đường',
-                message: 'Đang mở Bản đồ chỉ đường từ ${p1['name'] ?? ''}...',
-                icon: Icons.navigation_rounded,
-                color: AppTheme.primary,
-              );
+            onTap: () async {
+              final lat1 = p1['latitude'];
+              final lng1 = p1['longitude'];
+              final lat2 = p2['latitude'];
+              final lng2 = p2['longitude'];
+
+              if (lat1 != null && lng1 != null && lat2 != null && lng2 != null) {
+                final url = Uri.parse('https://www.google.com/maps/dir/?api=1&origin=$lat1,$lng1&destination=$lat2,$lng2');
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Không thể mở Google Maps')),
+                  );
+                }
+              } else if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Không đủ thông tin toạ độ để chỉ đường')),
+                );
+              }
             },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Chỉ đường',
-                  style: TextStyle(
-                    color: Color(0xFF0284C7),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+            child: const Text(
+              'Chỉ đường',
+              style: TextStyle(color: Color(0xFF5C5CFF), fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final boxWidth = constraints.constrainWidth();
+                const dashWidth = 4.0;
+                const dashSpace = 4.0;
+                final dashCount = (boxWidth / (dashWidth + dashSpace)).floor();
+                return Flex(
+                  direction: Axis.horizontal,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(dashCount, (_) {
+                    return SizedBox(
+                      width: dashWidth,
+                      height: 1,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(color: Colors.grey[300]),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTransportModeSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
                   ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Chế độ vận chuyển',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                _buildTransportModeOption(
+                  icon: Icons.directions_car_filled_rounded,
+                  title: 'Lái xe',
+                  info: '4 phút • 2,3 km',
+                  onTap: () => Navigator.pop(context),
                 ),
-                Icon(
-                  Icons.arrow_drop_down_rounded,
-                  color: Color(0xFF0284C7),
-                  size: 16,
+                _buildTransportModeOption(
+                  icon: Icons.directions_transit_rounded,
+                  title: 'Phương tiện công cộng',
+                  info: '32 phút • 2,3 km',
+                  onTap: () => Navigator.pop(context),
+                ),
+                _buildTransportModeOption(
+                  icon: Icons.directions_walk_rounded,
+                  title: 'Đi bộ',
+                  info: '28 phút • 2,3 km',
+                  onTap: () => Navigator.pop(context),
+                ),
+                _buildTransportModeOption(
+                  icon: Icons.visibility_off_outlined,
+                  title: 'Ẩn chỉ đường',
+                  info: null,
+                  onTap: () => Navigator.pop(context),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Divider(height: 32),
+                ),
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showDefaultTransportModeSheet();
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Thay đổi mặc định cho tất cả các địa điểm',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.darkText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
+        );
+      },
+    );
+  }
+
+  void _showDefaultTransportModeSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                      const Text(
+                        'Chế độ vận chuyển mặc định',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 16),
+                _buildDefaultModeOption(
+                  title: 'Phương tiện công cộng + đi bộ khoảng cách ngắn',
+                  isSelected: false,
+                  onTap: () => Navigator.pop(context),
+                ),
+                _buildDefaultModeOption(
+                  title: 'Lái xe + đi bộ khoảng cách ngắn',
+                  isSelected: true,
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTransportModeOption({
+    required IconData icon,
+    required String title,
+    String? info,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, color: AppTheme.darkText, size: 20),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.darkText,
+                ),
+              ),
+            ),
+            if (info != null)
+              Text(
+                info,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.subtitleText,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefaultModeOption({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.darkText,
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check, color: AppTheme.darkText, size: 20),
+          ],
+        ),
       ),
     );
   }
@@ -7484,7 +7760,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
           child: Column(
             children: [
               card,
-              ?travelSeparator,
+              if (travelSeparator != null) travelSeparator,
               if (travelSeparator != null) const SizedBox(height: 8),
             ],
           ),

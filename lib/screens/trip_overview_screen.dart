@@ -6980,49 +6980,297 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          const Icon(
-            Icons.directions_car_filled_rounded,
-            color: Colors.grey,
-            size: 16,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '$duration phút từ ${p1['name'] ?? ''} · $distance km',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          GestureDetector(
+            onTap: () => _showTransportModeSheet(),
+            child: Row(
+              children: [
+                Icon(Icons.directions_run_rounded, color: Colors.grey[600], size: 16),
+                const SizedBox(width: 4),
+                Text(
+                  '$duration phút • $distance km',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+                const SizedBox(width: 2),
+                Icon(Icons.arrow_drop_down_rounded, color: Colors.grey[600], size: 16),
+              ],
             ),
           ),
+          const SizedBox(width: 8),
           GestureDetector(
-            onTap: () {
-              _showPremiumNotification(
-                title: 'Chỉ đường',
-                message: 'Đang mở Bản đồ chỉ đường từ ${p1['name'] ?? ''}...',
-                icon: Icons.navigation_rounded,
-                color: AppTheme.primary,
-              );
+            onTap: () async {
+              final lat1 = p1['latitude'];
+              final lng1 = p1['longitude'];
+              final lat2 = p2['latitude'];
+              final lng2 = p2['longitude'];
+
+              if (lat1 != null && lng1 != null && lat2 != null && lng2 != null) {
+                final url = Uri.parse('https://www.google.com/maps/dir/?api=1&origin=$lat1,$lng1&destination=$lat2,$lng2');
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Không thể mở Google Maps')),
+                  );
+                }
+              } else if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Không đủ thông tin toạ độ để chỉ đường')),
+                );
+              }
             },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Chỉ đường',
-                  style: TextStyle(
-                    color: Color(0xFF0284C7),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+            child: const Text(
+              'Chỉ đường',
+              style: TextStyle(color: Color(0xFF5C5CFF), fontSize: 12, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final boxWidth = constraints.constrainWidth();
+                const dashWidth = 4.0;
+                const dashSpace = 4.0;
+                final dashCount = (boxWidth / (dashWidth + dashSpace)).floor();
+                return Flex(
+                  direction: Axis.horizontal,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(dashCount, (_) {
+                    return SizedBox(
+                      width: dashWidth,
+                      height: 1,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(color: Colors.grey[300]),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTransportModeSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
                   ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Chế độ vận chuyển',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                _buildTransportModeOption(
+                  icon: Icons.directions_car_filled_rounded,
+                  title: 'Lái xe',
+                  info: '4 phút • 2,3 km',
+                  onTap: () => Navigator.pop(context),
                 ),
-                Icon(
-                  Icons.arrow_drop_down_rounded,
-                  color: Color(0xFF0284C7),
-                  size: 16,
+                _buildTransportModeOption(
+                  icon: Icons.directions_transit_rounded,
+                  title: 'Phương tiện công cộng',
+                  info: '32 phút • 2,3 km',
+                  onTap: () => Navigator.pop(context),
+                ),
+                _buildTransportModeOption(
+                  icon: Icons.directions_walk_rounded,
+                  title: 'Đi bộ',
+                  info: '28 phút • 2,3 km',
+                  onTap: () => Navigator.pop(context),
+                ),
+                _buildTransportModeOption(
+                  icon: Icons.visibility_off_outlined,
+                  title: 'Ẩn chỉ đường',
+                  info: null,
+                  onTap: () => Navigator.pop(context),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Divider(height: 32),
+                ),
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showDefaultTransportModeSheet();
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Thay đổi mặc định cho tất cả các địa điểm',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.darkText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
+        );
+      },
+    );
+  }
+
+  void _showDefaultTransportModeSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                      const Text(
+                        'Chế độ vận chuyển mặc định',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 16),
+                _buildDefaultModeOption(
+                  title: 'Phương tiện công cộng + đi bộ khoảng cách ngắn',
+                  isSelected: false,
+                  onTap: () => Navigator.pop(context),
+                ),
+                _buildDefaultModeOption(
+                  title: 'Lái xe + đi bộ khoảng cách ngắn',
+                  isSelected: true,
+                  onTap: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+        ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTransportModeOption({
+    required IconData icon,
+    required String title,
+    String? info,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, color: AppTheme.darkText, size: 20),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.darkText,
+                ),
+              ),
+            ),
+            if (info != null)
+              Text(
+                info,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.subtitleText,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefaultModeOption({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppTheme.darkText,
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check, color: AppTheme.darkText, size: 20),
+          ],
+        ),
       ),
     );
   }
