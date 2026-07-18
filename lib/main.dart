@@ -255,28 +255,28 @@ class _CloudmoodFloatingNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1A56DB).withAlpha(30),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Colors.black.withAlpha(15),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: AppTheme.border, width: 1),
-      ),
-      child: SafeArea(
-        top: false,
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1A56DB).withAlpha(30),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: Colors.black.withAlpha(15),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(color: AppTheme.border, width: 1),
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: List.generate(_items.length, (i) {
