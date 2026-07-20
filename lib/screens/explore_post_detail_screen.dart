@@ -7,14 +7,18 @@ import 'package:intl/intl.dart';
 import 'explore_post_map_screen.dart';
 import '../utils/time_utils.dart';
 import '../widgets/expandable_opening_hours.dart';
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
 class ExplorePostDetailScreen extends StatefulWidget {
-  final int postId;
+  final int? postId;
   final String title;
+  final Map<String, dynamic>? post;
 
   const ExplorePostDetailScreen({
     Key? key,
-    required this.postId,
+    this.postId,
     required this.title,
+    this.post,
   }) : super(key: key);
 
   @override
@@ -25,20 +29,51 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
   Map<String, dynamic>? _post;
   bool _isLoading = true;
   final Set<int> _expandedPlaces = {};
+  final Set<String> _collapsedSections = {};
+  
+  bool _isLiked = false;
+  int _likeCount = 0;
+  int _viewCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _fetchPostDetail();
+    if (widget.post != null) {
+      _post = widget.post;
+      _isLoading = false;
+      _initStats();
+      if (widget.postId != null) {
+        _fetchPostDetail(silent: true);
+      }
+    } else if (widget.postId != null) {
+      _fetchPostDetail();
+    } else {
+      _isLoading = false;
+    }
+  }
+  
+  void _initStats() {
+    if (_post == null) return;
+    _likeCount = _post!['likeCount'] ?? 0;
+    _viewCount = _post!['viewCount'] ?? 0;
+    
+    final myUserId = AuthService().currentUser.value?.id;
+    final likesList = _post!['likes'] as List?;
+    if (likesList != null && myUserId != null) {
+      _isLiked = likesList.any((l) => l['userId'] == myUserId);
+    }
   }
 
-  Future<void> _fetchPostDetail() async {
+  Future<void> _fetchPostDetail({bool silent = false}) async {
     try {
-      // Giả định backend chạy ở localhost:3000
-      final response = await http.get(Uri.parse('http://localhost:3000/explore/${widget.postId}'));
+      if (!silent) {
+        setState(() => _isLoading = true);
+      }
+      final response = await ApiClient.get('/explore/${widget.postId}');
       if (response.statusCode == 200) {
         setState(() {
           _post = jsonDecode(response.body);
+          _initStats();
           _isLoading = false;
         });
       } else {
@@ -47,6 +82,30 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
     } catch (e) {
       print('Error fetching post details: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    if (widget.postId == null) return;
+    
+    final newIsLiked = !_isLiked;
+    setState(() {
+      _isLiked = newIsLiked;
+      _likeCount += newIsLiked ? 1 : -1;
+    });
+    
+    try {
+      if (newIsLiked) {
+        await ApiClient.post('/explore/${widget.postId}/like');
+      } else {
+        await ApiClient.delete('/explore/${widget.postId}/like');
+      }
+    } catch (e) {
+      // Revert on error
+      setState(() {
+        _isLiked = !newIsLiked;
+        _likeCount += !newIsLiked ? 1 : -1;
+      });
     }
   }
 
@@ -102,7 +161,21 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
         ? platformLogo 
         : (_post!['author']?['avatar'] ?? 'https://via.placeholder.com/150');
 
-    final items = _post!['items'] as List? ?? [];
+    final itemsRaw = _post!['items'] as List? ?? [];
+    
+    // Filter items based on collapsed sections
+    final List<dynamic> items = [];
+    String? currentSection;
+    for (final item in itemsRaw) {
+      if (item['itemType'] == 'SECTION_HEADER') {
+        currentSection = item['content'];
+        items.add(item);
+      } else {
+        if (currentSection == null || !_collapsedSections.contains(currentSection)) {
+          items.add(item);
+        }
+      }
+    }
 
     int placeCounter = 1;
 
@@ -184,7 +257,9 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      isPlatform ? 'Từ $authorName' : authorName,
+                      isPlatform 
+                          ? (authorName.toLowerCase().startsWith('từ ') ? authorName : 'Từ $authorName') 
+                          : authorName,
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey[700],
@@ -207,6 +282,31 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                           color: Colors.black87,
                         ),
                       ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: _toggleLike,
+                          child: Icon(
+                            _isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: _isLiked ? Colors.red : Colors.grey[600],
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$_likeCount',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                        ),
+                        const SizedBox(width: 16),
+                        Icon(Icons.visibility_outlined, size: 20, color: Colors.grey[600]),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$_viewCount',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -230,10 +330,8 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
             ),
           
           // List of Places/Items
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final item = items[index];
                   final itemType = item['itemType'];
@@ -246,7 +344,10 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                     final placeImage = place['image'] ?? 'https://via.placeholder.com/300x200';
                     final category = place['category']?['name'] ?? 'Địa điểm';
                     final featuredReview = item['featuredReview'];
-                    final content = item['content'] ?? '';
+                    String content = item['content'] ?? '';
+                    if (content.isEmpty) {
+                      content = place['description'] ?? '';
+                    }
                     
                     final currentIndex = placeCounter++;
                     int currentReviewIndex = 0;
@@ -264,7 +365,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                         });
                       },
                       child: Container(
-                        margin: const EdgeInsets.only(bottom: 16),
+                        margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -646,26 +747,184 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                       ),
                     );
                   } else if (itemType == 'SECTION_HEADER') {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: Text(
-                        item['content'] ?? '',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                    final bool isFirstSection = index == 0 || items.take(index).where((it) => it['itemType'] == 'SECTION_HEADER').isEmpty;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (!isFirstSection)
+                          Container(
+                            height: 12,
+                            width: double.infinity,
+                            color: const Color(0xFFF3F4F6),
+                          ),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              final sectionName = item['content'] ?? '';
+                              if (_collapsedSections.contains(sectionName)) {
+                                _collapsedSections.remove(sectionName);
+                              } else {
+                                _collapsedSections.add(sectionName);
+                              }
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _collapsedSections.contains(item['content']) ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_down,
+                                  size: 24,
+                                  color: Colors.black87,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    item['content'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     );
                   } else if (itemType == 'NOTE') {
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        item['content'] ?? '',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Colors.black87,
-                          height: 1.5,
+                      padding: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.grey.shade200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.02),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF9CA3AF),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.insert_drive_file, color: Colors.white, size: 16),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Text(
+                                  item['content'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  } else if (itemType == 'TODO') {
+                    String title = item['content'] ?? 'Danh sách công việc';
+                    List<dynamic> todoList = [];
+                    
+                    try {
+                      final parsedContent = jsonDecode(title);
+                      if (parsedContent is Map) {
+                        title = parsedContent['title'] ?? 'Danh sách công việc';
+                        todoList = parsedContent['items'] ?? [];
+                      }
+                    } catch (_) {}
+
+                    final rawTodo = item['todoItems'];
+                    if (rawTodo != null && todoList.isEmpty) {
+                      if (rawTodo is List) {
+                        todoList = rawTodo;
+                      } else if (rawTodo is String) {
+                        try {
+                          todoList = json.decode(rawTodo) as List;
+                        } catch (_) {}
+                      }
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFE2E8F0),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.fact_check_outlined,
+                                    color: AppTheme.subtitleText,
+                                    size: 16,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (todoList.isNotEmpty) const SizedBox(height: 12),
+                            ...todoList.map((todo) {
+                              final isDone = todo['done'] == true;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isDone ? Icons.check_circle : Icons.radio_button_unchecked,
+                                      color: isDone ? Colors.green : Colors.grey,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        todo['text'] ?? '',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: isDone ? Colors.grey : Colors.black87,
+                                          decoration: isDone ? TextDecoration.lineThrough : null,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
                         ),
                       ),
                     );
@@ -676,7 +935,6 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                 childCount: items.length,
               ),
             ),
-          ),
           
           // Extra bottom padding
           const SliverToBoxAdapter(
