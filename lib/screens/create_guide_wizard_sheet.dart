@@ -239,7 +239,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close_rounded, color: AppTheme.subtitleText),
+                        icon: Icon(Icons.close_rounded, color: AppTheme.subtitleText),
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                     ],
@@ -261,11 +261,11 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                     children: [
                       Text(
                         'Bước ${_currentStep + 1} / 2',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.subtitleText),
+                        style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
                       ),
                       Text(
                         _currentStep == 0 ? 'Đặt tên' : 'Chọn điểm đến',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppTheme.subtitleText,
                           fontWeight: FontWeight.w600,
@@ -277,7 +277,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
               ),
             ),
 
-            const Divider(color: AppTheme.border, height: 1),
+            Divider(color: AppTheme.border, height: 1),
 
             // Page content
             Expanded(
@@ -299,7 +299,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                 top: 16,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 24,
               ),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border(top: BorderSide(color: AppTheme.border, width: 1)),
               ),
@@ -316,7 +316,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                             color: AppTheme.surfaceVariant,
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Text(
                               'Quay lại',
                               style: TextStyle(
@@ -376,7 +376,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '📝 Đặt tên cho hướng dẫn',
             style: TextStyle(
               fontSize: 20,
@@ -385,7 +385,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Một cái tên hay sẽ giúp người đọc biết ngay đây là hướng dẫn về gì.',
             style: TextStyle(fontSize: 14, color: AppTheme.subtitleText),
           ),
@@ -394,7 +394,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
             controller: _titleController,
             autofocus: true,
             maxLength: 80,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.darkText),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.darkText),
             decoration: AppTheme.inputDecoration(
               hintText: 'VD: Khám phá Đà Nẵng từ A-Z',
               prefixIcon: Icons.menu_book_rounded,
@@ -414,7 +414,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFFFE082)),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -449,12 +449,12 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 '📍 Chọn điểm đến',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.darkText),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Hướng dẫn này nói về địa điểm nào?',
                 style: TextStyle(fontSize: 14, color: AppTheme.subtitleText),
               ),
@@ -499,14 +499,14 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                               color: const Color(0xFFFFF8E1),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.location_on_rounded, color: AppTheme.amber, size: 18),
+                            child: Icon(Icons.location_on_rounded, color: AppTheme.amber, size: 18),
                           ),
-                          title: Text(shortName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                          title: Text(shortName, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           subtitle: Text(
                             name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12, color: AppTheme.subtitleText),
+                             style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
                           ),
                           onTap: () {
                             setState(() {
@@ -541,7 +541,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                                 Expanded(
                                   child: Text(
                                     _selectedDestination,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       color: AppTheme.darkText,
                                       fontSize: 15,
@@ -553,14 +553,14 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                                     _selectedDestination = '';
                                     _placesForDestination = [];
                                   }),
-                                  child: const Icon(Icons.close_rounded, color: AppTheme.subtitleText, size: 18),
+                                  child: Icon(Icons.close_rounded, color: AppTheme.subtitleText, size: 18),
                                 ),
                               ],
                             ),
                           ),
 
                         // Popular destinations chips
-                        const Text(
+                        Text(
                           'Điểm đến phổ biến',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.subtitleText),
                         ),
@@ -611,11 +611,11 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                           const SizedBox(height: 24),
                           Row(
                             children: [
-                              const Icon(Icons.storefront_rounded, size: 16, color: AppTheme.subtitleText),
+                              Icon(Icons.storefront_rounded, size: 16, color: AppTheme.subtitleText),
                               const SizedBox(width: 6),
                               Text(
                                 'Địa điểm ở $_selectedDestination',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                   color: AppTheme.subtitleText,
@@ -624,7 +624,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                               if (_placesForDestination.isNotEmpty)
                                 Text(
                                   ' (${_placesForDestination.length})',
-                                  style: const TextStyle(fontSize: 13, color: AppTheme.subtitleText),
+                                  style: TextStyle(fontSize: 13, color: AppTheme.subtitleText),
                                 ),
                             ],
                           ),
@@ -635,7 +635,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                               child: Center(child: CircularProgressIndicator(color: AppTheme.amber, strokeWidth: 2.5)),
                             )
                           else if (_placesForDestination.isEmpty)
-                            const Padding(
+                            Padding(
                               padding: EdgeInsets.symmetric(vertical: 12),
                               child: Text(
                                 'Chưa có địa điểm nào trong khu vực này.',

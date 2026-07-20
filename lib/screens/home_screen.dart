@@ -199,7 +199,7 @@ class SearchHeaderWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Hôm nay tâm trạng bạn thế nào?',
             style: TextStyle(
               fontSize: 14,
@@ -208,7 +208,7 @@ class SearchHeaderWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Lên lịch trình\ntheo cảm xúc ✨',
             style: TextStyle(
               fontSize: 26,
@@ -223,7 +223,7 @@ class SearchHeaderWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppTheme.surface,
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
@@ -266,7 +266,7 @@ class SearchHeaderWidget extends StatelessWidget {
                     color: AppTheme.surfaceVariant,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.tune_rounded,
                     color: AppTheme.subtitleText,
                     size: 16,
@@ -310,7 +310,7 @@ class MoodSelectorWidget extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Row(
             children: [
-              const Text(
+              Text(
                 'Tâm trạng hôm nay',
                 style: AppTheme.sectionTitleStyle,
               ),
@@ -358,7 +358,7 @@ class MoodSelectorWidget extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     gradient: isSelected ? AppTheme.primaryGradient : null,
-                    color: isSelected ? null : Colors.white,
+                    color: isSelected ? null : AppTheme.surface,
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
@@ -456,7 +456,7 @@ class FeaturedGuidesSection extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Hướng dẫn nổi bật',
                 style: AppTheme.sectionTitleStyle,
               ),
@@ -495,7 +495,7 @@ class FeaturedGuidesSection extends StatelessWidget {
                 width: 265,
                 margin: const EdgeInsets.only(right: 16.0),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(22),
                   boxShadow: [
                     BoxShadow(
@@ -525,7 +525,7 @@ class FeaturedGuidesSection extends StatelessWidget {
                               return Container(
                                 height: 155,
                                 color: AppTheme.surfaceVariant,
-                                child: const Icon(
+                                child: Icon(
                                   Icons.image_rounded,
                                   color: AppTheme.hintText,
                                   size: 40,
@@ -624,7 +624,7 @@ class FeaturedGuidesSection extends StatelessWidget {
                             guide['title']!,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
                               color: AppTheme.darkText,
@@ -636,7 +636,7 @@ class FeaturedGuidesSection extends StatelessWidget {
                             guide['desc']!,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               color: AppTheme.subtitleText,
                               height: 1.4,
@@ -673,7 +673,7 @@ class FeaturedGuidesSection extends StatelessWidget {
                                   '${guide['author']} · ${guide['views']}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
                                     color: AppTheme.subtitleText,
                                     fontWeight: FontWeight.w500,
@@ -743,7 +743,7 @@ class WeekendTripsSection extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Chuyến đi cuối tuần',
                 style: AppTheme.sectionTitleStyle,
               ),
@@ -839,7 +839,7 @@ class WeekendTripsSection extends StatelessWidget {
                         ),
                         child: Text(
                           trip['tag']!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
                             color: AppTheme.darkText,
@@ -933,7 +933,7 @@ class PopularDestinationsSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
                 'Điểm đến phổ biến',
@@ -954,7 +954,7 @@ class PopularDestinationsSection extends StatelessWidget {
                     width: 155,
                     margin: const EdgeInsets.only(right: 12.0),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppTheme.surface,
                       borderRadius: BorderRadius.circular(18),
                       boxShadow: [
                         BoxShadow(
@@ -1008,7 +1008,7 @@ class PopularDestinationsSection extends StatelessWidget {
                                   dest['name'] ?? '',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.darkText,
@@ -1124,7 +1124,7 @@ class CreateMenuOverlay extends StatelessWidget {
                                       ),
                                     ],
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.close_rounded,
                                     color: AppTheme.darkText,
                                     size: 20,
@@ -1135,7 +1135,7 @@ class CreateMenuOverlay extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.symmetric(horizontal: 24.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1236,7 +1236,7 @@ class CreateMenuOverlay extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Text(
+                            Text(
                               'Bắt đầu nhanh với mẫu có sẵn',
                               style: TextStyle(
                                 fontSize: 14,
@@ -1320,7 +1320,7 @@ class CreateMenuOverlay extends StatelessWidget {
                                             tmpl['title']!,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w700,
                                               color: AppTheme.darkText,
@@ -1339,7 +1339,7 @@ class CreateMenuOverlay extends StatelessWidget {
                                             ),
                                             child: Text(
                                               tmpl['mood']!,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.w600,
                                                 color: AppTheme.bodyText,
@@ -1349,7 +1349,7 @@ class CreateMenuOverlay extends StatelessWidget {
                                           const SizedBox(height: 4),
                                           Text(
                                             tmpl['duration']!,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 10,
                                               color: AppTheme.subtitleText,
                                             ),
@@ -1419,7 +1419,7 @@ class CreateMenuOverlay extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.darkText,
@@ -1428,7 +1428,7 @@ class CreateMenuOverlay extends StatelessWidget {
                   const SizedBox(height: 5),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppTheme.subtitleText,
                       height: 1.4,

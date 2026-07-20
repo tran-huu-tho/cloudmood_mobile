@@ -46,9 +46,9 @@ class PlaceDetailBottomSheet extends StatefulWidget {
         minChildSize: 0.5,
         maxChildSize: 0.95,
         builder: (_, controller) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: PlaceDetailBottomSheet(
             place: place,
@@ -995,7 +995,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
             width: 45,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
                 color: AppTheme.darkText,
@@ -1324,7 +1324,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                   children: [
                     Text(
                       authorName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                         color: AppTheme.darkText,

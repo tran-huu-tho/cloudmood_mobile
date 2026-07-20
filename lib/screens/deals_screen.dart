@@ -64,7 +64,7 @@ class CloudmoodDealsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       'Mã Giảm Giá &\nƯu Đãi Chuyến Đi',
                       style: TextStyle(
                         fontSize: 26,
@@ -303,7 +303,7 @@ class CloudmoodDealsScreen extends StatelessWidget {
                                 const SizedBox(height: 6),
                                 Text(
                                   deal['title']!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w800,
                                     color: AppTheme.darkText,
@@ -313,7 +313,7 @@ class CloudmoodDealsScreen extends StatelessWidget {
                                 const SizedBox(height: 6),
                                 Text(
                                   deal['desc']!,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     color: AppTheme.subtitleText,
                                     height: 1.4,

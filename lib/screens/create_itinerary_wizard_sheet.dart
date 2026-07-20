@@ -445,7 +445,7 @@ class _CreateItineraryWizardSheetState
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.close_rounded,
                           color: AppTheme.subtitleText,
                         ),
@@ -492,7 +492,7 @@ class _CreateItineraryWizardSheetState
                 top: 16,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 24,
               ),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border(
                   top: BorderSide(color: AppTheme.border, width: 1),
@@ -515,7 +515,7 @@ class _CreateItineraryWizardSheetState
                         ),
                       ),
                       onPressed: _prevStep,
-                      child: const Text(
+                      child: Text(
                         'Quay lại',
                         style: TextStyle(
                           color: AppTheme.darkText,
@@ -580,7 +580,7 @@ class _CreateItineraryWizardSheetState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Bước 1: Điểm đến & Ràng buộc cơ bản',
             style: TextStyle(
               fontSize: 13,
@@ -591,7 +591,7 @@ class _CreateItineraryWizardSheetState
           const SizedBox(height: 16),
 
           // Trip Title
-          const Text('Tên chuyến đi của bạn?', style: AppTheme.bodyBoldStyle),
+          Text('Tên chuyến đi của bạn?', style: AppTheme.bodyBoldStyle),
           const SizedBox(height: 8),
           TextField(
             controller: _titleController,
@@ -603,7 +603,7 @@ class _CreateItineraryWizardSheetState
           const SizedBox(height: 20),
 
           // Destination display
-          const Text('Điểm đến của bạn', style: AppTheme.bodyBoldStyle),
+          Text('Điểm đến của bạn', style: AppTheme.bodyBoldStyle),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -620,7 +620,7 @@ class _CreateItineraryWizardSheetState
                   _selectedDestination.isNotEmpty
                       ? _selectedDestination
                       : 'Chưa chọn',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.darkText,
@@ -632,7 +632,7 @@ class _CreateItineraryWizardSheetState
           const SizedBox(height: 20),
 
           // Trip Duration (Date Range)
-          const Text(
+          Text(
             'Thời gian chuyến đi của bạn?',
             style: AppTheme.bodyBoldStyle,
           ),
@@ -647,7 +647,7 @@ class _CreateItineraryWizardSheetState
                 builder: (context, child) {
                   return Theme(
                     data: Theme.of(context).copyWith(
-                      colorScheme: const ColorScheme.light(
+                      colorScheme: ColorScheme.light(
                         primary: AppTheme.primary,
                         onPrimary: Colors.white,
                         surface: Colors.white,
@@ -675,7 +675,7 @@ class _CreateItineraryWizardSheetState
               ),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.calendar_month_rounded,
                     color: AppTheme.subtitleText,
                   ),
@@ -685,13 +685,13 @@ class _CreateItineraryWizardSheetState
                       _selectedDateRange == null
                           ? 'Chọn khoảng thời gian đi'
                           : '${_selectedDateRange!.start.day}/${_selectedDateRange!.start.month} - ${_selectedDateRange!.end.day}/${_selectedDateRange!.end.month}/${_selectedDateRange!.end.year} ($_days ngày)',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         color: AppTheme.darkText,
                       ),
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.keyboard_arrow_right_rounded,
                     color: AppTheme.subtitleText,
                   ),
@@ -705,7 +705,7 @@ class _CreateItineraryWizardSheetState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Ngân sách dự kiến?', style: AppTheme.bodyBoldStyle),
+              Text('Ngân sách dự kiến?', style: AppTheme.bodyBoldStyle),
               Text(
                 _formatCurrency(_budget),
                 style: const TextStyle(
@@ -783,7 +783,7 @@ class _CreateItineraryWizardSheetState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Bước 2: Sở thích & Phong cách trải nghiệm',
             style: TextStyle(
               fontSize: 13,
@@ -794,7 +794,7 @@ class _CreateItineraryWizardSheetState
           const SizedBox(height: 16),
 
           // Categories Select (Tag Chips)
-          const Text(
+          Text(
             'Bạn muốn trải nghiệm những gì? (Chọn 2 - 4 mục)',
             style: AppTheme.bodyBoldStyle,
           ),
@@ -844,7 +844,7 @@ class _CreateItineraryWizardSheetState
           const SizedBox(height: 24),
 
           // Companion Select
-          const Text('Bạn đi du lịch cùng ai?', style: AppTheme.bodyBoldStyle),
+          Text('Bạn đi du lịch cùng ai?', style: AppTheme.bodyBoldStyle),
           const SizedBox(height: 12),
           ListView.separated(
             shrinkWrap: true,
@@ -897,7 +897,7 @@ class _CreateItineraryWizardSheetState
                             const SizedBox(height: 2),
                             Text(
                               comp['subtitle'],
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.subtitleText,
                               ),
@@ -930,7 +930,7 @@ class _CreateItineraryWizardSheetState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Bước 3: Nhịp độ & Yêu cầu tiện ích',
             style: TextStyle(
               fontSize: 13,
@@ -941,7 +941,7 @@ class _CreateItineraryWizardSheetState
           const SizedBox(height: 16),
 
           // Pace Selection
-          const Text(
+          Text(
             'Nhịp độ chuyến đi mong muốn?',
             style: AppTheme.bodyBoldStyle,
           ),
@@ -994,7 +994,7 @@ class _CreateItineraryWizardSheetState
                             const SizedBox(height: 4),
                             Text(
                               pace['desc'],
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.subtitleText,
                               ),
@@ -1020,7 +1020,7 @@ class _CreateItineraryWizardSheetState
           const SizedBox(height: 20),
 
           // Amenities Selection (Tag Chips)
-          const Text(
+          Text(
             'Bạn có yêu cầu đặc biệt nào không?',
             style: AppTheme.bodyBoldStyle,
           ),
@@ -1065,7 +1065,7 @@ class _CreateItineraryWizardSheetState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Bước 1: Chọn điểm đến',
             style: TextStyle(
               fontSize: 13,
@@ -1074,7 +1074,7 @@ class _CreateItineraryWizardSheetState
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Bạn muốn đi du lịch ở đâu?',
             style: AppTheme.bodyBoldStyle,
           ),
@@ -1091,7 +1091,7 @@ class _CreateItineraryWizardSheetState
                 ).copyWith(
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.clear_rounded,
                             color: AppTheme.subtitleText,
                           ),
@@ -1115,7 +1115,7 @@ class _CreateItineraryWizardSheetState
 
           if (_searchResults.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Gợi ý tìm kiếm',
               style: TextStyle(
                 fontSize: 14,
@@ -1135,7 +1135,7 @@ class _CreateItineraryWizardSheetState
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _searchResults.length,
                 separatorBuilder: (context, index) =>
-                    const Divider(height: 1, color: AppTheme.border),
+                    Divider(height: 1, color: AppTheme.border),
                 itemBuilder: (context, index) {
                   final feature = _searchResults[index];
                   final address = feature['address'] ?? {};
@@ -1156,14 +1156,14 @@ class _CreateItineraryWizardSheetState
                       ),
                       title: Text(
                         name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppTheme.darkText,
                         ),
                       ),
                       subtitle: Text(
                         formatted,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppTheme.subtitleText,
                         ),
@@ -1178,7 +1178,7 @@ class _CreateItineraryWizardSheetState
             ),
           ] else if (!_isLoadingSearch) ...[
             const SizedBox(height: 24),
-            const Text('Điểm đến phổ biến', style: AppTheme.bodyBoldStyle),
+            Text('Điểm đến phổ biến', style: AppTheme.bodyBoldStyle),
             const SizedBox(height: 12),
             GridView.builder(
               shrinkWrap: true,

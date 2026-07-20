@@ -252,7 +252,7 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 24),
               child: Text(
                 'Thêm vào kế hoạch chuyến đi',
@@ -278,7 +278,7 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                     ),
                     title: Text(
                       itin['name'] ?? 'Chuyến đi chưa đặt tên',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         color: AppTheme.bodyText,
                         fontWeight: FontWeight.w500,
@@ -343,7 +343,7 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                   )
                 else
                   const SizedBox(width: 48),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Thêm vào plan',
                     style: TextStyle(
@@ -373,7 +373,7 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
               shrinkWrap: true,
               children: [
                 if (sections.isNotEmpty)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(left: 24, top: 8, bottom: 8),
                     child: Text(
                       'Tổng quan',
@@ -400,21 +400,21 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                     leading: Icon(Icons.location_on, color: color),
                     title: Text(
                       sectionName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         color: AppTheme.bodyText,
                       ),
                     ),
                     trailing: isChecked
-                        ? const Icon(Icons.check, color: AppTheme.darkText)
+                        ? Icon(Icons.check, color: AppTheme.darkText)
                         : null,
                     onTap: () => _toggleSectionLocal(sectionName),
                   );
                 }),
 
                 if (numDays > 0)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 24, top: 16, bottom: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 24, top: 16, bottom: 8),
                     child: Text(
                       'Hành trình',
                       style: TextStyle(
@@ -439,13 +439,13 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                     leading: Icon(Icons.location_on, color: color),
                     title: Text(
                       dayTitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         color: AppTheme.bodyText,
                       ),
                     ),
                     trailing: isChecked
-                        ? const Icon(Icons.check, color: AppTheme.darkText)
+                        ? Icon(Icons.check, color: AppTheme.darkText)
                         : null,
                     onTap: () => _toggleDayLocal(dayNum),
                   );

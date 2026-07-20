@@ -156,13 +156,13 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.info_rounded,
                           color: AppTheme.subtitleText,
                           size: 20,
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Thông tin từ Trợ lý AI có thể không hoàn toàn chính xác.',
                             style: TextStyle(
@@ -182,7 +182,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           children: [
                             const SizedBox(height: 8),
-                            const Text(
+                            Text(
                               'Không biết hỏi gì? Thử một số ví dụ sau:',
                               style: TextStyle(
                                 fontSize: 24,
@@ -289,7 +289,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'Còn lại 9 tin nhắn miễn phí',
                               style: TextStyle(
                                 color: AppTheme.subtitleText,
@@ -303,7 +303,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                                 minimumSize: const Size(0, 0),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              child: const Text(
+                              child: Text(
                                 'Nhận thêm',
                                 style: TextStyle(
                                   color: AppTheme.darkText,
@@ -333,7 +333,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                               Expanded(
                                 child: TextField(
                                   controller: _controller,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     hintText:
                                         'Hỏi các câu hỏi liên quan đến du lịch',
                                     hintStyle: TextStyle(
@@ -433,7 +433,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                 CircleAvatar(
                   backgroundColor: Colors.white,
                   child: IconButton(
-                    icon: const Icon(Icons.search, color: AppTheme.darkText),
+                    icon: Icon(Icons.search, color: AppTheme.darkText),
                     onPressed: () {},
                   ),
                 ),
@@ -441,7 +441,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                 CircleAvatar(
                   backgroundColor: Colors.white,
                   child: IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.layers_outlined,
                       color: AppTheme.darkText,
                     ),
@@ -481,7 +481,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                             ],
                     ),
                     child: IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.arrow_back,
                         color: AppTheme.darkText,
                       ),
@@ -516,7 +516,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
+                        Text(
                           'Cuộc trò chuyện mới',
                           style: TextStyle(
                             color: AppTheme.darkText,

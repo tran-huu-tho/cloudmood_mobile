@@ -305,7 +305,7 @@ class _InlinePlaceWhiteCardExtensionState
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.access_time_rounded,
                     color: AppTheme.subtitleText,
                     size: 16,
@@ -315,7 +315,7 @@ class _InlinePlaceWhiteCardExtensionState
                     startTime != null && endTime != null
                         ? '$startTime - $endTime'
                         : 'Thêm giờ',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppTheme.subtitleText,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
@@ -329,7 +329,7 @@ class _InlinePlaceWhiteCardExtensionState
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.attach_file_rounded,
                     color: AppTheme.subtitleText,
                     size: 16,
@@ -339,7 +339,7 @@ class _InlinePlaceWhiteCardExtensionState
                     attachments.isNotEmpty
                         ? '${attachments.length} tệp đính kèm'
                         : 'Đính kèm',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppTheme.subtitleText,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
@@ -351,7 +351,7 @@ class _InlinePlaceWhiteCardExtensionState
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   '\$',
                   style: TextStyle(
                     color: AppTheme.subtitleText,
@@ -739,7 +739,7 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                                       ),
                                     );
                                   },
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.copy,
                                     size: 16,
                                     color: AppTheme.subtitleText,

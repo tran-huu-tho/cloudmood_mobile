@@ -248,7 +248,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                                 ),
                               ],
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.arrow_back_ios_new_rounded,
                               color: AppTheme.darkText,
                               size: 18,
@@ -330,7 +330,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                       opacity: _fadeIn,
                       child: SlideTransition(
                         position: _slideUp,
-                        child: const Column(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
@@ -366,8 +366,8 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                               textInputAction: TextInputAction.next,
                               decoration: InputDecoration(
                                 hintText: 'Nhập địa chỉ email',
-                                hintStyle: const TextStyle(color: AppTheme.hintText, fontSize: 15),
-                                prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.hintText, size: 20),
+                                hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 15),
+                                prefixIcon: Icon(Icons.email_outlined, color: AppTheme.hintText, size: 20),
                                 filled: true,
                                 fillColor: Colors.white,
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -409,8 +409,8 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                               onFieldSubmitted: (_) => _handleLogin(),
                               decoration: InputDecoration(
                                 hintText: 'Nhập mật khẩu',
-                                hintStyle: const TextStyle(color: AppTheme.hintText, fontSize: 15),
-                                prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.hintText, size: 20),
+                                hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 15),
+                                prefixIcon: Icon(Icons.lock_outline_rounded, color: AppTheme.hintText, size: 20),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -460,7 +460,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                                       ),
                                     );
                                   },
-                                  child: const Text(
+                                  child: Text(
                                     'Quên mật khẩu?',
                                     style: TextStyle(
                                       fontSize: 13,
@@ -616,7 +616,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text(
+                                Text(
                                   "Chưa có tài khoản? ",
                                   style: TextStyle(
                                     color: AppTheme.subtitleText,

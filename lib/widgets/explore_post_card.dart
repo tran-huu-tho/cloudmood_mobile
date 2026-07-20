@@ -40,10 +40,10 @@ class ExplorePostCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppTheme.surface,
           border: Border(
             bottom: BorderSide(
-              color: Colors.grey[200]!,
+              color: AppTheme.border,
               width: 1,
             ),
           ),
@@ -82,7 +82,7 @@ class ExplorePostCard extends StatelessWidget {
                     // Title
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.darkText,
@@ -108,7 +108,7 @@ class ExplorePostCard extends StatelessWidget {
                             authorName,
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.grey[600],
+                              color: AppTheme.subtitleText,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -124,14 +124,14 @@ class ExplorePostCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           numberFormat.format(likeCount),
-                          style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                          style: TextStyle(fontSize: 13, color: AppTheme.subtitleText),
                         ),
                         const SizedBox(width: 16),
                         const Icon(Icons.visibility_outlined, size: 16, color: Colors.grey),
                         const SizedBox(width: 4),
                         Text(
                           numberFormat.format(viewCount),
-                          style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                          style: TextStyle(fontSize: 13, color: AppTheme.subtitleText),
                         ),
                         const Spacer(),
                         const Icon(Icons.shortcut, size: 20, color: Colors.grey),

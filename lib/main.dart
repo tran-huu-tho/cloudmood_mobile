@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
-import 'screens/hotel_screen.dart';
+import 'screens/places_screen.dart';
 import 'screens/deals_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/create_itinerary_wizard_sheet.dart';
@@ -17,6 +17,9 @@ import 'services/auth_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Load user's theme preference
+  await AppTheme.loadTheme();
+
   // Status bar style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -24,8 +27,6 @@ void main() async {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-
-  // Load environment variables from .env
 
   // Seed initial categories & places in Supabase if empty
   await DatabaseService().checkAndSeedData();
@@ -47,11 +48,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CLOUDMOOD',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      home: const CloudmoodMainShell(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.themeModeNotifier,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          title: 'CLOUDMOOD',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeMode,
+          home: const CloudmoodMainShell(),
+        );
+      },
     );
   }
 }
@@ -78,7 +86,7 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
           },
         );
       case 1:
-        return const CloudmoodHotelScreen();
+        return const CloudmoodPlacesScreen();
       case 3:
         return const CloudmoodDealsScreen();
       case 4:
@@ -232,9 +240,9 @@ class _CloudmoodFloatingNav extends StatelessWidget {
       label: 'Trang chủ',
     ),
     _NavItem(
-      icon: Icons.hotel_outlined,
-      activeIcon: Icons.hotel_rounded,
-      label: 'Khách sạn',
+      icon: Icons.place_outlined,
+      activeIcon: Icons.place_rounded,
+      label: 'Địa điểm',
     ),
     _NavItem(
       icon: Icons.add_circle_outline_rounded,
@@ -261,7 +269,7 @@ class _CloudmoodFloatingNav extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppTheme.surface,
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(

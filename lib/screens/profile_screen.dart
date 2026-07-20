@@ -34,7 +34,7 @@ Future<XFile?> _selectImage(BuildContext context) async {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Thay đổi ảnh đại diện',
                 style: TextStyle(
                   fontSize: 18,
@@ -55,7 +55,7 @@ Future<XFile?> _selectImage(BuildContext context) async {
                     color: AppTheme.primary,
                   ),
                 ),
-                title: const Text(
+                title: Text(
                   'Chụp ảnh mới',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
@@ -64,7 +64,7 @@ Future<XFile?> _selectImage(BuildContext context) async {
                 ),
                 onTap: () => Navigator.of(context).pop(ImageSource.camera),
               ),
-              const Divider(color: AppTheme.border, height: 1),
+              Divider(color: AppTheme.border, height: 1),
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
@@ -77,7 +77,7 @@ Future<XFile?> _selectImage(BuildContext context) async {
                     color: AppTheme.amber,
                   ),
                 ),
-                title: const Text(
+                title: Text(
                   'Chọn từ thư viện',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
@@ -128,6 +128,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _darkModeEnabled = AppTheme.isDarkMode;
   }
 
   @override
@@ -182,7 +183,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Chỉnh sửa hồ sơ',
                           style: TextStyle(
                             fontSize: 20,
@@ -198,7 +199,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                               color: AppTheme.surfaceVariant,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.close_rounded,
                               size: 18,
                               color: AppTheme.subtitleText,
@@ -216,7 +217,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
+                    Text(
                       'Ảnh đại diện',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
@@ -259,7 +260,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Center(
+                    Center(
                       child: Text(
                         'Nhấn vào ảnh để đổi ảnh đại diện từ thiết bị',
                         style: TextStyle(
@@ -344,7 +345,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Đổi mật khẩu',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
@@ -415,7 +416,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
+              child: Text(
                 'Hủy',
                 style: TextStyle(color: AppTheme.subtitleText, fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold),
               ),
@@ -467,7 +468,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
-          title: const Row(
+          title: Row(
             children: [
               Icon(Icons.logout_rounded, color: AppTheme.red, size: 22),
               SizedBox(width: 10),
@@ -481,14 +482,14 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
               ),
             ],
           ),
-          content: const Text(
+          content: Text(
             'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản Cloudmood?',
             style: TextStyle(color: AppTheme.bodyText),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
+              child: Text(
                 'Hủy',
                 style: TextStyle(color: AppTheme.subtitleText, fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold),
               ),
@@ -536,7 +537,10 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
           notifEnabled: _notifEnabled,
           darkModeEnabled: _darkModeEnabled,
           onNotifChanged: (v) => setState(() => _notifEnabled = v),
-          onDarkModeChanged: (v) => setState(() => _darkModeEnabled = v),
+          onDarkModeChanged: (v) {
+            setState(() => _darkModeEnabled = v);
+            AppTheme.toggleTheme(v);
+          },
           onEditProfile: _showEditProfileSheet,
           onChangePassword: _showChangePasswordDialog,
           onLogout: _showLogoutConfirmDialog,
@@ -612,7 +616,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
+                        Text(
                           'Lưu giữ và chia sẻ hành trình du lịch của bạn. Khám phá các điểm đến được gợi ý dựa trên tâm trạng.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -651,7 +655,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text(
+                            Text(
                               'Chưa có tài khoản? ',
                               style: TextStyle(color: AppTheme.subtitleText),
                             ),
@@ -1083,7 +1087,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Chưa có hành trình nào',
                 style: TextStyle(
                   fontSize: 16,
@@ -1092,7 +1096,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Hãy tạo hành trình đầu tiên của bạn!',
                 style: TextStyle(color: AppTheme.subtitleText, fontSize: 13),
               ),
@@ -1173,7 +1177,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     children: [
                       Text(
                         trip['title'] as String? ?? 'Hành trình',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: AppTheme.darkText,
@@ -1184,7 +1188,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.location_on_rounded,
                             size: 12,
                             color: AppTheme.subtitleText,
@@ -1193,7 +1197,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                           Expanded(
                             child: Text(
                               trip['destination'] as String? ?? 'Chưa xác định',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.subtitleText,
                               ),
@@ -1230,7 +1234,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   color: AppTheme.subtitleText,
                 ),
@@ -1293,7 +1297,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Chưa có hướng dẫn nào',
                 style: TextStyle(
                   fontSize: 16,
@@ -1302,7 +1306,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Hãy tạo hướng dẫn chuyến đi của riêng bạn!',
                 style: TextStyle(color: AppTheme.subtitleText, fontSize: 13),
               ),
@@ -1359,7 +1363,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     children: [
                       Text(
                         guide['title'] as String? ?? 'Hướng dẫn',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: AppTheme.darkText,
@@ -1370,7 +1374,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.location_on_rounded,
                             size: 12,
                             color: AppTheme.subtitleText,
@@ -1380,7 +1384,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                             child: Text(
                               guide['destination'] as String? ??
                                   'Chưa xác định',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.subtitleText,
                               ),
@@ -1411,7 +1415,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   color: AppTheme.subtitleText,
                 ),
@@ -1439,14 +1443,14 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 widget.user.email,
                 AppTheme.primary,
               ),
-              const Divider(color: AppTheme.divider),
+              Divider(color: AppTheme.divider),
               _buildInfoRow(
                 Icons.calendar_today_rounded,
                 'Ngày tham gia',
                 joinDate,
                 AppTheme.green,
               ),
-              const Divider(color: AppTheme.divider),
+              Divider(color: AppTheme.divider),
               _buildInfoRow(
                 Icons.verified_rounded,
                 'Vai trò',
@@ -1465,7 +1469,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Tùy chọn',
                 style: TextStyle(
                   fontSize: 13,
@@ -1484,7 +1488,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 value: widget.notifEnabled,
                 onChanged: widget.onNotifChanged,
               ),
-              const Divider(color: AppTheme.divider),
+              Divider(color: AppTheme.divider),
               _buildToggleTile(
                 icon: Icons.dark_mode_rounded,
                 iconBg: const Color(0xFF2D2D3A).withAlpha(20),
@@ -1506,7 +1510,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Tài khoản',
                 style: TextStyle(
                   fontSize: 13,
@@ -1523,7 +1527,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 title: 'Đổi mật khẩu',
                 onTap: widget.onChangePassword,
               ),
-              const Divider(color: AppTheme.divider),
+              Divider(color: AppTheme.divider),
               _buildActionTile(
                 icon: Icons.help_outline_rounded,
                 iconBg: AppTheme.lightAmber,
@@ -1531,7 +1535,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 title: 'Trợ giúp & Hỗ trợ',
                 onTap: () {},
               ),
-              const Divider(color: AppTheme.divider),
+              Divider(color: AppTheme.divider),
               _buildActionTile(
                 icon: Icons.logout_rounded,
                 iconBg: AppTheme.lightRed,
@@ -1545,7 +1549,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         ),
         const SizedBox(height: 20),
         // App version
-        const Center(
+        Center(
           child: Text(
             'cloudmood v1.0.0 — Phiên bản hiện tại',
             style: TextStyle(fontSize: 11, color: AppTheme.hintText),
@@ -1575,7 +1579,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     color: AppTheme.subtitleText,
                     fontWeight: FontWeight.w500,
@@ -1583,7 +1587,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 ),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     color: AppTheme.darkText,
                     fontWeight: FontWeight.w600,
@@ -1625,7 +1629,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.darkText,
@@ -1633,7 +1637,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     color: AppTheme.subtitleText,
                   ),

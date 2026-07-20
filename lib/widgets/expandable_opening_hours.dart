@@ -59,7 +59,7 @@ class _ExpandableOpeningHoursState extends State<ExpandableOpeningHours> {
             icon: Icons.access_time_rounded,
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppTheme.darkText,
                   height: 1.4,
                   fontSize: 13,

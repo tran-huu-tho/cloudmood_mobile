@@ -56,7 +56,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'Đánh giá $placeName',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 16,
                             color: AppTheme.darkText,
@@ -71,7 +71,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Chọn số sao:',
                     style: TextStyle(
                       fontSize: 13,
@@ -119,7 +119,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text(
+                  child: Text(
                     'Hủy',
                     style: TextStyle(color: AppTheme.subtitleText),
                   ),
@@ -249,7 +249,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           'Khách sạn &\nKhu nghỉ dưỡng',
                           style: TextStyle(
                             fontSize: 26,
@@ -267,7 +267,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                             vertical: 14,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppTheme.surface,
                             borderRadius: BorderRadius.circular(18),
                             boxShadow: [
                               BoxShadow(
@@ -308,7 +308,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                                   color: AppTheme.surfaceVariant,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.tune_rounded,
                                   color: AppTheme.subtitleText,
                                   size: 16,
@@ -499,7 +499,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                                     children: [
                                       Text(
                                         hotel['name'] ?? '',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 17,
                                           fontWeight: FontWeight.w800,
                                           color: AppTheme.darkText,
@@ -509,7 +509,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                                       const SizedBox(height: 4),
                                       Row(
                                         children: [
-                                          const Icon(
+                                          Icon(
                                             Icons.location_on_rounded,
                                             color: AppTheme.subtitleText,
                                             size: 13,
@@ -520,7 +520,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                                               addressText,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 color: AppTheme.subtitleText,
                                                 fontSize: 12,
                                               ),
@@ -536,7 +536,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
-                                              const Text(
+                                              Text(
                                                 'Giá từ / đêm',
                                                 style: TextStyle(
                                                   fontSize: 11,
@@ -566,7 +566,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                                             style: OutlinedButton.styleFrom(
                                               foregroundColor:
                                                   AppTheme.primary,
-                                              side: const BorderSide(
+                                              side: BorderSide(
                                                 color: AppTheme.border,
                                                 width: 1.5,
                                               ),
@@ -661,7 +661,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         gradient: isSelected ? AppTheme.primaryGradient : null,
-        color: isSelected ? null : Colors.white,
+        color: isSelected ? null : AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isSelected ? Colors.transparent : AppTheme.border,

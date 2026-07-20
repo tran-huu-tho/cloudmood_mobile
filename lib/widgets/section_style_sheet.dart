@@ -192,7 +192,7 @@ class _SectionStyleSheetState extends State<SectionStyleSheet> {
               const SizedBox(width: 80), // spacer for balance
               Text(
                 _selectedTabIndex == 0 ? 'Sắp xếp & màu sắc' : 'Sắp xếp lại',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.darkText,
@@ -200,7 +200,7 @@ class _SectionStyleSheetState extends State<SectionStyleSheet> {
               ),
               TextButton(
                 onPressed: _handleSave,
-                child: const Text(
+                child: Text(
                   'Hoàn thành',
                   style: TextStyle(
                     color: AppTheme.subtitleText,
@@ -371,7 +371,7 @@ class _SectionStyleSheetState extends State<SectionStyleSheet> {
                                 ),
                                 ReorderableDragStartListener(
                                   index: index,
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.drag_indicator,
                                     color: AppTheme.subtitleText,
                                   ),
@@ -479,7 +479,7 @@ class _SectionStyleSheetState extends State<SectionStyleSheet> {
                       padding: const EdgeInsets.only(top: 16, bottom: 8),
                       child: Text(
                         section,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                           color: AppTheme.darkText,
@@ -520,7 +520,7 @@ class _SectionStyleSheetState extends State<SectionStyleSheet> {
                               placeName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 color: AppTheme.darkText,
                                 fontWeight: FontWeight.w500,
@@ -529,7 +529,7 @@ class _SectionStyleSheetState extends State<SectionStyleSheet> {
                           ),
                           ReorderableDragStartListener(
                             index: index,
-                            child: const Icon(
+                            child: Icon(
                               Icons.drag_indicator,
                               color: AppTheme.subtitleText,
                               size: 20,

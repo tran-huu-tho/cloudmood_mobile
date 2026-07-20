@@ -192,7 +192,7 @@ class _CloudmoodForgotPasswordScreenState
                             ),
                           ],
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.arrow_back_ios_new_rounded,
                           color: AppTheme.darkText,
                           size: 18,
@@ -246,7 +246,7 @@ class _CloudmoodForgotPasswordScreenState
                               _codeSent
                                   ? 'Xác thực & Đặt lại\nmật khẩu mới'
                                   : 'Quên mật khẩu? Khôi phục\ntruy cập tại đây',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
                                 height: 1.3,
@@ -259,7 +259,7 @@ class _CloudmoodForgotPasswordScreenState
                               _codeSent
                                   ? 'Nhập mã xác thực 6 chữ số đã gửi đến email của bạn kèm theo mật khẩu mới.'
                                   : 'Nhập địa chỉ email của bạn bên dưới. Chúng tôi sẽ gửi một mã xác thực gồm 6 chữ số để bạn khôi phục lại mật khẩu.',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 color: AppTheme.subtitleText,
                                 height: 1.5,
@@ -287,8 +287,8 @@ class _CloudmoodForgotPasswordScreenState
                                 onFieldSubmitted: (_) => _handleSubmit(),
                                 decoration: InputDecoration(
                                   hintText: 'Nhập địa chỉ email',
-                                  hintStyle: const TextStyle(color: AppTheme.hintText, fontSize: 15),
-                                  prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.hintText, size: 20),
+                                  hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 15),
+                                  prefixIcon: Icon(Icons.email_outlined, color: AppTheme.hintText, size: 20),
                                   filled: true,
                                   fillColor: Colors.white,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -328,7 +328,7 @@ class _CloudmoodForgotPasswordScreenState
                                   Expanded(
                                     child: Text(
                                       'Mã đã gửi đến: $email',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 13,
                                         color: AppTheme.subtitleText,
                                         fontWeight: FontWeight.w600,
@@ -363,7 +363,7 @@ class _CloudmoodForgotPasswordScreenState
                                 keyboardType: TextInputType.number,
                                 maxLength: 6,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 6,
@@ -376,7 +376,7 @@ class _CloudmoodForgotPasswordScreenState
                                     letterSpacing: 6,
                                   ),
                                   counterText: '',
-                                  prefixIcon: const Icon(Icons.pin_rounded, color: AppTheme.hintText, size: 20),
+                                  prefixIcon: Icon(Icons.pin_rounded, color: AppTheme.hintText, size: 20),
                                   filled: true,
                                   fillColor: Colors.white,
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -415,8 +415,8 @@ class _CloudmoodForgotPasswordScreenState
                                 obscureText: _obscureNewPassword,
                                 decoration: InputDecoration(
                                   hintText: 'Nhập mật khẩu mới',
-                                  hintStyle: const TextStyle(color: AppTheme.hintText, fontSize: 15),
-                                  prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.hintText, size: 20),
+                                  hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 15),
+                                  prefixIcon: Icon(Icons.lock_outline_rounded, color: AppTheme.hintText, size: 20),
                                   suffixIcon: IconButton(
                                     icon: Icon(
                                       _obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -471,8 +471,8 @@ class _CloudmoodForgotPasswordScreenState
                                 onFieldSubmitted: (_) => _handleSubmit(),
                                 decoration: InputDecoration(
                                   hintText: 'Xác nhận mật khẩu mới',
-                                  hintStyle: const TextStyle(color: AppTheme.hintText, fontSize: 15),
-                                  prefixIcon: const Icon(Icons.lock_rounded, color: AppTheme.hintText, size: 20),
+                                  hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 15),
+                                  prefixIcon: Icon(Icons.lock_rounded, color: AppTheme.hintText, size: 20),
                                   suffixIcon: IconButton(
                                     icon: Icon(
                                       _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,

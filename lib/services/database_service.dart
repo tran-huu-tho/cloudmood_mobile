@@ -550,4 +550,45 @@ class DatabaseService {
     }
     return [];
   }
+
+  /// Proposes a new place for database insertion (awaits admin approval)
+  Future<Map<String, dynamic>?> proposePlace({
+    required String name,
+    required String address,
+    required int categoryId,
+    required String description,
+    required String price,
+    String? image,
+    String? phone,
+    String? website,
+    String? priceLevel,
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      final data = {
+        'name': name,
+        'address': address,
+        'categoryId': categoryId,
+        'description': description,
+        'price': price,
+        'image': image ?? '',
+        'phone': phone,
+        'website': website,
+        'priceLevel': priceLevel ?? 'MODERATE',
+        'latitude': latitude ?? 0.0,
+        'longitude': longitude ?? 0.0,
+      };
+
+      final response = await ApiClient.post('/places', body: data);
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        refreshTrigger.value++;
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error proposing place: $e');
+      return null;
+    }
+  }
 }

@@ -123,7 +123,7 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                       size: 48,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'Xác thực Email',
                       style: TextStyle(
                         fontSize: 20,
@@ -132,7 +132,7 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Chúng tôi đã gửi mã xác thực gồm 6 chữ số tới email:',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppTheme.subtitleText, fontSize: 13),
@@ -154,7 +154,7 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                       keyboardType: TextInputType.number,
                       maxLength: 6,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 8,
@@ -373,7 +373,7 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                                 ),
                               ],
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.arrow_back_ios_new_rounded,
                               color: AppTheme.darkText,
                               size: 18,
@@ -420,7 +420,7 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                       opacity: _fadeIn,
                       child: SlideTransition(
                         position: _slideUp,
-                        child: const Column(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
@@ -453,8 +453,8 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                               textInputAction: TextInputAction.next,
                               decoration: InputDecoration(
                                 hintText: 'Nhập họ và tên',
-                                hintStyle: const TextStyle(color: AppTheme.hintText, fontSize: 15),
-                                prefixIcon: const Icon(Icons.person_outline_rounded, color: AppTheme.hintText, size: 20),
+                                hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 15),
+                                prefixIcon: Icon(Icons.person_outline_rounded, color: AppTheme.hintText, size: 20),
                                 filled: true,
                                 fillColor: Colors.white,
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -491,8 +491,8 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                               textInputAction: TextInputAction.next,
                               decoration: InputDecoration(
                                 hintText: 'Nhập địa chỉ email',
-                                hintStyle: const TextStyle(color: AppTheme.hintText, fontSize: 15),
-                                prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.hintText, size: 20),
+                                hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 15),
+                                prefixIcon: Icon(Icons.email_outlined, color: AppTheme.hintText, size: 20),
                                 filled: true,
                                 fillColor: Colors.white,
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -533,8 +533,8 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                               textInputAction: TextInputAction.next,
                               decoration: InputDecoration(
                                 hintText: 'Nhập mật khẩu',
-                                hintStyle: const TextStyle(color: AppTheme.hintText, fontSize: 15),
-                                prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.hintText, size: 20),
+                                hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 15),
+                                prefixIcon: Icon(Icons.lock_outline_rounded, color: AppTheme.hintText, size: 20),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -589,8 +589,8 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                               onFieldSubmitted: (_) => _handleRegister(),
                               decoration: InputDecoration(
                                 hintText: 'Xác nhận mật khẩu',
-                                hintStyle: const TextStyle(color: AppTheme.hintText, fontSize: 15),
-                                prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.hintText, size: 20),
+                                hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 15),
+                                prefixIcon: Icon(Icons.lock_outline_rounded, color: AppTheme.hintText, size: 20),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -670,7 +670,7 @@ class _CloudmoodRegisterScreenState extends State<CloudmoodRegisterScreen>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text(
+                                Text(
                                   "Đã có tài khoản? ",
                                   style: TextStyle(
                                     color: AppTheme.subtitleText,

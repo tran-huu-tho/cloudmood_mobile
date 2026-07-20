@@ -244,7 +244,7 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
               const SizedBox(width: 80),
               Text(
                 _selectedTabIndex == 0 ? 'Sắp xếp & màu sắc' : 'Sắp xếp lại',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.darkText,
@@ -252,7 +252,7 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
               ),
               TextButton(
                 onPressed: _handleSave,
-                child: const Text(
+                child: Text(
                   'Hoàn thành',
                   style: TextStyle(
                     color: AppTheme.subtitleText,
@@ -415,7 +415,7 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                                 ),
                                 ReorderableDragStartListener(
                                   index: index,
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.drag_indicator,
                                     color: AppTheme.subtitleText,
                                   ),
@@ -489,7 +489,7 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                       padding: const EdgeInsets.only(top: 16, bottom: 8),
                       child: Text(
                         item.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                           color: AppTheme.darkText,
@@ -520,7 +520,7 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                               item.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 color: AppTheme.darkText,
                                 fontWeight: FontWeight.w500,
@@ -529,7 +529,7 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
                           ),
                           ReorderableDragStartListener(
                             index: index,
-                            child: const Icon(
+                            child: Icon(
                               Icons.drag_indicator,
                               color: AppTheme.subtitleText,
                               size: 20,

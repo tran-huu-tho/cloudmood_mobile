@@ -1,27 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppTheme {
+  // ─── Theme Mode Notifier ──────────────────────────────────────────────────
+  static final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
+
+  static bool get isDarkMode => themeModeNotifier.value == ThemeMode.dark;
+
+  static void toggleTheme(bool isDark) async {
+    themeModeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_dark_mode', isDark);
+  }
+
+  static Future<void> loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isDark = prefs.getBool('is_dark_mode') ?? false;
+    themeModeNotifier.value = isDark ? ThemeMode.dark : ThemeMode.light;
+  }
+
   // ─── Brand Colors ────────────────────────────────────────────────────────────
   static const Color primary = Color(0xFF1A56DB); // Vibrant brand blue
   static const Color primaryDark = Color(0xFF0A3F8B); // Deep navy
   static const Color primaryLight = Color(0xFF3B82F6); // Sky blue
-  static const Color primaryContainer = Color(0xFFDBEAFE); // Light blue tint
-
   static const Color accent = Color(0xFF00B4A6); // Vibrant teal
   static const Color accentLight = Color(0xFFCCF5F2); // Teal tint
-
-  static const Color background = Color(0xFFF8FAFF); // Soft blue-white
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceVariant = Color(0xFFF1F5FF); // Slight blue tint
-
-  static const Color darkText = Color(0xFF0F172A); // Slate 900
-  static const Color bodyText = Color(0xFF334155); // Slate 700
-  static const Color subtitleText = Color(0xFF64748B); // Slate 500
-  static const Color hintText = Color(0xFF94A3B8); // Slate 400
-
-  static const Color border = Color(0xFFE2E8F0); // Slate 200
-  static const Color divider = Color(0xFFF1F5F9); // Slate 100
 
   static const Color green = Color(0xFF10B981); // Emerald 500
   static const Color lightGreen = Color(0xFFD1FAE5); // Emerald 100
@@ -30,9 +34,23 @@ class AppTheme {
   static const Color red = Color(0xFFEF4444); // Red 500
   static const Color lightRed = Color(0xFFFEE2E2); // Red 100
 
+  // ─── Dynamic Colors (Getters based on theme mode) ────────────────────────────
+  static Color get background => isDarkMode ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFF);
+  static Color get surface => isDarkMode ? const Color(0xFF1E293B) : const Color(0xFFFFFFFF);
+  static Color get surfaceVariant => isDarkMode ? const Color(0xFF151D30) : const Color(0xFFF1F5FF);
+  static Color get primaryContainer => isDarkMode ? const Color(0xFF1E3A8A) : const Color(0xFFDBEAFE);
+
+  static Color get darkText => isDarkMode ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+  static Color get bodyText => isDarkMode ? const Color(0xFFE2E8F0) : const Color(0xFF334155);
+  static Color get subtitleText => isDarkMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  static Color get hintText => isDarkMode ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+
+  static Color get border => isDarkMode ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  static Color get divider => isDarkMode ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+
   // Legacy aliases (keep existing code working)
-  static const Color primaryPeach = primaryContainer;
-  static const Color lightGray = surfaceVariant;
+  static Color get primaryPeach => primaryContainer;
+  static Color get lightGray => surfaceVariant;
 
   // ─── Gradients ───────────────────────────────────────────────────────────────
   static const LinearGradient primaryGradient = LinearGradient(
@@ -84,46 +102,43 @@ class AppTheme {
         labelSmall: baseTheme.textTheme.labelSmall?.copyWith(fontSize: 8.0),
       ).apply(
         fontFamily: 'SDK_SC_Web-Heavy',
-        bodyColor: darkText,
-        displayColor: darkText,
+        bodyColor: const Color(0xFF0F172A),
+        displayColor: const Color(0xFF0F172A),
       ),
       colorScheme: const ColorScheme(
-
-
-
         brightness: Brightness.light,
         primary: primary,
         onPrimary: Colors.white,
-        primaryContainer: primaryContainer,
+        primaryContainer: Color(0xFFDBEAFE),
         onPrimaryContainer: primaryDark,
         secondary: accent,
         onSecondary: Colors.white,
         secondaryContainer: accentLight,
         onSecondaryContainer: Color(0xFF003733),
-        surface: surface,
-        onSurface: darkText,
-        surfaceContainerHighest: surfaceVariant,
-        onSurfaceVariant: subtitleText,
-        outline: border,
-        outlineVariant: divider,
+        surface: Colors.white,
+        onSurface: Color(0xFF0F172A),
+        surfaceContainerHighest: Color(0xFFF1F5FF),
+        onSurfaceVariant: Color(0xFF64748B),
+        outline: Color(0xFFE2E8F0),
+        outlineVariant: Color(0xFFF1F5F9),
         error: red,
         onError: Colors.white,
-        errorContainer: lightRed,
+        errorContainer: Color(0xFFFEE2E2),
         onErrorContainer: Color(0xFF7F1D1D),
         shadow: Color(0xFF000000),
         scrim: Color(0xFF000000),
-        inverseSurface: darkText,
+        inverseSurface: Color(0xFF0F172A),
         onInverseSurface: Colors.white,
         inversePrimary: primaryLight,
       ),
-      scaffoldBackgroundColor: background,
+      scaffoldBackgroundColor: const Color(0xFFF8FAFF),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        iconTheme: IconThemeData(color: darkText),
+        iconTheme: IconThemeData(color: Color(0xFF0F172A)),
         titleTextStyle: TextStyle(
-          color: darkText,
+          color: Color(0xFF0F172A),
           fontSize: 18,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
@@ -148,7 +163,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: primary,
-          side: const BorderSide(color: border, width: 1.5),
+          side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -170,16 +185,16 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceVariant,
-        hintStyle: const TextStyle(color: hintText, fontSize: 14),
+        fillColor: const Color(0xFFF1F5FF),
+        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: border),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: border, width: 1),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -195,16 +210,16 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: surface,
+        color: Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: border, width: 1),
+          side: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: surfaceVariant,
-        selectedColor: primaryContainer,
+        backgroundColor: const Color(0xFFF1F5FF),
+        selectedColor: const Color(0xFFDBEAFE),
         labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
@@ -224,7 +239,177 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         selectedItemColor: primary,
-        unselectedItemColor: subtitleText,
+        unselectedItemColor: Color(0xFF64748B),
+        showUnselectedLabels: true,
+        selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+        unselectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+        type: BottomNavigationBarType.fixed,
+      ),
+    );
+  }
+
+  static ThemeData get darkTheme {
+    final baseTheme = ThemeData(brightness: Brightness.dark);
+    return ThemeData(
+      useMaterial3: true,
+      fontFamily: 'SDK_SC_Web-Heavy',
+      textTheme: baseTheme.textTheme.copyWith(
+        displayLarge: baseTheme.textTheme.displayLarge?.copyWith(fontSize: 26),
+        displayMedium: baseTheme.textTheme.displayMedium?.copyWith(fontSize: 22),
+        displaySmall: baseTheme.textTheme.displaySmall?.copyWith(fontSize: 18),
+        headlineLarge: baseTheme.textTheme.headlineLarge?.copyWith(fontSize: 16),
+        headlineMedium: baseTheme.textTheme.headlineMedium?.copyWith(fontSize: 14),
+        headlineSmall: baseTheme.textTheme.headlineSmall?.copyWith(fontSize: 12.5),
+        titleLarge: baseTheme.textTheme.titleLarge?.copyWith(fontSize: 16.5),
+        titleMedium: baseTheme.textTheme.titleMedium?.copyWith(fontSize: 13.5),
+        titleSmall: baseTheme.textTheme.titleSmall?.copyWith(fontSize: 11.5),
+        bodyLarge: baseTheme.textTheme.bodyLarge?.copyWith(fontSize: 12.5),
+        bodyMedium: baseTheme.textTheme.bodyMedium?.copyWith(fontSize: 11.5),
+        bodySmall: baseTheme.textTheme.bodySmall?.copyWith(fontSize: 9.5),
+        labelLarge: baseTheme.textTheme.labelLarge?.copyWith(fontSize: 10.5),
+        labelMedium: baseTheme.textTheme.labelMedium?.copyWith(fontSize: 9.0),
+        labelSmall: baseTheme.textTheme.labelSmall?.copyWith(fontSize: 8.0),
+      ).apply(
+        fontFamily: 'SDK_SC_Web-Heavy',
+        bodyColor: Colors.white,
+        displayColor: Colors.white,
+      ),
+      colorScheme: const ColorScheme(
+        brightness: Brightness.dark,
+        primary: primary,
+        onPrimary: Colors.white,
+        primaryContainer: Color(0xFF1E3A8A),
+        onPrimaryContainer: Color(0xFFDBEAFE),
+        secondary: accent,
+        onSecondary: Colors.white,
+        secondaryContainer: Color(0xFF0F766E),
+        onSecondaryContainer: Color(0xFFCCF5F2),
+        surface: Color(0xFF1E293B),
+        onSurface: Colors.white,
+        surfaceContainerHighest: Color(0xFF151D30),
+        onSurfaceVariant: Color(0xFF94A3B8),
+        outline: Color(0xFF334155),
+        outlineVariant: Color(0xFF1E293B),
+        error: red,
+        onError: Colors.white,
+        errorContainer: Color(0xFF7F1D1D),
+        onErrorContainer: Color(0xFFFEE2E2),
+        shadow: Color(0xFF000000),
+        scrim: Color(0xFF000000),
+        inverseSurface: Colors.white,
+        onInverseSurface: Color(0xFF0F172A),
+        inversePrimary: primaryLight,
+      ),
+      scaffoldBackgroundColor: const Color(0xFF0B0F19),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        iconTheme: IconThemeData(color: Colors.white),
+        titleTextStyle: TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: primary,
+          foregroundColor: Colors.white,
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+            fontFamily: 'SDK_SC_Web-Heavy',
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: const BorderSide(color: Color(0xFF334155), width: 1.5),
+          minimumSize: const Size.fromHeight(52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'SDK_SC_Web-Heavy',
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: primaryLight,
+          textStyle: const TextStyle(
+            fontFamily: 'SDK_SC_Web-Heavy',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF151D30),
+        hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF334155)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF334155), width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: primary, width: 1.8),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: red, width: 1),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: red, width: 1.8),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: const Color(0xFF1E293B),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFF334155), width: 1),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: const Color(0xFF151D30),
+        selectedColor: const Color(0xFF1E3A8A),
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.white),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontFamily: 'SDK_SC_Web-Heavy',
+        ),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        selectedItemColor: primaryLight,
+        unselectedItemColor: Color(0xFF94A3B8),
         showUnselectedLabels: true,
         selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
         unselectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
@@ -237,15 +422,16 @@ class AppTheme {
 
   /// Premium card with subtle shadow
   static BoxDecoration premiumCardDecoration({
-    Color color = surface,
+    Color? color,
     double radius = 20.0,
     bool withShadow = true,
   }) {
+    final cardColor = color ?? surface;
     return BoxDecoration(
-      color: color,
+      color: cardColor,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(color: border, width: 1),
-      boxShadow: withShadow
+      boxShadow: withShadow && !isDarkMode
           ? [
               BoxShadow(
                 color: const Color(0xFF1A56DB).withAlpha(12),
@@ -303,7 +489,7 @@ class AppTheme {
     return InputDecoration(
       hintText: hintText,
       labelText: labelText,
-      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+      hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 14),
       prefixIcon: Icon(prefixIcon, color: subtitleText, size: 20),
       suffixIcon: suffixIcon,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -311,11 +497,11 @@ class AppTheme {
       fillColor: surfaceVariant,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: border, width: 1),
+        borderSide: BorderSide(color: border, width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: border, width: 1),
+        borderSide: BorderSide(color: border, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -323,7 +509,7 @@ class AppTheme {
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: red, width: 1),
+        borderSide: BorderSide(color: red, width: 1),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -333,46 +519,46 @@ class AppTheme {
   }
 
   // ─── Typography Tokens ───────────────────────────────────────────────────────
-  static const TextStyle brandLogoStyle = TextStyle(
+  static TextStyle get brandLogoStyle => const TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w800,
     color: primary,
     letterSpacing: -0.8,
   );
 
-  static const TextStyle screenTitleStyle = TextStyle(
+  static TextStyle get screenTitleStyle => TextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w800,
     color: darkText,
     letterSpacing: -0.8,
   );
 
-  static const TextStyle sectionTitleStyle = TextStyle(
+  static TextStyle get sectionTitleStyle => TextStyle(
     fontSize: 14.5,
     fontWeight: FontWeight.w700,
     color: darkText,
     letterSpacing: -0.4,
   );
 
-  static const TextStyle bodyBoldStyle = TextStyle(
+  static TextStyle get bodyBoldStyle => TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.w600,
     color: darkText,
   );
 
-  static const TextStyle bodyMediumStyle = TextStyle(
+  static TextStyle get bodyMediumStyle => TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w500,
     color: bodyText,
   );
 
-  static const TextStyle captionStyle = TextStyle(
+  static TextStyle get captionStyle => TextStyle(
     fontSize: 9.5,
     fontWeight: FontWeight.w400,
     color: subtitleText,
   );
 
-  static const TextStyle labelStyle = TextStyle(
+  static TextStyle get labelStyle => TextStyle(
     fontSize: 8.5,
     fontWeight: FontWeight.w700,
     color: subtitleText,
