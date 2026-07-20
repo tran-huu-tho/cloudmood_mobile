@@ -14,7 +14,9 @@ class DatabaseService {
   Future<void> checkAndSeedData() async {
     // This logic is usually handled on the backend or triggered via a specific endpoint
     // We can assume the backend handles seeding or we call a setup endpoint if needed.
-    debugPrint('checkAndSeedData called - handled by backend or manual seeding in NestJS now.');
+    debugPrint(
+      'checkAndSeedData called - handled by backend or manual seeding in NestJS now.',
+    );
   }
 
   /// Fetches all categories
@@ -34,8 +36,8 @@ class DatabaseService {
   /// Fetches places based on category name
   Future<List<Map<String, dynamic>>> fetchPlaces({String? categoryName}) async {
     try {
-      final endpoint = categoryName != null 
-          ? '/places?categoryName=${Uri.encodeComponent(categoryName)}' 
+      final endpoint = categoryName != null
+          ? '/places?categoryName=${Uri.encodeComponent(categoryName)}'
           : '/places';
       final response = await ApiClient.get(endpoint);
       if (response.statusCode == 200) {
@@ -49,9 +51,13 @@ class DatabaseService {
   }
 
   /// Fetches places based on destination city
-  Future<List<Map<String, dynamic>>> fetchPlacesByDestination(String destination) async {
+  Future<List<Map<String, dynamic>>> fetchPlacesByDestination(
+    String destination,
+  ) async {
     try {
-      final response = await ApiClient.get('/places/search?destination=${Uri.encodeComponent(destination)}');
+      final response = await ApiClient.get(
+        '/places/search?destination=${Uri.encodeComponent(destination)}',
+      );
       if (response.statusCode == 200) {
         return List<Map<String, dynamic>>.from(jsonDecode(response.body));
       }
@@ -69,7 +75,8 @@ class DatabaseService {
     String? categoryName,
   }) async {
     try {
-      String endpoint = '/places/search?destination=${Uri.encodeComponent(destination)}';
+      String endpoint =
+          '/places/search?destination=${Uri.encodeComponent(destination)}';
       if (query != null && query.isNotEmpty) {
         endpoint += '&query=${Uri.encodeComponent(query)}';
       }
@@ -87,8 +94,30 @@ class DatabaseService {
     }
   }
 
+  /// Searches for images from the backend based on query and page
+  Future<Map<String, dynamic>> searchWebImages(String query, {int page = 1}) async {
+    try {
+      final response = await ApiClient.get(
+        '/explore/images/search?query=${Uri.encodeComponent(query)}&page=$page',
+      );
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
+      }
+      return {'results': [], 'page': page, 'hasMore': false};
+    } catch (e) {
+      debugPrint('Error searching web images: $e');
+      return {'results': [], 'page': page, 'hasMore': false};
+    }
+  }
+
   /// Fetches all itineraries created by the user
-  Future<List<Map<String, dynamic>>> fetchUserItineraries(int userId, {bool isGuide = false}) async {
+  Future<List<Map<String, dynamic>>> fetchUserItineraries(
+    int userId, {
+    bool isGuide = false,
+  }) async {
     try {
       final response = await ApiClient.get('/itineraries?isGuide=$isGuide');
       if (response.statusCode == 200) {
@@ -128,7 +157,7 @@ class DatabaseService {
         'amenities': amenities,
         'isGuide': isGuide,
       };
-      
+
       final response = await ApiClient.post('/itineraries', body: data);
       if (response.statusCode == 201) {
         refreshTrigger.value++;
@@ -163,10 +192,10 @@ class DatabaseService {
     required int offset,
   }) async {
     try {
-      final response = await ApiClient.post('/itineraries/$itineraryId/shift-details', body: {
-        'targetDay': targetDay,
-        'offset': offset,
-      });
+      final response = await ApiClient.post(
+        '/itineraries/$itineraryId/shift-details',
+        body: {'targetDay': targetDay, 'offset': offset},
+      );
       if (response.statusCode == 201 || response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -184,7 +213,9 @@ class DatabaseService {
     required int day,
   }) async {
     try {
-      final response = await ApiClient.delete('/itineraries/$itineraryId/details/day/$day');
+      final response = await ApiClient.delete(
+        '/itineraries/$itineraryId/details/day/$day',
+      );
       if (response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -220,13 +251,16 @@ class DatabaseService {
     required String authorAvatar,
   }) async {
     try {
-      final response = await ApiClient.post('/reviews', body: {
-        'placeId': placeId,
-        'rating': rating,
-        'comment': comment,
-        'authorName': authorName,
-        'authorAvatar': authorAvatar,
-      });
+      final response = await ApiClient.post(
+        '/reviews',
+        body: {
+          'placeId': placeId,
+          'rating': rating,
+          'comment': comment,
+          'authorName': authorName,
+          'authorAvatar': authorAvatar,
+        },
+      );
       if (response.statusCode == 201) {
         refreshTrigger.value++;
         return jsonDecode(response.body);
@@ -255,7 +289,9 @@ class DatabaseService {
   /// Checks if a destination city is supported
   Future<bool> isDestinationSupported(String cityName) async {
     try {
-      final response = await ApiClient.get('/places/check-destination?cityName=${Uri.encodeComponent(cityName)}');
+      final response = await ApiClient.get(
+        '/places/check-destination?cityName=${Uri.encodeComponent(cityName)}',
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['supported'] == true;
@@ -282,9 +318,15 @@ class DatabaseService {
   }
 
   /// Updates day configs for an itinerary
-  Future<bool> updateItineraryDayConfigs(int itineraryId, Map<String, dynamic> dayConfigs) async {
+  Future<bool> updateItineraryDayConfigs(
+    int itineraryId,
+    Map<String, dynamic> dayConfigs,
+  ) async {
     try {
-      final response = await ApiClient.put('/itineraries/$itineraryId/day-configs', body: dayConfigs);
+      final response = await ApiClient.put(
+        '/itineraries/$itineraryId/day-configs',
+        body: dayConfigs,
+      );
       if (response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -305,13 +347,16 @@ class DatabaseService {
     String? noteText,
   }) async {
     try {
-      final response = await ApiClient.post('/itineraries/details', body: {
-        'itineraryId': itineraryId,
-        'placeId': placeId,
-        'day': day,
-        'sortOrder': sortOrder,
-        'noteText': noteText,
-      });
+      final response = await ApiClient.post(
+        '/itineraries/details',
+        body: {
+          'itineraryId': itineraryId,
+          'placeId': placeId,
+          'day': day,
+          'sortOrder': sortOrder,
+          'noteText': noteText,
+        },
+      );
       if (response.statusCode == 201) {
         refreshTrigger.value++;
         return jsonDecode(response.body);
@@ -341,7 +386,10 @@ class DatabaseService {
   /// Updates an itinerary detail
   Future<bool> updateItineraryDetail(int id, Map<String, dynamic> data) async {
     try {
-      final response = await ApiClient.put('/itineraries/details/$id', body: data);
+      final response = await ApiClient.put(
+        '/itineraries/details/$id',
+        body: data,
+      );
       if (response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -356,7 +404,10 @@ class DatabaseService {
   /// Updates a saved place item
   Future<bool> updateSavedPlace(int id, Map<String, dynamic> data) async {
     try {
-      final response = await ApiClient.put('/itineraries/saved-places/$id', body: data);
+      final response = await ApiClient.put(
+        '/itineraries/saved-places/$id',
+        body: data,
+      );
       if (response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -374,7 +425,11 @@ class DatabaseService {
   }
 
   /// Helper to update either ItineraryDetail or ItinerarySavedPlace
-  Future<bool> updateNoteOrDetail(int id, Map<String, dynamic> data, bool isItineraryDetail) async {
+  Future<bool> updateNoteOrDetail(
+    int id,
+    Map<String, dynamic> data,
+    bool isItineraryDetail,
+  ) async {
     if (isItineraryDetail) {
       return updateItineraryDetail(id, data);
     } else {
@@ -392,14 +447,17 @@ class DatabaseService {
     String sectionType = 'LIST',
   }) async {
     try {
-      final response = await ApiClient.post('/itineraries/sections', body: {
-        'itineraryId': itineraryId,
-        'name': name,
-        'colorCode': colorCode,
-        'iconCode': iconCode,
-        'sortOrder': sortOrder,
-        'sectionType': sectionType,
-      });
+      final response = await ApiClient.post(
+        '/itineraries/sections',
+        body: {
+          'itineraryId': itineraryId,
+          'name': name,
+          'colorCode': colorCode,
+          'iconCode': iconCode,
+          'sortOrder': sortOrder,
+          'sectionType': sectionType,
+        },
+      );
       if (response.statusCode == 201 || response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -414,7 +472,9 @@ class DatabaseService {
   /// Deletes an itinerary section by name
   Future<bool> deleteItinerarySection(int itineraryId, String name) async {
     try {
-      final response = await ApiClient.delete('/itineraries/$itineraryId/sections/${Uri.encodeComponent(name)}');
+      final response = await ApiClient.delete(
+        '/itineraries/$itineraryId/sections/${Uri.encodeComponent(name)}',
+      );
       if (response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -435,13 +495,16 @@ class DatabaseService {
     int? sortOrder,
   }) async {
     try {
-      final response = await ApiClient.post('/itineraries/saved-places', body: {
-        'itineraryId': itineraryId,
-        'placeId': placeId,
-        'section': section,
-        'noteText': noteText,
-        'sortOrder': sortOrder,
-      });
+      final response = await ApiClient.post(
+        '/itineraries/saved-places',
+        body: {
+          'itineraryId': itineraryId,
+          'placeId': placeId,
+          'section': section,
+          'noteText': noteText,
+          'sortOrder': sortOrder,
+        },
+      );
       if (response.statusCode == 201) {
         refreshTrigger.value++;
         return jsonDecode(response.body);
@@ -454,9 +517,14 @@ class DatabaseService {
   }
 
   /// Deletes all saved places or notes in a specific section
-  Future<bool> deleteSavedPlacesBySection(int itineraryId, String section) async {
+  Future<bool> deleteSavedPlacesBySection(
+    int itineraryId,
+    String section,
+  ) async {
     try {
-      final response = await ApiClient.delete('/itineraries/$itineraryId/saved-places/section/${Uri.encodeComponent(section)}');
+      final response = await ApiClient.delete(
+        '/itineraries/$itineraryId/saved-places/section/${Uri.encodeComponent(section)}',
+      );
       if (response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -471,7 +539,9 @@ class DatabaseService {
   /// Deletes a place or note from saved places
   Future<bool> deletePlaceFromSaved(int savedId) async {
     try {
-      final response = await ApiClient.delete('/itineraries/saved-places/$savedId');
+      final response = await ApiClient.delete(
+        '/itineraries/saved-places/$savedId',
+      );
       if (response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -486,7 +556,10 @@ class DatabaseService {
   /// Deletes multiple saved places
   Future<bool> deleteMultipleSavedPlaces(List<int> itemIds) async {
     try {
-      final response = await ApiClient.post('/itineraries/saved-places/bulk-delete', body: {'ids': itemIds});
+      final response = await ApiClient.post(
+        '/itineraries/saved-places/bulk-delete',
+        body: {'ids': itemIds},
+      );
       if (response.statusCode == 201 || response.statusCode == 200) {
         refreshTrigger.value++;
         return true;
@@ -498,10 +571,10 @@ class DatabaseService {
     }
   }
 
-  // The below methods move/copy saved places, which could be implemented in backend directly 
+  // The below methods move/copy saved places, which could be implemented in backend directly
   // or via iterating through API calls. In the original version it was iterating via DB calls.
   // Assuming we implement logic similar to before, calling API iteratively.
-  
+
   /// Moves multiple saved places to a new section
   Future<bool> moveSavedPlaces(List<int> itemIds, String targetSection) async {
     bool success = true;
@@ -516,13 +589,15 @@ class DatabaseService {
   Future<bool> copySavedPlaces(List<int> itemIds, String targetSection) async {
     // In a complete backend refactor, we would add an endpoint for this.
     // For now, it's difficult without fetching the actual entities first.
-    // Assuming backend will handle it or we fetch then post. 
+    // Assuming backend will handle it or we fetch then post.
     // This is a simplified version.
-    return true; 
+    return true;
   }
 
   /// Creates a new ExplorePost (e.g. for User Guides)
-  Future<Map<String, dynamic>?> createExplorePost(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>?> createExplorePost(
+    Map<String, dynamic> data,
+  ) async {
     try {
       final response = await ApiClient.post('/explore', body: data);
       if (response.statusCode == 201 || response.statusCode == 200) {
