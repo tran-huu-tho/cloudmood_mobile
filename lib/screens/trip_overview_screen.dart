@@ -361,7 +361,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           if (title != null)
                             Text(
                               title,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.darkText,
                                 fontSize: 13,
@@ -390,7 +390,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         _currentNotification?.remove();
                         _currentNotification = null;
                       },
-                      child: const Icon(
+                      child: Icon(
                         Icons.close_rounded,
                         color: AppTheme.subtitleText,
                         size: 16,
@@ -759,7 +759,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
+            colorScheme: ColorScheme.light(
               primary: AppTheme.primary,
               onPrimary: Colors.white,
               onSurface: AppTheme.darkText,
@@ -806,7 +806,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 ),
                 const SizedBox(height: 8),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.edit_outlined,
                     color: AppTheme.darkText,
                   ),
@@ -817,7 +817,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   },
                 ),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.palette_outlined,
                     color: AppTheme.darkText,
                   ),
@@ -832,7 +832,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   },
                 ),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.unfold_less_rounded,
                     color: AppTheme.darkText,
                   ),
@@ -849,7 +849,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   },
                 ),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.playlist_add_rounded,
                     color: AppTheme.darkText,
                   ),
@@ -874,7 +874,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   },
                 ),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.menu_book_rounded,
                     color: AppTheme.darkText,
                   ),
@@ -891,7 +891,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   },
                 ),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.calendar_month_outlined,
                     color: AppTheme.darkText,
                   ),
@@ -902,7 +902,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   },
                 ),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.sort_rounded,
                     color: AppTheme.darkText,
                   ),
@@ -947,7 +947,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
+              child: Text(
                 'Hủy',
                 style: TextStyle(color: AppTheme.subtitleText),
               ),
@@ -1177,7 +1177,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   ),
                 ),
                 const Divider(),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Align(
                     alignment: Alignment.centerLeft,
@@ -1193,7 +1193,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 ),
                 ..._sectionNames.map((sec) {
                   return ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.folder_outlined,
                       color: AppTheme.primary,
                     ),
@@ -1205,7 +1205,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   );
                 }),
                 const Divider(),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Align(
                     alignment: Alignment.centerLeft,
@@ -1305,7 +1305,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   children: [
                     Text(
                       isCopy ? 'Sao chép đến...' : 'Di chuyển đến...',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.darkText,
@@ -1444,7 +1444,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
+              child: Text(
                 'Hủy',
                 style: TextStyle(color: AppTheme.subtitleText),
               ),
@@ -1570,7 +1570,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
+                      child: Text(
                         'Có thể chỉnh sửa',
                         style: TextStyle(
                           color: AppTheme.primary,
@@ -1588,7 +1588,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       alignment: Alignment.center,
-                      child: const Text(
+                      child: Text(
                         'Chỉ xem',
                         style: TextStyle(color: AppTheme.subtitleText),
                       ),
@@ -1650,7 +1650,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         Text(
           label,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12, color: AppTheme.subtitleText),
+          style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
         ),
       ],
     );
@@ -1743,7 +1743,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   Widget _buildSettingTile(IconData icon, String title, {VoidCallback? onTap}) {
     return ListTile(
       leading: Icon(icon, color: AppTheme.darkText),
-      title: Text(title, style: const TextStyle(color: AppTheme.darkText)),
+      title: Text(title, style: TextStyle(color: AppTheme.darkText)),
       onTap: () {
         Navigator.pop(context);
         if (onTap != null) {
@@ -1773,20 +1773,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   leading: Icon(icon, color: AppTheme.darkText),
                   title: Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppTheme.darkText,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   subtitle: Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppTheme.subtitleText,
                       fontSize: 12,
                     ),
                   ),
                   trailing: _privacySetting == value
-                      ? const Icon(Icons.check, color: AppTheme.darkText)
+                      ? Icon(Icons.check, color: AppTheme.darkText)
                       : null,
                   onTap: () async {
                     setSheetState(() => _privacySetting = value);
@@ -1817,13 +1817,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   Row(
                     children: [
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_back,
                           color: AppTheme.darkText,
                         ),
                         onPressed: () => Navigator.pop(context),
                       ),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Cài đặt quyền riêng tư',
                           textAlign: TextAlign.center,
@@ -1909,7 +1909,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text(
+              child: Text(
                 'Hủy',
                 style: TextStyle(color: AppTheme.subtitleText),
               ),
@@ -2302,7 +2302,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       Text(
                                         cat['name'] ?? '',
                                         textAlign: TextAlign.center,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
                                           color: AppTheme.subtitleText,
                                         ),
@@ -2341,7 +2341,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         secondary: Icon(Icons.location_on, color: color),
                         title: Text(
                           section,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppTheme.darkText,
                             fontWeight: FontWeight.w500,
                           ),
@@ -2385,7 +2385,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         secondary: Icon(Icons.location_on, color: color),
                         title: Text(
                           'Ngày $day',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppTheme.darkText,
                             fontWeight: FontWeight.w500,
                           ),
@@ -2440,7 +2440,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         Text(
           label,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12, color: AppTheme.subtitleText),
+          style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
         ),
       ],
     );
@@ -3115,7 +3115,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       ),
                     ],
                   )
-                : const Center(
+                : Center(
                     child: CircularProgressIndicator(color: AppTheme.primary),
                   ),
           ),
@@ -3139,7 +3139,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Icon(
                         Icons.search_rounded,
                         color: AppTheme.darkText,
@@ -3161,7 +3161,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      child: const Center(
+                      child: Center(
                         child: Icon(
                           Icons.layers_rounded,
                           color: AppTheme.darkText,
@@ -3189,7 +3189,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Icon(
                         Icons.bed_rounded,
                         color: AppTheme.darkText,
@@ -3210,7 +3210,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Icon(
                         Icons.near_me_rounded, // Location arrow
                         color: AppTheme.darkText,
@@ -3346,7 +3346,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   },
                                   child: Container(
                                     color: Colors.transparent,
-                                    child: const Center(
+                                    child: Center(
                                       child: Icon(
                                         Icons.arrow_back_ios_new_rounded,
                                         color: AppTheme.darkText,
@@ -3362,7 +3362,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         _itineraryData['title'] as String? ??
                                             'Hướng dẫn',
                                         textAlign: TextAlign.center,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: AppTheme.darkText,
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
@@ -3405,7 +3405,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       child: Container(
                                         width: 32,
                                         color: Colors.transparent,
-                                        child: const Center(
+                                        child: Center(
                                           child: Icon(
                                             Icons.add_photo_alternate_outlined,
                                             color: AppTheme.darkText,
@@ -3427,7 +3427,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         width: 32,
                                         color:
                                             Colors.transparent, // for hit test
-                                        child: const Center(
+                                        child: Center(
                                           child: Icon(
                                             Icons.more_horiz_rounded,
                                             color: AppTheme.darkText,
@@ -3648,7 +3648,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             child: Stack(
                               children: [
                                 _isLoading
-                                    ? const Center(
+                                    ? Center(
                                         child: CircularProgressIndicator(
                                           color: AppTheme.primary,
                                         ),
@@ -3686,7 +3686,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Container(
-                                          decoration: const BoxDecoration(
+                                          decoration: BoxDecoration(
                                             shape: BoxShape.circle,
                                             gradient: LinearGradient(
                                               colors: [
@@ -3828,7 +3828,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.search_rounded,
                         size: 20,
                         color: AppTheme.primary,
@@ -4134,7 +4134,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     (i) {
                       final dayNum = i + 1;
                       return ListTile(
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.location_on,
                           color: AppTheme.amber,
                         ),
@@ -4300,7 +4300,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.darkText,
@@ -4312,7 +4312,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         const SizedBox(height: 4),
                         Text(
                           'Mô tả: $description',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             color: AppTheme.subtitleText,
                           ),
@@ -4435,7 +4435,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Chi tiết',
                         style: TextStyle(
                           color: AppTheme.darkText,
@@ -4464,7 +4464,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         color: Color(0xFFF1F5F9),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.directions,
                         color: AppTheme.darkText,
                         size: 18,
@@ -4481,7 +4481,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
                         Icon(
                           Icons.auto_awesome,
@@ -4613,7 +4613,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         ? TextField(
                             controller: editController,
                             autofocus: true,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               color: AppTheme.darkText,
                               fontWeight: FontWeight.w500,
@@ -4661,7 +4661,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   : (text.isEmpty
                                         ? 'Thêm ghi chú tại đây'
                                         : text),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
                                 color: AppTheme.darkText,
                                 fontWeight: FontWeight.w500,
@@ -4686,7 +4686,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       setState(() => _editingNoteId = null);
                       await _loadData(silent: true);
                     },
-                    child: const Icon(
+                    child: Icon(
                       Icons.check_rounded,
                       color: AppTheme.green,
                       size: 22,
@@ -4832,7 +4832,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             ),
                             ReorderableDragStartListener(
                               index: itemIdx,
-                              child: const Padding(
+                              child: Padding(
                                 padding: EdgeInsets.only(left: 4),
                                 child: Icon(
                                   Icons.drag_indicator_rounded,
@@ -4857,7 +4857,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 padding: const EdgeInsets.only(left: 36),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.radio_button_unchecked,
                       color: AppTheme.subtitleText,
                       size: 20,
@@ -4865,7 +4865,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Thêm mục mới...',
                           hintStyle: TextStyle(
                             color: AppTheme.subtitleText,
@@ -4926,7 +4926,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             // ── Toolbar (shown when expanded)
             if (!isCollapsed) ...[
               const SizedBox(height: 8),
-              const Divider(color: AppTheme.border, height: 1, thickness: 0.5),
+              Divider(color: AppTheme.border, height: 1, thickness: 0.5),
               const SizedBox(height: 8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -4940,7 +4940,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               todoList,
                               isItineraryDetail,
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
@@ -4994,7 +4994,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     shape: BoxShape.circle,
                                     border: Border.all(color: AppTheme.border),
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.sentiment_satisfied_alt_outlined,
                                     color: AppTheme.subtitleText,
                                     size: 16,
@@ -5011,7 +5011,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       text,
                       isSavedPlace: !isItineraryDetail,
                     ),
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 6),
                       child: Icon(
                         Icons.delete_outline_rounded,
@@ -5022,7 +5022,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   ),
                   ReorderableDragStartListener(
                     index: listIdx,
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4),
                       child: Icon(
                         Icons.drag_indicator_rounded,
@@ -5053,7 +5053,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         children: [
           Text(emoji, style: const TextStyle(fontSize: 14)),
           const SizedBox(width: 3),
-          const Text(
+          Text(
             '1',
             style: TextStyle(
               fontSize: 10,
@@ -6089,7 +6089,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     children: [
                                       Text(
                                         name,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 15,
                                           color: AppTheme.darkText,
@@ -6099,7 +6099,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         const SizedBox(height: 4),
                                         Row(
                                           children: [
-                                            const Icon(
+                                            Icon(
                                               Icons.access_time_rounded,
                                               color: AppTheme.subtitleText,
                                               size: 12,
@@ -6216,7 +6216,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             alignment: Alignment.centerLeft,
                             child: Text(
                               detail['noteText'].toString().trim(),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 color: AppTheme.darkText,
                               ),
@@ -6249,7 +6249,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.delete_outline,
                                   color: AppTheme.subtitleText,
                                 ),
@@ -6260,7 +6260,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.drag_indicator,
                                   color: AppTheme.subtitleText,
                                 ),
@@ -6271,7 +6271,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.keyboard_arrow_up,
                                   color: AppTheme.subtitleText,
                                 ),
@@ -6420,7 +6420,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               borderRadius: BorderRadius.circular(4),
                             ),
                           )
-                        : const Icon(
+                        : Icon(
                             Icons.keyboard_arrow_down_rounded,
                             color: AppTheme.darkText,
                           ),
@@ -6456,14 +6456,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         _sectionTypes[section] == 'ITINERARY'
                                             ? 'Hành trình'
                                             : 'Danh sách',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 13,
                                           color: AppTheme.darkText,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      const Icon(
+                                      Icon(
                                         Icons.arrow_drop_down_rounded,
                                         size: 20,
                                         color: AppTheme.darkText,
@@ -6483,15 +6483,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     height: 48,
                                     child: Row(
                                       children: [
-                                        const Icon(
+                                        Icon(
                                           Icons.format_list_bulleted_rounded,
                                           size: 20,
                                           color: AppTheme.darkText,
                                         ),
                                         const SizedBox(width: 12),
-                                        const Text(
+                                        Text(
                                           'Danh sách',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 14,
                                             color: AppTheme.darkText,
                                           ),
@@ -6501,7 +6501,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           const Spacer(),
                                         if (_sectionTypes[section] !=
                                             'ITINERARY')
-                                          const Icon(
+                                          Icon(
                                             Icons.check_rounded,
                                             size: 20,
                                             color: AppTheme.darkText,
@@ -6514,15 +6514,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     height: 48,
                                     child: Row(
                                       children: [
-                                        const Icon(
+                                        Icon(
                                           Icons.calendar_month_rounded,
                                           size: 20,
                                           color: AppTheme.darkText,
                                         ),
                                         const SizedBox(width: 12),
-                                        const Text(
+                                        Text(
                                           'Hành trình',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 14,
                                             color: AppTheme.darkText,
                                           ),
@@ -6532,7 +6532,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           const Spacer(),
                                         if (_sectionTypes[section] ==
                                             'ITINERARY')
-                                          const Icon(
+                                          Icon(
                                             Icons.check_rounded,
                                             size: 20,
                                             color: AppTheme.darkText,
@@ -6550,7 +6550,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             highlightColor: Colors.transparent,
                           ),
                           child: PopupMenuButton<String>(
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.more_horiz_rounded,
                               color: AppTheme.subtitleText,
                             ),
@@ -6626,7 +6626,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               }
                             },
                             itemBuilder: (context) => [
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'edit',
                                 height: 48,
                                 child: Row(
@@ -6648,7 +6648,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   ],
                                 ),
                               ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'color',
                                 height: 48,
                                 child: Row(
@@ -6673,7 +6673,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   ],
                                 ),
                               ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'select_all',
                                 height: 48,
                                 child: Row(
@@ -6695,7 +6695,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   ],
                                 ),
                               ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'collapse',
                                 height: 48,
                                 child: Row(
@@ -6720,7 +6720,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   ],
                                 ),
                               ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'delete',
                                 height: 48,
                                 child: Row(
@@ -6743,7 +6743,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                               ),
                               const PopupMenuDivider(),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'reorder',
                                 height: 48,
                                 child: Row(
@@ -6918,7 +6918,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                               : 3,
                                         );
                                       },
-                                      decoration: const InputDecoration(
+                                      decoration: InputDecoration(
                                         hintText: 'Thêm địa điểm',
                                         hintStyle: TextStyle(
                                           color: AppTheme.hintText,
@@ -6947,7 +6947,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       color: AppTheme.surfaceVariant,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: const Icon(
+                                    child: Icon(
                                       Icons.description_outlined,
                                       color: AppTheme.darkText,
                                       size: 20,
@@ -6964,7 +6964,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       color: AppTheme.surfaceVariant,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: const Icon(
+                                    child: Icon(
                                       Icons.checklist_rounded,
                                       color: AppTheme.darkText,
                                       size: 20,
@@ -6994,7 +6994,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   itemBuilder: (context, sIdx) {
                                     final p = searchResultsList[sIdx];
                                     return ListTile(
-                                      leading: const Icon(
+                                      leading: Icon(
                                         Icons.location_on,
                                         color: AppTheme.primary,
                                       ),
@@ -7024,7 +7024,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             ],
 
                             const SizedBox(height: 12),
-                            const Text(
+                            Text(
                               'Địa điểm được đề xuất',
                               style: TextStyle(
                                 fontSize: 12,
@@ -7062,7 +7062,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             style: BorderStyle.solid,
                                           ),
                                         ),
-                                        child: const Row(
+                                        child: Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
                                           children: [
@@ -7141,11 +7141,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           ),
                                           Container(
                                             padding: const EdgeInsets.all(4),
-                                            decoration: const BoxDecoration(
+                                            decoration: BoxDecoration(
                                               color: AppTheme.primaryPeach,
                                               shape: BoxShape.circle,
                                             ),
-                                            child: const Icon(
+                                            child: Icon(
                                               Icons.add,
                                               size: 12,
                                               color: AppTheme.primary,
@@ -7295,7 +7295,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     ),
                     const SizedBox(height: 16),
                     // Title
-                    const Text(
+                    Text(
                       'Thêm địa điểm',
                       style: TextStyle(
                         fontSize: 18,
@@ -7335,7 +7335,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     ),
                     const SizedBox(height: 16),
                     // Subtitle
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: Align(
                         alignment: Alignment.centerLeft,
@@ -7362,13 +7362,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           final place = filteredPlaces[index];
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(
+                            leading: Icon(
                               Icons.location_on,
                               color: AppTheme.darkText,
                             ),
                             title: Text(
                               place['name'] ?? '',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 color: AppTheme.darkText,
                               ),
@@ -7606,7 +7606,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       Navigator.pop(context);
                       _showDefaultTransportModeSheet();
                     },
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 12,
@@ -7717,13 +7717,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(fontSize: 14, color: AppTheme.darkText),
+                style: TextStyle(fontSize: 14, color: AppTheme.darkText),
               ),
             ),
             if (info != null)
               Text(
                 info,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   color: AppTheme.subtitleText,
                 ),
@@ -7748,11 +7748,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(fontSize: 14, color: AppTheme.darkText),
+                style: TextStyle(fontSize: 14, color: AppTheme.darkText),
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check, color: AppTheme.darkText, size: 20),
+              Icon(Icons.check, color: AppTheme.darkText, size: 20),
           ],
         ),
       ),
@@ -7933,7 +7933,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           children: [
                                             Text(
                                               name,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 15,
                                                 color: AppTheme.darkText,
@@ -7943,7 +7943,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                               const SizedBox(height: 4),
                                               Row(
                                                 children: [
-                                                  const Icon(
+                                                  Icon(
                                                     Icons.access_time_rounded,
                                                     color:
                                                         AppTheme.subtitleText,
@@ -8078,7 +8078,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   alignment: Alignment.centerLeft,
                                   child: Text(
                                     detail['noteText'].toString().trim(),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
                                       color: AppTheme.darkText,
                                     ),
@@ -8136,7 +8136,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.delete_outline,
                                   color: AppTheme.subtitleText,
                                 ),
@@ -8147,7 +8147,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.drag_indicator,
                                   color: AppTheme.subtitleText,
                                 ),
@@ -8159,7 +8159,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.keyboard_arrow_up,
                                   color: AppTheme.subtitleText,
                                 ),
@@ -8305,7 +8305,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             onTap: _changeTripStartDate,
             child: Container(
               padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppTheme.darkText,
                 shape: BoxShape.circle,
               ),
@@ -8422,7 +8422,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 const SizedBox(width: 8),
                                 Text(
                                   _getDayLabel(index),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.w800,
                                     color: AppTheme.darkText,
@@ -8451,7 +8451,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(
+                                  icon: Icon(
                                     Icons.more_horiz_rounded,
                                     color: AppTheme.subtitleText,
                                   ),
@@ -8905,13 +8905,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Chi tiết chi tiêu',
                 style: AppTheme.sectionTitleStyle,
               ),
               TextButton.icon(
-                icon: const Icon(Icons.add, size: 16, color: AppTheme.primary),
-                label: const Text(
+                icon: Icon(Icons.add, size: 16, color: AppTheme.primary),
+                label: Text(
                   'Thêm chi phí',
                   style: TextStyle(
                     color: AppTheme.primary,
@@ -8926,7 +8926,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
           // Places cost section
           if (placeCosts > 0) ...[
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               child: Text(
                 'VÉ THAM QUAN / DỊCH VỤ ĐỊA ĐIỂM',
@@ -8954,7 +8954,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     decoration: AppTheme.premiumCardDecoration(radius: 12),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.location_on_outlined,
                           color: AppTheme.primary,
                           size: 20,
@@ -8973,7 +8973,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         ),
                         Text(
                           formatDong(50000),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: AppTheme.darkText,
                             fontSize: 13,
@@ -8987,7 +8987,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           ],
 
           // Custom Expenses Section
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             child: Text(
               'CHI PHÍ TỰ THÊM',
@@ -9002,7 +9002,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             Container(
               padding: const EdgeInsets.symmetric(vertical: 30),
               alignment: Alignment.center,
-              child: const Text(
+              child: Text(
                 'Chưa có chi tiêu tự thêm nào. Hãy nhấn "+ Thêm chi phí"!',
                 style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
               ),
@@ -9019,7 +9019,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 decoration: AppTheme.premiumCardDecoration(radius: 12),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.credit_card_rounded,
                       color: AppTheme.primary,
                       size: 20,
@@ -9039,7 +9039,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           const SizedBox(height: 2),
                           Text(
                             item['date'] ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppTheme.subtitleText,
                               fontSize: 10,
                             ),
@@ -9049,7 +9049,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     ),
                     Text(
                       formatDong(item['amount']),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: AppTheme.darkText,
                         fontSize: 13,
