@@ -1503,11 +1503,18 @@ class _ProfileDashboardState extends State<ProfileDashboard>
       return '$dayName, Ngày ${date.day} tháng ${date.month}, ${date.year}';
     }
 
+<<<<<<< Updated upstream
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Month Navigation Row
+=======
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 110),
+      children: [
+        // Month Navigation Row
+>>>>>>> Stashed changes
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
           child: Row(
@@ -1688,6 +1695,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         ),
 
         // Timeline Agenda list
+<<<<<<< Updated upstream
         events.isEmpty
             ? Center(
                   child: SingleChildScrollView(
@@ -1740,179 +1748,235 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     final startTime = event['startTime'] as String?;
                     final noteText = event['noteText'] as String?;
                     final isCustomNote = event['isCustomNote'] == true;
+=======
+        if (events.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.calendar_today_rounded,
+                    size: 40,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Trống lịch trình',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Không có địa điểm hay ghi chú nào cho ngày này.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.subtitleText,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              final event = events[index];
+              final tripTitle = event['tripTitle'] as String?;
+              final place = event['place'];
+              final startTime = event['startTime'] as String?;
+              final noteText = event['noteText'] as String?;
+              final isCustomNote = event['isCustomNote'] == true;
+>>>>>>> Stashed changes
 
-                    final hasImage = place != null &&
-                        place['image'] != null &&
-                        place['image'].toString().isNotEmpty &&
-                        !place['image'].toString().contains('placeholder');
+              final hasImage = place != null &&
+                  place['image'] != null &&
+                  place['image'].toString().isNotEmpty &&
+                  !place['image'].toString().contains('placeholder');
 
-                    return IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Left side: Time
+                    SizedBox(
+                      width: 65,
+                      child: Column(
                         children: [
-                          // Left side: Time
-                          SizedBox(
-                            width: 65,
-                            child: Column(
-                              children: [
-                                Text(
-                                  startTime ?? 'Chưa hẹn',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: isCustomNote ? Colors.blueGrey : AppTheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Expanded(
-                                  child: Container(
-                                    width: 2,
-                                    color: AppTheme.border,
-                                  ),
-                                ),
-                              ],
+                          Text(
+                            startTime ?? 'Chưa hẹn',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isCustomNote ? Colors.blueGrey : AppTheme.primary,
                             ),
                           ),
-                          
-                          // Timeline Node
-                          Column(
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                margin: const EdgeInsets.only(top: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isCustomNote ? Colors.blueGrey : AppTheme.primary,
-                                    width: 3,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Container(
-                                  width: 2,
-                                  color: index == events.length - 1
-                                      ? Colors.transparent
-                                      : AppTheme.border,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 14),
-
-                          // Right side: Event Card
+                          const SizedBox(height: 6),
                           Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                if (place != null) {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    backgroundColor: Colors.transparent,
-                                    builder: (context) => PlaceDetailBottomSheet(
-                                      place: place,
-                                    ),
-                                  );
-                                }
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 16),
-                                padding: const EdgeInsets.all(12),
-                                decoration: AppTheme.premiumCardDecoration(),
-                                child: Row(
+                            child: Container(
+                              width: 2,
+                              color: AppTheme.border,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Timeline Node
+                    Column(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          margin: const EdgeInsets.only(top: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isCustomNote ? Colors.blueGrey : AppTheme.primary,
+                              width: 3,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            width: 2,
+                            color: index == events.length - 1
+                                ? Colors.transparent
+                                : AppTheme.border,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 14),
+
+                    // Right side: Event Card
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          if (place != null) {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => PlaceDetailBottomSheet(
+                                place: place,
+                              ),
+                            );
+                          }
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(12),
+                          decoration: AppTheme.premiumCardDecoration(),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  width: 50,
+                                  height: 50,
+                                  color: isCustomNote ? Colors.blueGrey.withOpacity(0.1) : Colors.grey[200],
+                                  child: isCustomNote
+                                      ? const Icon(Icons.event_note_rounded, color: Colors.blueGrey)
+                                      : hasImage
+                                          ? Image.network(
+                                              place['image'].toString(),
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (c, e, s) =>
+                                                  const Icon(Icons.place_rounded, color: Colors.grey),
+                                            )
+                                          : const Icon(Icons.place_rounded, color: Colors.grey),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Container(
-                                        width: 50,
-                                        height: 50,
-                                        color: isCustomNote ? Colors.blueGrey.withOpacity(0.1) : Colors.grey[200],
-                                        child: isCustomNote
-                                            ? const Icon(Icons.event_note_rounded, color: Colors.blueGrey)
-                                            : hasImage
-                                                ? Image.network(
-                                                    place['image'].toString(),
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (c, e, s) =>
-                                                        const Icon(Icons.place_rounded, color: Colors.grey),
-                                                  )
-                                                : const Icon(Icons.place_rounded, color: Colors.grey),
+                                    Text(
+                                      isCustomNote
+                                          ? event['title'] ?? 'Ghi chú'
+                                          : place != null ? place['name']?.toString() ?? 'Ghi chú' : 'Ghi chú',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.darkText,
                                       ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            isCustomNote
-                                                ? event['title'] ?? 'Ghi chú'
-                                                : place != null ? place['name']?.toString() ?? 'Ghi chú' : 'Ghi chú',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppTheme.darkText,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Text(
-                                            isCustomNote
-                                                ? 'Nhắc nhở cá nhân'
-                                                : 'Thuộc: $tripTitle',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: AppTheme.subtitleText,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (noteText != null && noteText.trim().isNotEmpty) ...[
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              noteText,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontStyle: FontStyle.italic,
-                                                color: isCustomNote ? Colors.black87 : Colors.black54,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    if (isCustomNote) ...[
-                                      GestureDetector(
-                                        onTap: () => _deleteNote(event['id'] as int),
-                                        child: const Icon(
-                                          Icons.delete_outline_rounded,
-                                          color: Colors.redAccent,
-                                          size: 20,
-                                        ),
-                                      ),
-                                    ] else ...[
-                                      Icon(
-                                        Icons.chevron_right_rounded,
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      isCustomNote
+                                          ? 'Nhắc nhở cá nhân'
+                                          : 'Thuộc: $tripTitle',
+                                      style: TextStyle(
+                                        fontSize: 11,
                                         color: AppTheme.subtitleText,
-                                        size: 20,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (noteText != null && noteText.trim().isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        noteText,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontStyle: FontStyle.italic,
+                                          color: isCustomNote ? Colors.black87 : Colors.black54,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ],
                                 ),
                               ),
-                            ),
+                              if (isCustomNote) ...[
+                                GestureDetector(
+                                  onTap: () => _deleteNote(event['id'] as int),
+                                  child: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Colors.redAccent,
+                                    size: 20,
+                                  ),
+                                ),
+                              ] else ...[
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: AppTheme.subtitleText,
+                                  size: 20,
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
+<<<<<<< Updated upstream
+=======
+              );
+            },
+          ),
+>>>>>>> Stashed changes
       ],
     ));
   }
