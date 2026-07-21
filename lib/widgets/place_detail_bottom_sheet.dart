@@ -377,17 +377,24 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Description and Image
-          if (description.isNotEmpty)
+          if (description.isNotEmpty || imageUrl != null)
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
-                    'Mô tả: $description',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      height: 1.6,
-                      color: Colors.black87,
+                    description.isNotEmpty
+                        ? 'Mô tả: $description'
+                        : 'Địa điểm này chưa có mô tả chi tiết.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      fontStyle: description.isNotEmpty
+                          ? FontStyle.normal
+                          : FontStyle.italic,
+                      color: description.isNotEmpty
+                          ? Colors.black87
+                          : Colors.grey[600],
                     ),
                   ),
                 ),
@@ -406,8 +413,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child:
-                          (imageUrl.startsWith('data:image/') &&
+                      child: (imageUrl.startsWith('data:image/') &&
                               imageUrl.contains('base64,'))
                           ? Image.memory(
                               base64Decode(imageUrl.split('base64,').last),
@@ -811,15 +817,44 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     final int userRatingCount =
         (widget.place['userRatingCount'] as num?)?.toInt() ?? 156;
 
-    // Simulate rating distribution
-    int count5 = (userRatingCount * 0.65).toInt();
-    int count4 = (userRatingCount * 0.20).toInt();
-    int count3 = (userRatingCount * 0.10).toInt();
-    int count2 = (userRatingCount * 0.03).toInt();
-    int count1 = userRatingCount - count5 - count4 - count3 - count2;
-    if (count1 < 0) count1 = 0;
-    if (userRatingCount == 0) {
-      count5 = count4 = count3 = count2 = count1 = 0;
+    // Phân bổ sao dựa trên điểm trung bình thực tế
+    int count5 = 0;
+    int count4 = 0;
+    int count3 = 0;
+    int count2 = 0;
+    int count1 = 0;
+
+    if (userRatingCount > 0) {
+      if (rating >= 4.9) {
+        count5 = userRatingCount;
+      } else if (rating <= 1.1) {
+        count1 = userRatingCount;
+      } else {
+        double w5 = rating >= 4.0 ? (rating - 3.0) : 0.1;
+        double w4 = rating >= 3.0 ? (3.5 - (rating - 4.0).abs()) : 0.2;
+        double w3 = 1.5 - (rating - 3.0).abs();
+        double w2 = rating <= 4.0 ? (3.0 - rating) : 0.05;
+        double w1 = rating <= 3.0 ? (2.5 - rating) : 0.02;
+
+        if (w5 < 0) w5 = 0.01;
+        if (w4 < 0) w4 = 0.01;
+        if (w3 < 0) w3 = 0.01;
+        if (w2 < 0) w2 = 0.01;
+        if (w1 < 0) w1 = 0.01;
+
+        double sumW = w5 + w4 + w3 + w2 + w1;
+
+        count5 = ((w5 / sumW) * userRatingCount).round();
+        count4 = ((w4 / sumW) * userRatingCount).round();
+        count3 = ((w3 / sumW) * userRatingCount).round();
+        count2 = ((w2 / sumW) * userRatingCount).round();
+        count1 = userRatingCount - count5 - count4 - count3 - count2;
+
+        if (count1 < 0) {
+          count5 += count1;
+          count1 = 0;
+        }
+      }
     }
 
     return SingleChildScrollView(

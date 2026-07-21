@@ -65,5 +65,7 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Cho phép ứng dụng nhìn thấy và tương tác với app Facebook Native trên Android 11+ -->
+        <package android:name="com.facebook.katana" />
     </queries>
 </manifest>

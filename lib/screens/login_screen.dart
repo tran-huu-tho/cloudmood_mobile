@@ -94,6 +94,8 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
         clientId: '798468966090-ipq61378j4f09cnsrkrv1mq4bldku934.apps.googleusercontent.com',
         scopes: ['email', 'profile'],
       );
+      // Đăng xuất phiên cũ để bắt buộc hiển thị hộp thoại chọn tài khoản
+      await googleSignIn.signOut();
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser != null) {
         final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -145,6 +147,8 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
   Future<void> _handleFacebookSignIn() async {
     setState(() => _isLoading = true);
     try {
+      // Đăng xuất phiên cũ để bắt buộc hiển thị hộp thoại đăng nhập Facebook
+      await FacebookAuth.instance.logOut();
       final LoginResult result = await FacebookAuth.instance.login(
         permissions: ['public_profile', 'email'],
       );

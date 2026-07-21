@@ -7,6 +7,7 @@ import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/places_screen.dart';
 import 'screens/deals_screen.dart';
+import 'screens/forum_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/create_itinerary_wizard_sheet.dart';
 import 'screens/create_guide_wizard_sheet.dart';
@@ -88,7 +89,7 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
       case 1:
         return const CloudmoodPlacesScreen();
       case 3:
-        return const CloudmoodDealsScreen();
+        return const CloudmoodForumScreen();
       case 4:
         return const CloudmoodProfileScreen();
       default:
@@ -250,9 +251,9 @@ class _CloudmoodFloatingNav extends StatelessWidget {
       label: 'Tạo lịch',
     ),
     _NavItem(
-      icon: Icons.local_offer_outlined,
-      activeIcon: Icons.local_offer_rounded,
-      label: 'Ưu đãi',
+      icon: Icons.feed_outlined,
+      activeIcon: Icons.feed_rounded,
+      label: 'Diễn đàn',
     ),
     _NavItem(
       icon: Icons.person_outline_rounded,

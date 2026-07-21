@@ -13,6 +13,8 @@ import 'create_itinerary_wizard_sheet.dart';
 import 'trip_overview_screen.dart';
 import '../widgets/place_detail_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'post_detail_screen.dart';
+import '../services/api_client.dart';
 
 Future<XFile?> _selectImage(BuildContext context) async {
   final source = await showModalBottomSheet<ImageSource>(
@@ -357,61 +359,64 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
               ),
             ],
           ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: currentPasswordController,
-                    obscureText: true,
-                    decoration: AppTheme.inputDecoration(
-                      hintText: 'Mật khẩu hiện tại',
-                      prefixIcon: Icons.lock_open_rounded,
+          content: SizedBox(
+            width: 360,
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: currentPasswordController,
+                      obscureText: true,
+                      decoration: AppTheme.inputDecoration(
+                        hintText: 'Mật khẩu hiện tại',
+                        prefixIcon: Icons.lock_open_rounded,
+                      ),
+                      validator: (v) => v == null || v.isEmpty
+                          ? 'Nhập mật khẩu hiện tại.'
+                          : null,
                     ),
-                    validator: (v) => v == null || v.isEmpty
-                        ? 'Nhập mật khẩu hiện tại.'
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: newPasswordController,
-                    obscureText: true,
-                    decoration: AppTheme.inputDecoration(
-                      hintText: 'Mật khẩu mới',
-                      prefixIcon: Icons.lock_outline_rounded,
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: newPasswordController,
+                      obscureText: true,
+                      decoration: AppTheme.inputDecoration(
+                        hintText: 'Mật khẩu mới',
+                        prefixIcon: Icons.lock_outline_rounded,
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Nhập mật khẩu mới.';
+                        if (v.length < 8)
+                          return 'Mật khẩu phải có ít nhất 8 ký tự.';
+                        if (!v.contains(RegExp(r'[A-Z]'))) {
+                          return 'Mật khẩu phải có ít nhất 1 chữ viết hoa.';
+                        }
+                        if (!v.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) {
+                          return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt.';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Nhập mật khẩu mới.';
-                      if (v.length < 8)
-                        return 'Mật khẩu phải có ít nhất 8 ký tự.';
-                      if (!v.contains(RegExp(r'[A-Z]'))) {
-                        return 'Mật khẩu phải có ít nhất 1 chữ viết hoa.';
-                      }
-                      if (!v.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) {
-                        return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: confirmNewPasswordController,
-                    obscureText: true,
-                    decoration: AppTheme.inputDecoration(
-                      hintText: 'Xác nhận mật khẩu mới',
-                      prefixIcon: Icons.lock_rounded,
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: confirmNewPasswordController,
+                      obscureText: true,
+                      decoration: AppTheme.inputDecoration(
+                        hintText: 'Xác nhận mật khẩu mới',
+                        prefixIcon: Icons.lock_rounded,
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Xác nhận mật khẩu.';
+                        if (v != newPasswordController.text) {
+                          return 'Mật khẩu không khớp.';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Xác nhận mật khẩu.';
-                      if (v != newPasswordController.text) {
-                        return 'Mật khẩu không khớp.';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -735,7 +740,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     super.initState();
     _selectedCalendarDate = DateTime.now();
     _currentMonth = DateTime.now();
-    _tabController = TabController(length: widget.user.role ? 2 : 4, vsync: this);
+    _tabController = TabController(length: widget.user.role ? 3 : 5, vsync: this);
     _loadData();
     _loadNotes();
     DatabaseService.refreshTrigger.addListener(_loadData);
@@ -1027,19 +1032,19 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               delegate: _StickyTabBarDelegate(
                 TabBar(
                   controller: _tabController,
-                  isScrollable: true,
+                  isScrollable: false,
                   labelColor: AppTheme.primary,
                   unselectedLabelColor: AppTheme.subtitleText,
                   indicatorColor: AppTheme.primary,
                   indicatorWeight: 2.5,
                   indicatorSize: TabBarIndicatorSize.tab,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 2),
                   labelStyle: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
                   unselectedLabelStyle: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                   tabs: [
@@ -1048,6 +1053,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                       const Tab(text: 'Lịch'),
                       const Tab(text: 'Hướng dẫn'),
                     ],
+                    const Tab(text: 'Đã lưu'),
                     const Tab(text: 'Cài đặt'),
                   ],
                 ),
@@ -1064,7 +1070,9 @@ class _ProfileDashboardState extends State<ProfileDashboard>
             if (!widget.user.role) _buildCalendarTab(),
             // ── Tab 3: Guides ────────────────────────────────────
             if (!widget.user.role) _buildGuidesTab(),
-            // ── Tab 4: Settings ───────────────────────────────────
+            // ── Tab 4: Saved Posts ───────────────────────────────
+            const SavedPostsTab(),
+            // ── Tab 5: Settings ───────────────────────────────────
             _buildSettingsTab(joinDate),
           ],
         ),
@@ -1283,6 +1291,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     final titleController = TextEditingController();
     final contentController = TextEditingController();
     TimeOfDay selectedTime = TimeOfDay.now();
+    DateTime startDate = _selectedCalendarDate;
+    DateTime endDate = _selectedCalendarDate;
 
     showDialog(
       context: context,
@@ -1290,6 +1300,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         return StatefulBuilder(
           builder: (context, setModalState) {
             return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Text(
                 'Thêm ghi chú/hoạt động',
@@ -1299,52 +1310,170 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                   fontSize: 18,
                 ),
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: titleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Tiêu đề',
-                        hintText: 'Ví dụ: Ăn trưa cùng bạn',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: contentController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nội dung chi tiết',
-                        hintText: 'Nhập ghi chú thêm...',
-                      ),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Thời gian:',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.85,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: titleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Tiêu đề',
+                          hintText: 'Ví dụ: Ăn trưa cùng bạn',
                         ),
-                        TextButton.icon(
-                          onPressed: () async {
-                            final TimeOfDay? time = await showTimePicker(
-                              context: context,
-                              initialTime: selectedTime,
-                            );
-                            if (time != null) {
-                              setModalState(() {
-                                selectedTime = time;
-                              });
-                            }
-                          },
-                          icon: const Icon(Icons.access_time_rounded),
-                          label: Text(selectedTime.format(context)),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: contentController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nội dung chi tiết',
+                          hintText: 'Nhập ghi chú thêm...',
                         ),
-                      ],
-                    ),
-                  ],
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Từ ngày:',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                                const SizedBox(height: 4),
+                                InkWell(
+                                  onTap: () async {
+                                    final DateTime? date = await showDatePicker(
+                                      context: context,
+                                      initialDate: startDate,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (date != null) {
+                                      setModalState(() {
+                                        startDate = date;
+                                        if (startDate.isAfter(endDate)) {
+                                          endDate = startDate;
+                                        }
+                                      });
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey[300]!),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.calendar_today_rounded, size: 14, color: AppTheme.primary),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${startDate.day}/${startDate.month}/${startDate.year}',
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Đến ngày:',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                                const SizedBox(height: 4),
+                                InkWell(
+                                  onTap: () async {
+                                    final DateTime? date = await showDatePicker(
+                                      context: context,
+                                      initialDate: endDate,
+                                      firstDate: startDate,
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (date != null) {
+                                      setModalState(() {
+                                        endDate = date;
+                                      });
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey[300]!),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.calendar_today_rounded, size: 14, color: AppTheme.primary),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${endDate.day}/${endDate.month}/${endDate.year}',
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Thời gian:',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          InkWell(
+                            onTap: () async {
+                              final TimeOfDay? time = await showTimePicker(
+                                context: context,
+                                initialTime: selectedTime,
+                              );
+                              if (time != null) {
+                                setModalState(() {
+                                  selectedTime = time;
+                                });
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.access_time_rounded, size: 14, color: AppTheme.primary),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    selectedTime.format(context),
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -1362,12 +1491,14 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     if (title.isEmpty) return;
 
                     final timeStr = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
-                    final dateStr = '${_selectedCalendarDate.year}-${_selectedCalendarDate.month.toString().padLeft(2, '0')}-${_selectedCalendarDate.day.toString().padLeft(2, '0')}';
+                    final startStr = '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
+                    final endStr = '${endDate.year}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}';
 
                     setState(() {
                       _customNotes.add({
                         'id': DateTime.now().millisecondsSinceEpoch,
-                        'date': dateStr,
+                        'startDate': startStr,
+                        'endDate': endStr,
                         'time': timeStr,
                         'title': title,
                         'content': contentController.text.trim(),
@@ -1454,14 +1585,18 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     }
 
     for (var note in _customNotes) {
-      if (note['date'] == dateStr) {
-        events.add({
-          'isCustomNote': true,
-          'id': note['id'],
-          'title': note['title'] ?? 'Ghi chú',
-          'startTime': note['time'] ?? '00:00',
-          'noteText': note['content'] ?? '',
-        });
+      final String? startDateStr = note['startDate'] ?? note['date'];
+      final String? endDateStr = note['endDate'] ?? note['date'];
+      if (startDateStr != null && endDateStr != null) {
+        if (dateStr.compareTo(startDateStr) >= 0 && dateStr.compareTo(endDateStr) <= 0) {
+          events.add({
+            'isCustomNote': true,
+            'id': note['id'],
+            'title': note['title'] ?? 'Ghi chú',
+            'startTime': note['time'] ?? '00:00',
+            'noteText': note['content'] ?? '',
+          });
+        }
       }
     }
     
@@ -1503,18 +1638,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
       return '$dayName, Ngày ${date.day} tháng ${date.month}, ${date.year}';
     }
 
-<<<<<<< Updated upstream
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Month Navigation Row
-=======
     return ListView(
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 110),
       children: [
         // Month Navigation Row
->>>>>>> Stashed changes
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
           child: Row(
@@ -1571,7 +1698,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
             )).toList(),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
 
         // Calendar Grid
         Padding(
@@ -1583,7 +1710,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               crossAxisCount: 7,
               mainAxisSpacing: 4,
               crossAxisSpacing: 4,
-              childAspectRatio: 1.1,
+              childAspectRatio: 1.35,
             ),
             itemCount: calendarDays.length,
             itemBuilder: (context, index) {
@@ -1630,7 +1757,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                       ),
                       if (hasEvents)
                         Positioned(
-                          bottom: 4,
+                          bottom: 2,
                           child: Container(
                             width: 4,
                             height: 4,
@@ -1648,11 +1775,11 @@ class _ProfileDashboardState extends State<ProfileDashboard>
           ),
         ),
 
-        const Divider(height: 24, thickness: 1, color: Color(0xFFF1F5F9)),
+        const Divider(height: 16, thickness: 1, color: Color(0xFFF1F5F9)),
 
         // Date Title and Add Note Button
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1695,88 +1822,18 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         ),
 
         // Timeline Agenda list
-<<<<<<< Updated upstream
-        events.isEmpty
-            ? Center(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.calendar_today_rounded,
-                            size: 40,
-                            color: AppTheme.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Trống lịch trình',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.darkText,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Không có địa điểm hay ghi chú nào cho ngày này.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.subtitleText,
-                          ),
-                        ),
-                        const SizedBox(height: 40),
-                      ],
-                    ),
-                  ),
-                )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
-                  itemCount: events.length,
-                  itemBuilder: (context, index) {
-                    final event = events[index];
-                    final tripTitle = event['tripTitle'] as String?;
-                    final place = event['place'];
-                    final startTime = event['startTime'] as String?;
-                    final noteText = event['noteText'] as String?;
-                    final isCustomNote = event['isCustomNote'] == true;
-=======
         if (events.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 40),
+            padding: const EdgeInsets.symmetric(vertical: 20),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.calendar_today_rounded,
-                    size: 40,
-                    color: AppTheme.primary,
-                  ),
+                Icon(
+                  Icons.calendar_today_rounded,
+                  size: 32,
+                  color: AppTheme.subtitleText,
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Trống lịch trình',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.darkText,
-                  ),
-                ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 10),
                 Text(
                   'Không có địa điểm hay ghi chú nào cho ngày này.',
                   style: TextStyle(
@@ -1800,7 +1857,6 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               final startTime = event['startTime'] as String?;
               final noteText = event['noteText'] as String?;
               final isCustomNote = event['isCustomNote'] == true;
->>>>>>> Stashed changes
 
               final hasImage = place != null &&
                   place['image'] != null &&
@@ -1971,14 +2027,11 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     ),
                   ],
                 ),
-<<<<<<< Updated upstream
-=======
               );
             },
           ),
->>>>>>> Stashed changes
       ],
-    ));
+    );
   }
 
   Widget _buildTripChip(String label, IconData icon, Color bg, Color fg) {
@@ -2463,5 +2516,279 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _StickyTabBarDelegate oldDelegate) {
     return tabBar != oldDelegate.tabBar;
+  }
+}
+
+// ─── Màn hình Tab hiển thị Bài viết đã lưu ────────────────────────────────────
+class SavedPostsTab extends StatefulWidget {
+  const SavedPostsTab({super.key});
+
+  @override
+  State<SavedPostsTab> createState() => _SavedPostsTabState();
+}
+
+class _SavedPostsTabState extends State<SavedPostsTab> {
+  final List<Map<String, dynamic>> _posts = [];
+  bool _isLoading = true;
+  int _page = 1;
+  bool _hasMore = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSavedPosts();
+  }
+
+  Future<void> _fetchSavedPosts({bool loadMore = false}) async {
+    if (loadMore && !_hasMore) return;
+
+    if (!loadMore) {
+      if (mounted) {
+        setState(() {
+          _page = 1;
+          _hasMore = true;
+          _isLoading = true;
+        });
+      }
+    }
+
+    try {
+      final response = await ApiClient.get('/forum/saved', query: {
+        'page': _page.toString(),
+        'pageSize': '10',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final fetchedPosts = data.map((e) => Map<String, dynamic>.from(e)).toList();
+
+        if (mounted) {
+          setState(() {
+            if (!loadMore) {
+              _posts.clear();
+            }
+            for (var post in fetchedPosts) {
+              if (!_posts.any((p) => p['id'] == post['id'])) {
+                _posts.add(post);
+              }
+            }
+            _isLoading = false;
+            _hasMore = fetchedPosts.length == 10;
+            if (_hasMore) _page++;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching saved posts: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  String _formatTimeAgo(String? dateStr) {
+    if (dateStr == null) return '';
+    try {
+      final date = DateTime.parse(dateStr).toLocal();
+      final diff = DateTime.now().difference(date);
+      if (diff.inDays > 7) {
+        return '${date.day}/${date.month}/${date.year}';
+      } else if (diff.inDays >= 1) {
+        return '${diff.inDays} ngày trước';
+      } else if (diff.inHours >= 1) {
+        return '${diff.inHours} giờ trước';
+      } else if (diff.inMinutes >= 1) {
+        return '${diff.inMinutes} phút trước';
+      } else {
+        return 'Vừa xong';
+      }
+    } catch (e) {
+      return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading && _posts.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primary),
+      );
+    }
+
+    if (_posts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.bookmark_outline_rounded, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Chưa lưu bài viết nào',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _fetchSavedPosts(),
+      color: AppTheme.primary,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: _posts.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= _posts.length) {
+            _fetchSavedPosts(loadMore: true);
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: CircularProgressIndicator(color: AppTheme.primary),
+              ),
+            );
+          }
+
+          final post = _posts[index];
+          final author = post['user'] ?? {};
+          final place = post['place'];
+          final media = post['media'] as List? ?? [];
+          final bool hasMedia = media.isNotEmpty;
+
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            elevation: 1,
+            color: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => PostDetailScreen(postId: post['id'] as int),
+                  ),
+                );
+                _fetchSavedPosts();
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        AvatarImage(avatarUrl: author['avatar'], size: 32),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                author['fullName'] ?? 'Người dùng',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                _formatTimeAgo(post['createdAt']),
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                post['content'] ?? '',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black87,
+                                  height: 1.4,
+                                ),
+                              ),
+                              if (place != null) ...[
+                                const SizedBox(height: 6),
+                                InkWell(
+                                  onTap: () => PlaceDetailBottomSheet.show(context, place),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryContainer.withOpacity(0.4),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.place_rounded,
+                                          color: AppTheme.primary,
+                                          size: 12,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            place['name'] ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        if (hasMedia) ...[
+                          const SizedBox(width: 12),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              media[0]['url'],
+                              width: 64,
+                              height: 64,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
