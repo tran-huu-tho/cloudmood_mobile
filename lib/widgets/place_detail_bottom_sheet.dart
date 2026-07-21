@@ -1,11 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../services/database_service.dart';
 import '../utils/time_utils.dart';
+import '../utils/string_utils.dart';
 import 'save_to_trip_bottom_sheet.dart';
-import 'expandable_opening_hours.dart';
 
 class PlaceDetailBottomSheet extends StatefulWidget {
   final Map<String, dynamic> place;
@@ -79,24 +80,27 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
   void initState() {
     super.initState();
     _localSavedCount = widget.savedCount;
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadReviews();
   }
 
   Future<void> _loadReviews() async {
-    final placeId = widget.place['id'];
-    if (placeId != null) {
-      final reviews = await DatabaseService().fetchPlaceReviews(placeId);
-      if (mounted) {
-        setState(() {
-          _reviews = reviews;
-          _isLoadingReviews = false;
-        });
+    final rawId = widget.place['id'];
+    if (rawId != null) {
+      final placeId = int.tryParse(rawId.toString());
+      if (placeId != null) {
+        final reviews = await DatabaseService().fetchPlaceReviews(placeId);
+        if (mounted) {
+          setState(() {
+            _reviews = reviews;
+            _isLoadingReviews = false;
+          });
+        }
+        return;
       }
-    } else {
-      if (mounted) {
-        setState(() => _isLoadingReviews = false);
-      }
+    }
+    if (mounted) {
+      setState(() => _isLoadingReviews = false);
     }
   }
 
@@ -125,6 +129,18 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
         setState(() {
           _localSavedCount = count;
         });
+      }
+    }
+  }
+
+  Future<void> _launchURL(Uri url) async {
+    try {
+      await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+    } catch (e) {
+      try {
+        await launchUrl(url, mode: LaunchMode.platformDefault);
+      } catch (ex) {
+        debugPrint('Error launching URL: $ex');
       }
     }
   }
@@ -268,7 +284,6 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
             Tab(text: 'Giới thiệu'),
             Tab(text: 'Đánh giá'),
             Tab(text: 'Ảnh'),
-            Tab(text: 'Đề cập'),
           ],
         ),
         // Content
@@ -279,7 +294,6 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
               _buildIntroTab(),
               _buildReviewsTab(),
               _buildPhotosTab(),
-              const Center(child: Text('Đề cập (Chưa có dữ liệu)')),
             ],
           ),
         ),
@@ -293,7 +307,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     final double rating = (widget.place['rating'] as num?)?.toDouble() ?? 0.0;
     final int userRatingCount =
         (widget.place['userRatingCount'] as num?)?.toInt() ?? 0;
-    final String address = widget.place['address'] ?? '';
+    final String address = StringUtils.cleanAddress(widget.place['address'] ?? '');
 
     final String? phone =
         widget.place['internationalPhoneNumber'] ??
@@ -302,6 +316,8 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
         widget.place['phoneNumber'];
     final String? website =
         widget.place['websiteUri'] ?? widget.place['website'];
+    final String? price = widget.place['price'];
+    final String? priceLevel = widget.place['priceLevel'];
 
     String? openingHours;
     final hoursRaw = widget.place['regularOpeningHours'] ?? widget.place['openingHours'];
@@ -309,16 +325,17 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
       openingHours = TimeUtils.getOpeningHoursText(hoursRaw);
     }
 
-    List<dynamic> subCategories = [];
     final cat = widget.place['category'];
-    if (cat != null && cat['name'] != null) {
-      subCategories.add(cat['name']);
-    }
+    final String? mainCategory = cat != null && cat['name'] != null ? cat['name'].toString() : null;
+
+    final List<String> amenities = [];
     final rawSub =
         widget.place['subCategories'] ??
         widget.place['subcategories'] ??
         widget.place['sub_categories'];
-    if (rawSub is List) subCategories.addAll(rawSub);
+    if (rawSub is List) {
+      amenities.addAll(rawSub.map((e) => e.toString()));
+    }
 
     String? imageUrl;
     if (widget.place['image'] != null &&
@@ -370,103 +387,107 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        imageUrl,
-                        width: 90,
-                        height: 90,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                      ),
+                      child: (imageUrl.startsWith('data:image/') && imageUrl.contains('base64,'))
+                          ? Image.memory(
+                              base64Decode(imageUrl.split('base64,').last),
+                              width: 90,
+                              height: 90,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                            )
+                          : Image.network(
+                              imageUrl,
+                              width: 90,
+                              height: 90,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                            ),
                     ),
                   ),
                 ],
               ],
             ),
           const SizedBox(height: 16),
-          // Action Buttons row 1 (Save, Mark visited)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _localSavedCount > 0
-                    ? _buildActionButton(
-                        Icons.bookmark,
-                        'Đã thêm vào $_localSavedCount danh sách',
-                        Colors.grey[200]!,
-                        Colors.black,
-                        suffixIcon: Icons.keyboard_arrow_down,
-                        onTap: () async {
-                          if (widget.currentItinerary != null) {
-                            await SaveToTripBottomSheet.show(
-                              context,
-                              widget.place,
-                              onSaved: widget.onTripUpdated ?? () {},
-                              initialItinerary: widget.currentItinerary,
-                            );
-                            _refreshSavedCount();
-                          }
-                        },
-                      )
-                    : _buildActionButton(
-                        Icons.bookmark_border,
-                        'Thêm vào chuyến đi',
-                        AppTheme.primary,
-                        Colors.white,
-                        onTap: () async {
-                          if (widget.currentItinerary != null) {
-                            await SaveToTripBottomSheet.show(
-                              context,
-                              widget.place,
-                              onSaved: widget.onTripUpdated ?? () {},
-                              initialItinerary: widget.currentItinerary,
-                            );
-                            _refreshSavedCount();
-                          }
-                        },
-                      ),
-                const SizedBox(width: 8),
-                _buildActionButton(
-                  Icons.check,
-                  'Đánh dấu ghé thăm',
-                  Colors.white,
-                  Colors.black,
-                  borderColor: Colors.grey[300],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Action Buttons row 2 (AI, Guide, etc)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildActionButton(
-                  Icons.search,
-                  'Hỏi AI',
-                  Colors.red[50]!,
-                  Colors.red,
-                ),
-                const SizedBox(width: 8),
-                _buildActionButton(
-                  Icons.person,
-                  'Hướng dẫn viên du lịch',
-                  Colors.white,
-                  Colors.black,
-                  borderColor: Colors.grey[300],
-                ),
-              ],
-            ),
+          // Action Buttons Row (Save & Hỏi AI)
+          Row(
+            children: [
+              _localSavedCount > 0
+                  ? _buildActionButton(
+                      Icons.bookmark,
+                      'Đã thêm vào $_localSavedCount danh sách',
+                      Colors.grey[200]!,
+                      Colors.black,
+                      suffixIcon: Icons.keyboard_arrow_down,
+                      onTap: () async {
+                        if (widget.currentItinerary != null) {
+                          await SaveToTripBottomSheet.show(
+                            context,
+                            widget.place,
+                            onSaved: widget.onTripUpdated ?? () {},
+                            initialItinerary: widget.currentItinerary,
+                          );
+                          _refreshSavedCount();
+                        }
+                      },
+                    )
+                  : _buildActionButton(
+                      Icons.bookmark_border,
+                      'Thêm vào chuyến đi',
+                      AppTheme.primary,
+                      Colors.white,
+                      onTap: () async {
+                        if (widget.currentItinerary != null) {
+                          await SaveToTripBottomSheet.show(
+                            context,
+                            widget.place,
+                            onSaved: widget.onTripUpdated ?? () {},
+                            initialItinerary: widget.currentItinerary,
+                          );
+                          _refreshSavedCount();
+                        }
+                      },
+                    ),
+              const SizedBox(width: 8),
+              _buildActionButton(
+                Icons.search,
+                'Hỏi AI',
+                Colors.red[50]!,
+                Colors.red,
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          // Tags
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [...subCategories.map((t) => _buildTag(t.toString()))],
+          // Tags (Category & Amenities)
+          if (mainCategory != null) ...[
+            const Text(
+              'Danh mục:',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Colors.black87,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            _buildTag(mainCategory.toString()),
+            const SizedBox(height: 16),
+          ],
+          if (amenities.isNotEmpty) ...[
+            const Text(
+              'Tiện ích:',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [...amenities.map((t) => _buildTag(t.toString(), isAmenity: true))],
+            ),
+            const SizedBox(height: 16),
+          ],
           // Rating, Mentions, Address
           Row(
             children: [
@@ -497,89 +518,139 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Icon(
-                Icons.local_fire_department_rounded,
-                color: Colors.orange[300],
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Được đề cập trong 6 danh sách khác',
-                style: TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(Icons.location_on, color: Colors.grey, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () async {
-                    final url = Uri.parse(
-                      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.place['name'] ?? address)}',
-                    );
-                    if (await canLaunchUrl(url)) await launchUrl(url);
-                  },
-                  child: Text(
-                    address,
-                    style: const TextStyle(color: Colors.blue),
-                  ),
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: address));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã sao chép địa chỉ')),
-                  );
-                },
-                child: const Icon(Icons.copy, color: Colors.grey, size: 16),
-              ),
-            ],
-          ),
-          if (phone != null && phone.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.phone, color: Colors.grey, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text(phone)),
-              ],
+          // Info Section
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.border),
             ),
-          ],
-          if (website != null && website.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.language, color: Colors.grey, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () async {
-                      final url = Uri.parse(website);
-                      if (await canLaunchUrl(url)) await launchUrl(url);
-                    },
-                    child: Text(
-                      website,
-                      style: const TextStyle(color: Colors.blue),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                // Address
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on_rounded, color: AppTheme.primary, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final url = Uri.parse(
+                            'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.place['name'] ?? address)}',
+                          );
+                          await _launchURL(url);
+                        },
+                        child: Text(
+                          address,
+                          style: const TextStyle(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: address));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Đã sao chép địa chỉ')),
+                        );
+                      },
+                      child: Icon(Icons.copy_rounded, color: AppTheme.subtitleText, size: 16),
+                    ),
+                  ],
                 ),
+
+                // Phone
+                if (phone != null && phone.isNotEmpty) ...[
+                  const Divider(height: 24, thickness: 1),
+                  Row(
+                    children: [
+                      const Icon(Icons.phone_rounded, color: AppTheme.primary, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () async {
+                            final url = Uri.parse('tel:$phone');
+                            await _launchURL(url);
+                          },
+                          child: Text(
+                            phone,
+                            style: const TextStyle(
+                              color: AppTheme.primary,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                // Website
+                if (website != null && website.isNotEmpty) ...[
+                  const Divider(height: 24, thickness: 1),
+                  Row(
+                    children: [
+                      const Icon(Icons.language_rounded, color: AppTheme.primary, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () async {
+                            final url = Uri.parse(website);
+                            await _launchURL(url);
+                          },
+                          child: Text(
+                            website,
+                            style: const TextStyle(
+                              color: AppTheme.primary,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                // Price / Price Level
+                if ((price != null && price.isNotEmpty) || (priceLevel != null && priceLevel.isNotEmpty)) ...[
+                  const Divider(height: 24, thickness: 1),
+                  Row(
+                    children: [
+                      const Icon(Icons.monetization_on_rounded, color: AppTheme.primary, size: 20),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Mức giá: ',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Expanded(
+                        child: Text(
+                          '${price ?? ''}${priceLevel != null && priceLevel.isNotEmpty ? ' (${_formatPriceLevel(priceLevel)})' : ''}',
+                          style: TextStyle(
+                            color: AppTheme.darkText,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
-          ],
+          ),
           if (widget.place['openingHours'] != null || widget.place['regularOpeningHours'] != null) ...[
             const SizedBox(height: 12),
-            ExpandableOpeningHours(hoursData: widget.place['regularOpeningHours'] ?? widget.place['openingHours']),
+            _buildFullOpeningHours(widget.place['regularOpeningHours'] ?? widget.place['openingHours']),
           ],
           const SizedBox(height: 24),
           // Open in
@@ -593,23 +664,14 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
             runSpacing: 8,
             children: [
               _buildOpenInImageButton(
-                'assets/images/chi-duong.png',
-                'Chỉ đường',
-                () async {
-                  final url = Uri.parse(
-                    'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address)}',
-                  );
-                  if (await canLaunchUrl(url)) await launchUrl(url);
-                },
-              ),
-              _buildOpenInImageButton(
                 'assets/images/googlemap.png',
                 'Google Maps',
                 () async {
+                  final String query = (widget.place['name'] ?? '') + (address.isNotEmpty ? ' ' + address : '');
                   final url = Uri.parse(
-                    'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.place['name'] ?? address)}',
+                    'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}',
                   );
-                  if (await canLaunchUrl(url)) await launchUrl(url);
+                  await _launchURL(url);
                 },
               ),
               _buildOpenInImageButton(
@@ -617,86 +679,29 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 'Tripadvisor',
                 () async {
                   final String? urlString = widget.place['tripadvisorUrl'];
-                  if (urlString != null && urlString.isNotEmpty) {
-                    final url = Uri.parse(urlString);
-                    if (await canLaunchUrl(url)) await launchUrl(url);
-                  }
+                  final String suffix = address.toLowerCase().contains('cần thơ') ? ' Cần Thơ' : '';
+                  final String query = (widget.place['name'] ?? '') + suffix;
+                  final url = Uri.parse(
+                    (urlString != null && urlString.isNotEmpty)
+                        ? urlString
+                        : 'https://www.tripadvisor.com/Search?q=${Uri.encodeComponent(query)}',
+                  );
+                  await _launchURL(url);
                 },
               ),
               _buildOpenInImageButton(
                 'assets/images/google.png',
                 'Google',
                 () async {
+                  final String suffix = address.toLowerCase().contains('cần thơ') ? ' Cần Thơ' : '';
+                  final String query = (widget.place['name'] ?? '') + suffix + ' wikipedia';
                   final url = Uri.parse(
-                    'https://www.google.com/search?q=${Uri.encodeComponent(widget.place['name'] ?? '')}',
+                    'https://www.google.com/search?q=${Uri.encodeComponent(query)}',
                   );
-                  if (await canLaunchUrl(url)) await launchUrl(url);
+                  await _launchURL(url);
                 },
               ),
             ],
-          ),
-          const SizedBox(height: 24),
-          // Why you should go
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFF8F5FF), Color(0xFFF0EDFF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE5DEFF)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Tại sao bạn nên đi',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Color(0xFF1E1E1E),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildNumberedListItem(
-                  '1',
-                  'Trải nghiệm một chuyến tham quan giàu văn hóa tại một ngôi đền Trung Quốc được bảo tồn tuyệt đẹp',
-                ),
-                _buildNumberedListItem(
-                  '2',
-                  'Chiêm ngưỡng sự kết hợp độc đáo giữa các phong cách kiến trúc Trung Quốc và Việt Nam',
-                ),
-                _buildNumberedListItem(
-                  '3',
-                  'Tìm hiểu về lịch sử, tôn giáo và truyền thống của Việt Nam thông qua các chạm khắc tinh xảo và họa tiết truyền thống.',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Things to know
-          const Text(
-            'Những điều cần biết trước khi đi',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 12),
-          _buildIconListItem(
-            Icons.lightbulb_outline,
-            'Hãy ghé thăm trong các lễ hội trăng tròn hoặc ngày Tết để có trải nghiệm nhập vai khi đền rất đông đúc.',
-          ),
-          _buildIconListItem(
-            Icons.lightbulb_outline,
-            'Mua trầm hương xoắn ốc để may mắn như được các du khách khuyên dùng',
-          ),
-          _buildIconListItem(
-            Icons.lightbulb_outline,
-            'Khi quyên góp tại chùa, hãy nhớ ấn nút để thanh toán bằng thẻ.',
-          ),
-          _buildIconListItem(
-            Icons.lightbulb_outline,
-            'Mặc trang phục lịch sự khi vào những không gian linh thiêng như Chùa Ông Cần Thơ',
           ),
           const SizedBox(height: 24),
           // Highlighted Reviews
@@ -729,40 +734,6 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 child: const Text('Xem tất cả đánh giá'),
               ),
             ),
-          const SizedBox(height: 24),
-          // Mentioned in articles
-          const Text(
-            'Được đề cập trong các bài viết',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 12),
-          _buildArticleCard(
-            'Top things to do in Can Tho',
-            'assets/images/tripadvisor.jpg',
-          ),
-          _buildArticleCard(
-            '10 Must-See Attractions in Can Tho, Vietnam for 2024',
-            'assets/images/googlemap.png',
-          ),
-          _buildArticleCard(
-            'Top things to do in Vietnam',
-            'assets/images/googlemap.png',
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[200],
-                foregroundColor: Colors.black,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-              child: const Text('Xem tất cả các đề cập'),
-            ),
-          ),
           const SizedBox(height: 24),
         ],
       ),
@@ -1121,24 +1092,42 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     );
   }
 
-  Widget _buildTag(String text) {
+  Widget _buildTag(String text, {bool isAmenity = false}) {
     return Container(
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
+        color: isAmenity ? AppTheme.accentLight : const Color(0xFFF3F4F6),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: isAmenity ? AppTheme.accent.withOpacity(0.3) : Colors.grey[200]!),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w500,
-          color: Colors.black87,
+          color: isAmenity ? AppTheme.primaryDark : Colors.black87,
         ),
       ),
     );
+  }
+
+  String _formatPriceLevel(String level) {
+    switch (level.toUpperCase()) {
+      case 'CHEAP':
+      case 'INEXPENSIVE':
+        return 'Giá rẻ';
+      case 'MODERATE':
+        return 'Trung bình';
+      case 'EXPENSIVE':
+        return 'Sang trọng';
+      case 'VERY_EXPENSIVE':
+        return 'Rất sang trọng';
+      case 'FREE':
+        return 'Miễn phí';
+      default:
+        return level;
+    }
   }
 
   Widget _buildOpenInButton(
@@ -1377,29 +1366,92 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     );
   }
 
-  Widget _buildArticleCard(String title, String imagePath) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Row(
+
+
+  Widget _buildFullOpeningHours(dynamic hoursData) {
+    if (hoursData == null) return const SizedBox.shrink();
+
+    final schedule = TimeUtils.getFullWeekSchedule(hoursData);
+    if (schedule.isEmpty) {
+      final hoursText = TimeUtils.getOpeningHoursText(hoursData);
+      if (hoursText.isEmpty) return const SizedBox.shrink();
+      
+      final isClosed = hoursText.toLowerCase().contains('đóng cửa');
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: Colors.transparent,
-            child: Image.asset(
-              imagePath,
-              errorBuilder: (_, _, _) => const Icon(Icons.article, size: 16),
+          const Icon(Icons.access_time_rounded, color: Colors.grey, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              hoursText,
+              style: TextStyle(
+                color: isClosed ? Colors.red : Colors.black87,
+                fontWeight: isClosed ? FontWeight.w600 : FontWeight.normal,
+                height: 1.4,
+                fontSize: 13,
+              ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(child: Text(title, style: const TextStyle(fontSize: 14))),
         ],
-      ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.access_time_rounded, color: Colors.grey, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                children: schedule.map((day) {
+                  final isToday = day['isToday'] == true;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: isToday ? Colors.blueAccent : Colors.blueAccent.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            day['shortName'] ?? '',
+                            style: TextStyle(
+                              color: isToday ? Colors.white : Colors.blueAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${day['dayName']}: ${day['time']}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: day['time'].toString().toLowerCase().contains('đóng cửa') ? Colors.red : (isToday ? Colors.black87 : Colors.black54),
+                              fontWeight: (isToday || day['time'].toString().toLowerCase().contains('đóng cửa')) ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
+
 }
+

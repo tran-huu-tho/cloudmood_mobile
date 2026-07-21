@@ -1,6 +1,6 @@
 {
-    "name": "cloudmood_mobile",
-    "short_name": "cloudmood_mobile",
+    "name": "CloudMood",
+    "short_name": "CloudMood",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

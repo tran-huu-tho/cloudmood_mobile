@@ -34,20 +34,52 @@ class DatabaseService {
   }
 
   /// Fetches places based on category name
-  Future<List<Map<String, dynamic>>> fetchPlaces({String? categoryName}) async {
+  Future<List<Map<String, dynamic>>> fetchPlaces({
+    String? categoryName,
+    int? page,
+    int? limit,
+    String? query,
+    List<String>? priceLevels,
+    double? minRating,
+    List<String>? amenities,
+  }) async {
     try {
-      final endpoint = categoryName != null
-          ? '/places?categoryName=${Uri.encodeComponent(categoryName)}'
-          : '/places';
+      String endpoint = '/places';
+      final List<String> params = [];
+      if (categoryName != null && categoryName.isNotEmpty) {
+        params.add('categoryName=${Uri.encodeComponent(categoryName)}');
+      }
+      if (page != null) {
+        params.add('page=$page');
+      }
+      if (limit != null) {
+        params.add('limit=$limit');
+      }
+      if (query != null && query.isNotEmpty) {
+        params.add('query=${Uri.encodeComponent(query)}');
+      }
+      if (priceLevels != null && priceLevels.isNotEmpty) {
+        params.add('priceLevels=${Uri.encodeComponent(priceLevels.join(','))}');
+      }
+      if (minRating != null) {
+        params.add('minRating=$minRating');
+      }
+      if (amenities != null && amenities.isNotEmpty) {
+        params.add('amenities=${Uri.encodeComponent(amenities.join(','))}');
+      }
+      
+      if (params.isNotEmpty) {
+        endpoint += '?${params.join('&')}';
+      }
+      
       final response = await ApiClient.get(endpoint);
       if (response.statusCode == 200) {
         return List<Map<String, dynamic>>.from(jsonDecode(response.body));
       }
-      return [];
     } catch (e) {
       debugPrint('Error fetching places: $e');
-      return [];
     }
+    return [];
   }
 
   /// Fetches places based on destination city
@@ -73,6 +105,9 @@ class DatabaseService {
     required String destination,
     String? query,
     String? categoryName,
+    List<String>? priceLevels,
+    double? minRating,
+    List<String>? amenities,
   }) async {
     try {
       String endpoint =
@@ -82,6 +117,15 @@ class DatabaseService {
       }
       if (categoryName != null && categoryName.isNotEmpty) {
         endpoint += '&categoryName=${Uri.encodeComponent(categoryName)}';
+      }
+      if (priceLevels != null && priceLevels.isNotEmpty) {
+        endpoint += '&priceLevels=${Uri.encodeComponent(priceLevels.join(','))}';
+      }
+      if (minRating != null) {
+        endpoint += '&minRating=$minRating';
+      }
+      if (amenities != null && amenities.isNotEmpty) {
+        endpoint += '&amenities=${Uri.encodeComponent(amenities.join(','))}';
       }
       final response = await ApiClient.get(endpoint);
       if (response.statusCode == 200) {
@@ -664,6 +708,20 @@ class DatabaseService {
     } catch (e) {
       debugPrint('Error proposing place: $e');
       return null;
+    }
+  }
+
+  /// Fetches explore posts mentioning a specific place by its ID
+  Future<List<Map<String, dynamic>>> fetchExplorePostsByPlace(int placeId) async {
+    try {
+      final response = await ApiClient.get('/explore/by-place/$placeId');
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching posts by place: $e');
+      return [];
     }
   }
 }

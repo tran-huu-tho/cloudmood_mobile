@@ -324,7 +324,7 @@ class CloudmoodHotelScreen extends StatelessWidget {
                           child: ListView(
                             scrollDirection: Axis.horizontal,
                             children: [
-                              _filterChip('Tất cả', true),
+                              _filterChip('Nổi bật', true),
                               _filterChip('Luxury', false),
                               _filterChip('Boutique', false),
                               _filterChip('Resort', false),

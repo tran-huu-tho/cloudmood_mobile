@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'explore_post_map_screen.dart';
 import '../utils/time_utils.dart';
+import '../utils/string_utils.dart';
 import '../widgets/expandable_opening_hours.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
@@ -637,13 +638,13 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
-                                          place['address'],
+                                          StringUtils.cleanAddress(place['address'] ?? ''),
                                           style: const TextStyle(fontSize: 14, color: Colors.blue, height: 1.3),
                                         ),
                                       ),
                                       GestureDetector(
                                         onTap: () {
-                                          Clipboard.setData(ClipboardData(text: place['address']));
+                                          Clipboard.setData(ClipboardData(text: StringUtils.cleanAddress(place['address'] ?? '')));
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             const SnackBar(
                                               content: Text('Đã sao chép địa chỉ'),
@@ -882,7 +883,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                     color: Color(0xFFE2E8F0),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.fact_check_outlined,
                                     color: AppTheme.subtitleText,
                                     size: 16,

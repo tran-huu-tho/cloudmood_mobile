@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/database_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/place_detail_bottom_sheet.dart';
+import '../utils/string_utils.dart';
 
 class CloudmoodPlacesScreen extends StatefulWidget {
   const CloudmoodPlacesScreen({super.key});
@@ -14,18 +19,64 @@ class CloudmoodPlacesScreen extends StatefulWidget {
 class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
   List<Map<String, dynamic>> _places = [];
   List<Map<String, dynamic>> _categories = [];
-  String _selectedCategory = 'Tất cả';
+  String _selectedCategory = 'Nổi bật';
   String _searchQuery = '';
   bool _isLoading = true;
   bool _isLoadingCategories = true;
 
+  // Pagination State
+  int _currentPage = 1;
+  static const int _limit = 10;
+  bool _hasMore = true;
+  Timer? _debounce;
+
+  final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
+
+  // Filter States
+  final List<String> _uiPriceLevels = []; // 'cheap', 'moderate', 'expensive'
+  double _selectedMinRating = 0.0;
+
+  List<String> get _dbPriceLevels {
+    final List<String> dbLevels = [];
+    if (_uiPriceLevels.contains('cheap')) {
+      dbLevels.addAll(['CHEAP', 'INEXPENSIVE', 'FREE', r'$', r'$$']);
+    }
+    if (_uiPriceLevels.contains('moderate')) {
+      dbLevels.addAll(['MODERATE', r'$$$']);
+    }
+    if (_uiPriceLevels.contains('expensive')) {
+      dbLevels.addAll(['EXPENSIVE', 'VERY_EXPENSIVE', r'$$$$', r'$$$$$']);
+    }
+    return dbLevels;
+  }
+
+  final List<String> _uiAmenities = []; // 'wifi', 'ac', 'parking', 'pool', 'breakfast', 'outdoor'
+
+  List<String> get _dbAmenities {
+    final List<String> dbAm = [];
+    if (_uiAmenities.contains('wifi')) dbAm.add('Wifi miễn phí');
+    if (_uiAmenities.contains('ac')) dbAm.add('Máy lạnh');
+    if (_uiAmenities.contains('parking')) dbAm.add('đỗ xe');
+    if (_uiAmenities.contains('pool')) dbAm.add('Hồ bơi');
+    if (_uiAmenities.contains('breakfast')) dbAm.add('Ăn sáng');
+    if (_uiAmenities.contains('outdoor')) dbAm.add('ngoài trời');
+    return dbAm;
+  }
 
   @override
   void initState() {
     super.initState();
     _loadCategories();
-    _loadPlaces();
+    _loadPlaces(page: 1);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadCategories() async {
@@ -42,14 +93,27 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
     }
   }
 
-  Future<void> _loadPlaces() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadPlaces({int page = 1}) async {
+    setState(() {
+      _currentPage = page;
+      _isLoading = true;
+    });
+
     try {
-      // Fetch all approved places
-      final fetched = await DatabaseService().fetchPlaces();
+      final fetched = await DatabaseService().fetchPlaces(
+        categoryName: _selectedCategory == 'Nổi bật' ? null : _selectedCategory,
+        page: _currentPage,
+        limit: _limit,
+        query: _searchQuery.trim(),
+        priceLevels: _dbPriceLevels.isNotEmpty ? _dbPriceLevels : null,
+        minRating: _selectedMinRating > 0 ? _selectedMinRating : null,
+        amenities: _dbAmenities.isNotEmpty ? _dbAmenities : null,
+      );
+
       setState(() {
         _places = fetched;
         _isLoading = false;
+        _hasMore = fetched.length == _limit;
       });
     } catch (e) {
       debugPrint('Error loading places: $e');
@@ -58,28 +122,7 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
   }
 
   List<Map<String, dynamic>> get _displayPlaces {
-    return _places.where((place) {
-      // Filter by category
-      if (_selectedCategory != 'Tất cả') {
-        final cat = place['category'];
-        final catName = cat != null ? cat['name'] : '';
-        if (catName != _selectedCategory) {
-          return false;
-        }
-      }
-
-      // Filter by search query
-      if (_searchQuery.isNotEmpty) {
-        final name = (place['name'] ?? '').toString().toLowerCase();
-        final address = (place['address'] ?? '').toString().toLowerCase();
-        final query = _searchQuery.toLowerCase();
-        if (!name.contains(query) && !address.contains(query)) {
-          return false;
-        }
-      }
-
-      return true;
-    }).toList();
+    return _places;
   }
 
   void _showWriteReviewDialog(
@@ -273,12 +316,12 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
     final addressController = TextEditingController();
     final descController = TextEditingController();
     final priceController = TextEditingController();
-    final imageController = TextEditingController();
     
     int? selectedCategoryId;
     if (_categories.isNotEmpty) {
       selectedCategoryId = int.tryParse(_categories.first['id'].toString());
     }
+    XFile? selectedImage;
 
     showModalBottomSheet(
       context: context,
@@ -309,8 +352,7 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                           children: [
                             Text(
                               'Đề xuất địa điểm mới',
-                              style: TextStyle(
-                                fontSize: 18,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: AppTheme.darkText,
                               ),
@@ -324,19 +366,26 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Địa điểm của bạn sẽ được gửi tới Admin phê duyệt trước khi xuất hiện.',
-                          style: TextStyle(
-                            fontSize: 13,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.subtitleText,
                           ),
                         ),
                         const SizedBox(height: 20),
 
                         // Place name
-                        Text('Tên địa điểm *', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkText)),
+                        Text(
+                          'Tên địa điểm *',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: nameController,
-                          style: TextStyle(color: AppTheme.darkText),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.darkText,
+                          ),
                           decoration: AppTheme.inputDecoration(
                             hintText: 'Nhập tên địa điểm...',
                             prefixIcon: Icons.place_rounded,
@@ -348,11 +397,19 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                         const SizedBox(height: 16),
 
                         // Address
-                        Text('Địa chỉ *', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkText)),
+                        Text(
+                          'Địa chỉ *',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: addressController,
-                          style: TextStyle(color: AppTheme.darkText),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.darkText,
+                          ),
                           decoration: AppTheme.inputDecoration(
                             hintText: 'Nhập địa chỉ chi tiết...',
                             prefixIcon: Icons.location_on_rounded,
@@ -364,12 +421,21 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                         const SizedBox(height: 16),
 
                         // Category Dropdown
-                        Text('Danh mục *', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkText)),
+                        Text(
+                          'Danh mục *',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<int>(
                           value: selectedCategoryId,
                           dropdownColor: AppTheme.surface,
-                          style: TextStyle(color: AppTheme.darkText, fontSize: 14),
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.darkText,
+                            fontSize: 14,
+                          ),
                           decoration: AppTheme.inputDecoration(
                             hintText: 'Chọn danh mục',
                             prefixIcon: Icons.category_rounded,
@@ -378,7 +444,13 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                             final id = int.parse(cat['id'].toString());
                             return DropdownMenuItem<int>(
                               value: id,
-                              child: Text(cat['name'] ?? ''),
+                              child: Text(
+                                cat['name'] ?? '',
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: AppTheme.darkText,
+                                  fontSize: 14,
+                                ),
+                              ),
                             );
                           }).toList(),
                           onChanged: (val) {
@@ -391,11 +463,19 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                         const SizedBox(height: 16),
 
                         // Description
-                        Text('Mô tả *', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkText)),
+                        Text(
+                          'Mô tả *',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: descController,
-                          style: TextStyle(color: AppTheme.darkText),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.darkText,
+                          ),
                           maxLines: 3,
                           decoration: AppTheme.inputDecoration(
                             hintText: 'Nhập mô tả ngắn về địa điểm này...',
@@ -408,11 +488,19 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                         const SizedBox(height: 16),
 
                         // Price
-                        Text('Giá tham khảo *', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkText)),
+                        Text(
+                          'Giá tham khảo *',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         TextFormField(
                           controller: priceController,
-                          style: TextStyle(color: AppTheme.darkText),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.darkText,
+                          ),
                           decoration: AppTheme.inputDecoration(
                             hintText: 'VD: Miễn phí hoặc 50.000đ - 100.000đ',
                             prefixIcon: Icons.attach_money_rounded,
@@ -423,16 +511,98 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Image URL
-                        Text('Đường dẫn ảnh (URL)', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.darkText)),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: imageController,
-                          style: TextStyle(color: AppTheme.darkText),
-                          decoration: AppTheme.inputDecoration(
-                            hintText: 'https://images.unsplash.com/... (tùy chọn)',
-                            prefixIcon: Icons.image_rounded,
+                        // Image Picker instead of URL input field
+                        Text(
+                          'Ảnh địa điểm',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
                           ),
+                        ),
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: () async {
+                            final picker = ImagePicker();
+                            final XFile? image = await picker.pickImage(
+                              source: ImageSource.gallery,
+                              imageQuality: 50,
+                            );
+                            if (image != null) {
+                              setSheetState(() {
+                                selectedImage = image;
+                              });
+                            }
+                          },
+                          child: selectedImage != null
+                              ? Stack(
+                                  children: [
+                                    Container(
+                                      height: 150,
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        image: DecorationImage(
+                                          image: FileImage(File(selectedImage!.path)),
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          setSheetState(() {
+                                            selectedImage = null;
+                                          });
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.black54,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.close_rounded,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Container(
+                                  height: 120,
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceVariant,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppTheme.border,
+                                      style: BorderStyle.solid,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.add_photo_alternate_outlined,
+                                        color: AppTheme.primary,
+                                        size: 32,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Chọn ảnh từ điện thoại',
+                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: AppTheme.primary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                         ),
                         const SizedBox(height: 24),
 
@@ -468,7 +638,16 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                                     final address = addressController.text.trim();
                                     final desc = descController.text.trim();
                                     final price = priceController.text.trim();
-                                    final img = imageController.text.trim();
+
+                                    String? imgBase64;
+                                    if (selectedImage != null) {
+                                      try {
+                                        final bytes = await File(selectedImage!.path).readAsBytes();
+                                        imgBase64 = 'data:image/png;base64,' + base64Encode(bytes);
+                                      } catch (e) {
+                                        debugPrint('Error reading picked image file: $e');
+                                      }
+                                    }
 
                                     final result = await DatabaseService().proposePlace(
                                       name: name,
@@ -476,7 +655,7 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                                       categoryId: selectedCategoryId!,
                                       description: desc,
                                       price: price,
-                                      image: img.isNotEmpty ? img : null,
+                                      image: imgBase64,
                                     );
 
                                     if (context.mounted) {
@@ -556,112 +735,184 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
   Widget build(BuildContext context) {
     final displayList = _displayPlaces;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showProposePlaceSheet(context),
-        backgroundColor: AppTheme.primary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.add_location_alt_rounded, color: Colors.white),
-      ),
-      body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // ── Header ──────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'KHÁM PHÁ CÁC ĐỊA ĐIỂM',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.primary,
-                        letterSpacing: 1.5,
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.translucent,
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: () => _loadPlaces(page: 1),
+            color: AppTheme.primary,
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              slivers: [
+              // ── Header ──────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'KHÁM PHÁ CÁC ĐỊA ĐIỂM',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.primary,
+                          letterSpacing: 1.5,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Địa điểm thú vị',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.darkText,
-                        letterSpacing: -0.8,
-                        height: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Search bar
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primary.withAlpha(10),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: Row(
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.search_rounded,
-                              color: AppTheme.primary,
-                              size: 18,
+                          Text(
+                            'Địa điểm thú vị',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.darkText,
+                              letterSpacing: -0.8,
+                              height: 1.2,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              style: TextStyle(color: AppTheme.darkText),
-                              decoration: const InputDecoration(
-                                hintText: 'Tìm địa điểm, nhà hàng, quán cà phê...',
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
+                          TextButton.icon(
+                            onPressed: () => _showProposePlaceSheet(context),
+                            icon: const Icon(Icons.add_location_alt_rounded, size: 18),
+                            label: const Text(
+                              'Đề xuất mới',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.primary,
+                              backgroundColor: AppTheme.primaryContainer,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              onChanged: (val) {
-                                setState(() {
-                                  _searchQuery = val;
-                                });
-                              },
                             ),
                           ),
-                          if (_searchQuery.isNotEmpty)
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _searchQuery = '';
-                                  _searchController.clear();
-                                });
-                              },
-                              child: Icon(
-                                Icons.close_rounded,
-                                color: AppTheme.subtitleText,
-                                size: 18,
-                              ),
-                            ),
                         ],
                       ),
+                    const SizedBox(height: 16),
+                    // Search bar & Filter
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.primary.withAlpha(10),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                              border: Border.all(color: AppTheme.border),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.search_rounded,
+                                  color: AppTheme.primary,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    style: TextStyle(color: AppTheme.darkText),
+                                    decoration: const InputDecoration(
+                                      hintText: 'Tìm địa điểm, nhà hàng, quán cà phê...',
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      focusedErrorBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      filled: false,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 8,
+                                      ),
+                                    ),
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _searchQuery = val;
+                                      });
+                                      if (_debounce?.isActive ?? false) _debounce!.cancel();
+                                      _debounce = Timer(const Duration(milliseconds: 500), () {
+                                        _loadPlaces(page: 1);
+                                      });
+                                    },
+                                  ),
+                                ),
+                                if (_searchQuery.isNotEmpty)
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _searchQuery = '';
+                                        _searchController.clear();
+                                      });
+                                      if (_debounce?.isActive ?? false) _debounce!.cancel();
+                                      _loadPlaces(page: 1);
+                                    },
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      color: AppTheme.subtitleText,
+                                      size: 18,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        GestureDetector(
+                          onTap: () => _showFilterBottomSheet(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: (_uiPriceLevels.isNotEmpty || _selectedMinRating > 0 || _uiAmenities.isNotEmpty)
+                                  ? AppTheme.primary
+                                  : AppTheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: (_uiPriceLevels.isNotEmpty || _selectedMinRating > 0 || _uiAmenities.isNotEmpty)
+                                    ? AppTheme.primary
+                                    : AppTheme.border,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.primary.withAlpha(10),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.tune_rounded,
+                              color: (_uiPriceLevels.isNotEmpty || _selectedMinRating > 0 || _uiAmenities.isNotEmpty)
+                                  ? Colors.white
+                                  : AppTheme.primary,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
                     
@@ -683,13 +934,16 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                               scrollDirection: Axis.horizontal,
                               itemCount: _categories.length + 1,
                               itemBuilder: (context, index) {
-                                final label = index == 0 ? 'Tất cả' : _categories[index - 1]['name'] ?? '';
+                                final label = index == 0 ? 'Nổi bật' : _categories[index - 1]['name'] ?? '';
                                 final isSelected = _selectedCategory == label;
                                 return GestureDetector(
                                   onTap: () {
-                                    setState(() {
-                                      _selectedCategory = label;
-                                    });
+                                    if (_selectedCategory != label) {
+                                      setState(() {
+                                        _selectedCategory = label;
+                                      });
+                                      _loadPlaces(page: 1);
+                                    }
                                   },
                                   child: _filterChip(label, isSelected),
                                 );
@@ -736,10 +990,100 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    if (index >= displayList.length) return null;
+                    if (index == displayList.length) {
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: AppTheme.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                minimumSize: Size.zero,
+                              ),
+                              onPressed: _currentPage > 1 && !_isLoading
+                                  ? () {
+                                      _loadPlaces(page: _currentPage - 1);
+                                      _scrollController.animateTo(
+                                        0,
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeOut,
+                                      );
+                                    }
+                                  : null,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.arrow_back_ios_rounded, size: 12, color: _currentPage > 1 ? AppTheme.primary : AppTheme.subtitleText),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Trang trước',
+                                    style: TextStyle(
+                                      color: _currentPage > 1 ? AppTheme.primary : AppTheme.subtitleText,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'SDK_SC_Web-Heavy',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Text(
+                              'Trang $_currentPage',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.darkText,
+                                fontFamily: 'SDK_SC_Web-Heavy',
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: AppTheme.border),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                minimumSize: Size.zero,
+                              ),
+                              onPressed: _hasMore && !_isLoading
+                                  ? () {
+                                      _loadPlaces(page: _currentPage + 1);
+                                      _scrollController.animateTo(
+                                        0,
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeOut,
+                                      );
+                                    }
+                                  : null,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Trang sau',
+                                    style: TextStyle(
+                                      color: _hasMore ? AppTheme.primary : AppTheme.subtitleText,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'SDK_SC_Web-Heavy',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: _hasMore ? AppTheme.primary : AppTheme.subtitleText),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    if (index > displayList.length) return null;
                     final place = displayList[index];
                     final placeId = int.tryParse(place['id'].toString()) ?? 1;
-                    final addressText = place['address'] ?? '';
+                    final addressText = StringUtils.cleanAddress(place['address'] ?? '');
                     final priceText = place['price'] ?? 'Liên hệ';
                     final ratingVal = (place['rating'] as num?)?.toDouble() ?? 5.0;
                     final ratingText = ratingVal.toStringAsFixed(1);
@@ -761,26 +1105,65 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                                     borderRadius: const BorderRadius.vertical(
                                       top: Radius.circular(20),
                                     ),
-                                    child: Image.network(
-                                      place['image'] ?? '',
-                                      height: 185,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (c, e, s) => Container(
-                                        height: 185,
-                                        decoration: const BoxDecoration(
-                                          gradient: AppTheme.primaryGradient,
-                                          borderRadius: BorderRadius.vertical(
-                                            top: Radius.circular(20),
+                                    child: (place['image'] != null && place['image'].toString().isNotEmpty)
+                                        ? (place['image'].toString().startsWith('data:image/') && place['image'].toString().contains('base64,'))
+                                            ? Image.memory(
+                                                base64Decode(place['image'].toString().split('base64,').last),
+                                                height: 185,
+                                                width: double.infinity,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (c, e, s) => Container(
+                                                  height: 185,
+                                                  width: double.infinity,
+                                                  decoration: const BoxDecoration(
+                                                    gradient: AppTheme.primaryGradient,
+                                                    borderRadius: BorderRadius.vertical(
+                                                      top: Radius.circular(20),
+                                                    ),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.location_on_rounded,
+                                                    color: Colors.white54,
+                                                    size: 48,
+                                                  ),
+                                                ),
+                                              )
+                                            : Image.network(
+                                                place['image'],
+                                                height: 185,
+                                                width: double.infinity,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (c, e, s) => Container(
+                                                  height: 185,
+                                                  width: double.infinity,
+                                                  decoration: const BoxDecoration(
+                                                    gradient: AppTheme.primaryGradient,
+                                                    borderRadius: BorderRadius.vertical(
+                                                      top: Radius.circular(20),
+                                                    ),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.location_on_rounded,
+                                                    color: Colors.white54,
+                                                    size: 48,
+                                                  ),
+                                                ),
+                                              )
+                                        : Container(
+                                            height: 185,
+                                            width: double.infinity,
+                                            decoration: const BoxDecoration(
+                                              gradient: AppTheme.primaryGradient,
+                                              borderRadius: BorderRadius.vertical(
+                                                top: Radius.circular(20),
+                                              ),
+                                            ),
+                                            child: const Icon(
+                                              Icons.location_on_rounded,
+                                              color: Colors.white54,
+                                              size: 48,
+                                            ),
                                           ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.location_on_rounded,
-                                          color: Colors.white54,
-                                          size: 48,
-                                        ),
-                                      ),
-                                    ),
                                   ),
                                   // Gradient overlay
                                   Positioned(
@@ -989,12 +1372,344 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                       ),
                     );
                   },
-                  childCount: displayList.length,
+                  childCount: displayList.length + 1,
                 ),
               ),
             // Bottom padding for floating nav
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
+        ),
+      ),
+    ),
+  ),
+  );
+  }
+
+  void _showFilterBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Bộ lọc tìm kiếm',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setSheetState(() {
+                            _uiPriceLevels.clear();
+                            _selectedMinRating = 0.0;
+                            _uiAmenities.clear();
+                          });
+                        },
+                        child: const Text(
+                          'Xóa tất cả',
+                          style: TextStyle(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Divider(color: AppTheme.border),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Mức giá',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildFilterSheetChip(
+                        label: 'Giá rẻ',
+                        isSelected: _uiPriceLevels.contains('cheap'),
+                        onTap: () {
+                          setSheetState(() {
+                            if (_uiPriceLevels.contains('cheap')) {
+                              _uiPriceLevels.remove('cheap');
+                            } else {
+                              _uiPriceLevels.add('cheap');
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterSheetChip(
+                        label: 'Trung bình',
+                        isSelected: _uiPriceLevels.contains('moderate'),
+                        onTap: () {
+                          setSheetState(() {
+                            if (_uiPriceLevels.contains('moderate')) {
+                              _uiPriceLevels.remove('moderate');
+                            } else {
+                              _uiPriceLevels.add('moderate');
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterSheetChip(
+                        label: 'Sang trọng',
+                        isSelected: _uiPriceLevels.contains('expensive'),
+                        onTap: () {
+                          setSheetState(() {
+                            if (_uiPriceLevels.contains('expensive')) {
+                              _uiPriceLevels.remove('expensive');
+                            } else {
+                              _uiPriceLevels.add('expensive');
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Đánh giá (Tối thiểu)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildFilterSheetChip(
+                        label: 'Tất cả',
+                        isSelected: _selectedMinRating == 0.0,
+                        onTap: () {
+                          setSheetState(() {
+                            _selectedMinRating = 0.0;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterSheetChip(
+                        label: '3★+',
+                        isSelected: _selectedMinRating == 3.0,
+                        onTap: () {
+                          setSheetState(() {
+                            _selectedMinRating = 3.0;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterSheetChip(
+                        label: '4★+',
+                        isSelected: _selectedMinRating == 4.0,
+                        onTap: () {
+                          setSheetState(() {
+                            _selectedMinRating = 4.0;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterSheetChip(
+                        label: '4.5★+',
+                        isSelected: _selectedMinRating == 4.5,
+                        onTap: () {
+                          setSheetState(() {
+                            _selectedMinRating = 4.5;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Tiện ích',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildFilterSheetChip(
+                        label: 'Wifi',
+                        isSelected: _uiAmenities.contains('wifi'),
+                        onTap: () {
+                          setSheetState(() {
+                            if (_uiAmenities.contains('wifi')) {
+                              _uiAmenities.remove('wifi');
+                            } else {
+                              _uiAmenities.add('wifi');
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterSheetChip(
+                        label: 'Máy lạnh',
+                        isSelected: _uiAmenities.contains('ac'),
+                        onTap: () {
+                          setSheetState(() {
+                            if (_uiAmenities.contains('ac')) {
+                              _uiAmenities.remove('ac');
+                            } else {
+                              _uiAmenities.add('ac');
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterSheetChip(
+                        label: 'Đỗ xe',
+                        isSelected: _uiAmenities.contains('parking'),
+                        onTap: () {
+                          setSheetState(() {
+                            if (_uiAmenities.contains('parking')) {
+                              _uiAmenities.remove('parking');
+                            } else {
+                              _uiAmenities.add('parking');
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _buildFilterSheetChip(
+                        label: 'Hồ bơi',
+                        isSelected: _uiAmenities.contains('pool'),
+                        onTap: () {
+                          setSheetState(() {
+                            if (_uiAmenities.contains('pool')) {
+                              _uiAmenities.remove('pool');
+                            } else {
+                              _uiAmenities.add('pool');
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterSheetChip(
+                        label: 'Ăn sáng',
+                        isSelected: _uiAmenities.contains('breakfast'),
+                        onTap: () {
+                          setSheetState(() {
+                            if (_uiAmenities.contains('breakfast')) {
+                              _uiAmenities.remove('breakfast');
+                            } else {
+                              _uiAmenities.add('breakfast');
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterSheetChip(
+                        label: 'Ngoài trời',
+                        isSelected: _uiAmenities.contains('outdoor'),
+                        onTap: () {
+                          setSheetState(() {
+                            if (_uiAmenities.contains('outdoor')) {
+                              _uiAmenities.remove('outdoor');
+                            } else {
+                              _uiAmenities.add('outdoor');
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _loadPlaces(page: 1);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 2,
+                        shadowColor: AppTheme.primary.withAlpha(80),
+                      ),
+                      child: const Text(
+                        'Áp dụng',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterSheetChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppTheme.primaryContainer : AppTheme.surfaceVariant,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppTheme.primary : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? AppTheme.primary : AppTheme.darkText,
+            ),
+          ),
         ),
       ),
     );

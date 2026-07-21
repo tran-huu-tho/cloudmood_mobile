@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import '../theme/app_theme.dart';
 import '../services/database_service.dart';
 import '../utils/time_utils.dart';
+import '../utils/string_utils.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'place_detail_bottom_sheet.dart';
@@ -520,7 +521,7 @@ class InlinePlaceBottomInfo extends StatelessWidget {
     final String description =
         place['description'] ?? place['editorialSummary'] ?? '';
     final String duration = place['recommendedDuration']?.toString() ?? '';
-    final String address = place['address'] ?? '';
+    final String address = StringUtils.cleanAddress(place['address'] ?? '');
     final String website = place['website'] ?? '';
     final String phone =
         place['phone'] ??
@@ -528,6 +529,8 @@ class InlinePlaceBottomInfo extends StatelessWidget {
         place['formattedPhoneNumber'] ??
         place['phoneNumber'] ??
         '';
+    final String price = place['price'] ?? '';
+    final String priceLevel = place['priceLevel'] ?? '';
 
     String hoursText = '';
     if (place['openingHours'] != null) {
@@ -706,12 +709,23 @@ class InlinePlaceBottomInfo extends StatelessWidget {
 
                   if (address.isNotEmpty ||
                       website.isNotEmpty ||
-                      phone.isNotEmpty) ...[
+                      phone.isNotEmpty ||
+                      price.isNotEmpty ||
+                      priceLevel.isNotEmpty) ...[
                     const Divider(height: 1, color: Color(0xFFF1F5F9)),
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
+                          if (price.isNotEmpty || priceLevel.isNotEmpty) ...[
+                            _buildInfoRow(
+                              Icons.attach_money_rounded,
+                              'Mức giá: $price${priceLevel.isNotEmpty ? ' ($priceLevel)' : ''}',
+                              context,
+                            ),
+                            if (address.isNotEmpty || website.isNotEmpty || phone.isNotEmpty)
+                              const SizedBox(height: 12),
+                          ],
                           if (address.isNotEmpty)
                             GestureDetector(
                               onTap: () async {

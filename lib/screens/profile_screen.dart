@@ -11,6 +11,8 @@ import 'login_screen.dart';
 import 'register_screen.dart';
 import 'create_itinerary_wizard_sheet.dart';
 import 'trip_overview_screen.dart';
+import '../widgets/place_detail_bottom_sheet.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<XFile?> _selectImage(BuildContext context) async {
   final source = await showModalBottomSheet<ImageSource>(
@@ -724,12 +726,18 @@ class _ProfileDashboardState extends State<ProfileDashboard>
   List<Map<String, dynamic>> _itineraries = [];
   List<Map<String, dynamic>> _guides = [];
   bool _isLoading = true;
+  late DateTime _selectedCalendarDate;
+  late DateTime _currentMonth;
+  List<Map<String, dynamic>> _customNotes = [];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _selectedCalendarDate = DateTime.now();
+    _currentMonth = DateTime.now();
+    _tabController = TabController(length: widget.user.role ? 2 : 4, vsync: this);
     _loadData();
+    _loadNotes();
     DatabaseService.refreshTrigger.addListener(_loadData);
   }
 
@@ -846,7 +854,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         '${widget.user.createdAt.day}/${widget.user.createdAt.month}/${widget.user.createdAt.year}';
     final String roleText = widget.user.role
         ? 'Quản trị viên'
-        : 'Thành viên PRO';
+        : 'Thành viên';
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -1019,11 +1027,13 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               delegate: _StickyTabBarDelegate(
                 TabBar(
                   controller: _tabController,
+                  isScrollable: true,
                   labelColor: AppTheme.primary,
                   unselectedLabelColor: AppTheme.subtitleText,
                   indicatorColor: AppTheme.primary,
                   indicatorWeight: 2.5,
-                  indicatorSize: TabBarIndicatorSize.label,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 16),
                   labelStyle: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1032,10 +1042,13 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
-                  tabs: const [
-                    Tab(text: 'Lịch trình'),
-                    Tab(text: 'Hướng dẫn'),
-                    Tab(text: 'Cài đặt'),
+                  tabs: [
+                    const Tab(text: 'Lịch trình'),
+                    if (!widget.user.role) ...[
+                      const Tab(text: 'Lịch'),
+                      const Tab(text: 'Hướng dẫn'),
+                    ],
+                    const Tab(text: 'Cài đặt'),
                   ],
                 ),
               ),
@@ -1047,9 +1060,11 @@ class _ProfileDashboardState extends State<ProfileDashboard>
           children: [
             // ── Tab 1: Itineraries ────────────────────────────────
             _buildItineraryTab(),
-            // ── Tab 2: Guides ────────────────────────────────────
-            _buildGuidesTab(),
-            // ── Tab 3: Settings ───────────────────────────────────
+            // ── Tab 2: Calendar ──────────────────────────────────
+            if (!widget.user.role) _buildCalendarTab(),
+            // ── Tab 3: Guides ────────────────────────────────────
+            if (!widget.user.role) _buildGuidesTab(),
+            // ── Tab 4: Settings ───────────────────────────────────
             _buildSettingsTab(joinDate),
           ],
         ),
@@ -1243,6 +1258,661 @@ class _ProfileDashboardState extends State<ProfileDashboard>
           ),
         );
       },
+    );
+  }
+
+  Future<void> _loadNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final notesJson = prefs.getString('profile_calendar_notes') ?? '[]';
+    try {
+      final List decoded = jsonDecode(notesJson);
+      setState(() {
+        _customNotes = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+      });
+    } catch (e) {
+      debugPrint('Error loading calendar notes: $e');
+    }
+  }
+
+  Future<void> _saveNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('profile_calendar_notes', jsonEncode(_customNotes));
+  }
+
+  void _showAddNoteDialog(BuildContext context) {
+    final titleController = TextEditingController();
+    final contentController = TextEditingController();
+    TimeOfDay selectedTime = TimeOfDay.now();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text(
+                'Thêm ghi chú/hoạt động',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.darkText,
+                  fontSize: 18,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tiêu đề',
+                        hintText: 'Ví dụ: Ăn trưa cùng bạn',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: contentController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nội dung chi tiết',
+                        hintText: 'Nhập ghi chú thêm...',
+                      ),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Thời gian:',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final TimeOfDay? time = await showTimePicker(
+                              context: context,
+                              initialTime: selectedTime,
+                            );
+                            if (time != null) {
+                              setModalState(() {
+                                selectedTime = time;
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.access_time_rounded),
+                          label: Text(selectedTime.format(context)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    final title = titleController.text.trim();
+                    if (title.isEmpty) return;
+
+                    final timeStr = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+                    final dateStr = '${_selectedCalendarDate.year}-${_selectedCalendarDate.month.toString().padLeft(2, '0')}-${_selectedCalendarDate.day.toString().padLeft(2, '0')}';
+
+                    setState(() {
+                      _customNotes.add({
+                        'id': DateTime.now().millisecondsSinceEpoch,
+                        'date': dateStr,
+                        'time': timeStr,
+                        'title': title,
+                        'content': contentController.text.trim(),
+                      });
+                    });
+
+                    _saveNotes();
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Lưu', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _deleteNote(int id) {
+    setState(() {
+      _customNotes.removeWhere((note) => note['id'] == id);
+    });
+    _saveNotes();
+  }
+
+  int _getDaysInMonth(int year, int month) {
+    return DateTime(year, month + 1, 0).day;
+  }
+
+  List<DateTime?> _generateCalendarDays(DateTime monthDate) {
+    final int year = monthDate.year;
+    final int month = monthDate.month;
+    final int totalDays = _getDaysInMonth(year, month);
+    final DateTime firstDay = DateTime(year, month, 1);
+    final int paddingDays = firstDay.weekday % 7;
+    final List<DateTime?> days = [];
+    final DateTime prevMonth = DateTime(year, month - 1, 1);
+    final int prevTotalDays = _getDaysInMonth(prevMonth.year, prevMonth.month);
+    for (int i = paddingDays - 1; i >= 0; i--) {
+      days.add(DateTime(prevMonth.year, prevMonth.month, prevTotalDays - i));
+    }
+    for (int i = 1; i <= totalDays; i++) {
+      days.add(DateTime(year, month, i));
+    }
+    final int remaining = 42 - days.length;
+    for (int i = 1; i <= remaining; i++) {
+      final DateTime nextMonth = DateTime(year, month + 1, 1);
+      days.add(DateTime(nextMonth.year, nextMonth.month, i));
+    }
+    return days;
+  }
+
+  List<Map<String, dynamic>> _getEventsForDate(DateTime date) {
+    final List<Map<String, dynamic>> events = [];
+    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    
+    for (var trip in _itineraries) {
+      if (trip['startDate'] == null) continue;
+      try {
+        final DateTime tripStart = DateTime.parse(trip['startDate'] as String).toLocal();
+        
+        final details = trip['details'] as List?;
+        if (details == null) continue;
+        
+        for (var detail in details) {
+          final int day = (detail['day'] as num?)?.toInt() ?? 1;
+          final DateTime detailDate = tripStart.add(Duration(days: day - 1));
+          final detailDateStr = '${detailDate.year}-${detailDate.month.toString().padLeft(2, '0')}-${detailDate.day.toString().padLeft(2, '0')}';
+          
+          if (detailDateStr == dateStr) {
+            events.add({
+              'tripTitle': trip['title'] ?? 'Chuyến đi',
+              'place': detail['place'],
+              'startTime': detail['startTime'],
+              'endTime': detail['endTime'],
+              'noteText': detail['noteText'],
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error parsing trip dates: $e');
+      }
+    }
+
+    for (var note in _customNotes) {
+      if (note['date'] == dateStr) {
+        events.add({
+          'isCustomNote': true,
+          'id': note['id'],
+          'title': note['title'] ?? 'Ghi chú',
+          'startTime': note['time'] ?? '00:00',
+          'noteText': note['content'] ?? '',
+        });
+      }
+    }
+    
+    events.sort((a, b) {
+      final String timeA = a['startTime'] ?? '00:00';
+      final String timeB = b['startTime'] ?? '00:00';
+      return timeA.compareTo(timeB);
+    });
+    
+    return events;
+  }
+
+  String _getMonthName(int month) {
+    switch (month) {
+      case 1: return 'Tháng Một';
+      case 2: return 'Tháng Hai';
+      case 3: return 'Tháng Ba';
+      case 4: return 'Tháng Tư';
+      case 5: return 'Tháng Năm';
+      case 6: return 'Tháng Sáu';
+      case 7: return 'Tháng Bảy';
+      case 8: return 'Tháng Tám';
+      case 9: return 'Tháng Chín';
+      case 10: return 'Tháng Mười';
+      case 11: return 'Tháng Mười Một';
+      case 12: return 'Tháng Mười Hai';
+      default: return '';
+    }
+  }
+
+  Widget _buildCalendarTab() {
+    final List<DateTime?> calendarDays = _generateCalendarDays(_currentMonth);
+    final events = _getEventsForDate(_selectedCalendarDate);
+    final weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+    String getFullDateHeader(DateTime date) {
+      final daysOfWeek = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      final dayName = daysOfWeek[date.weekday % 7];
+      return '$dayName, Ngày ${date.day} tháng ${date.month}, ${date.year}';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Month Navigation Row
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${_getMonthName(_currentMonth.month)} ${_currentMonth.year}',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.darkText,
+                ),
+              ),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left_rounded, color: AppTheme.primary),
+                    onPressed: () {
+                      setState(() {
+                        _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+                      });
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right_rounded, color: AppTheme.primary),
+                    onPressed: () {
+                      setState(() {
+                        _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Weekday labels
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: weekdays.map((day) => Expanded(
+              child: Center(
+                child: Text(
+                  day,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.subtitleText,
+                  ),
+                ),
+              ),
+            )).toList(),
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Calendar Grid
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 4,
+              childAspectRatio: 1.1,
+            ),
+            itemCount: calendarDays.length,
+            itemBuilder: (context, index) {
+              final date = calendarDays[index];
+              if (date == null) return const SizedBox.shrink();
+
+              final isSelected = DateUtils.isSameDay(date, _selectedCalendarDate);
+              final isToday = DateUtils.isSameDay(date, DateTime.now());
+              final isCurrentMonth = date.month == _currentMonth.month;
+              final hasEvents = _getEventsForDate(date).isNotEmpty;
+
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedCalendarDate = date;
+                    if (date.month != _currentMonth.month) {
+                      _currentMonth = DateTime(date.year, date.month);
+                    }
+                  });
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppTheme.primary
+                        : isToday
+                            ? AppTheme.primaryContainer.withOpacity(0.4)
+                            : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Text(
+                        date.day.toString(),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected
+                              ? Colors.white
+                              : isCurrentMonth
+                                  ? AppTheme.darkText
+                                  : Colors.grey[400],
+                        ),
+                      ),
+                      if (hasEvents)
+                        Positioned(
+                          bottom: 4,
+                          child: Container(
+                            width: 4,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.white : AppTheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+
+        const Divider(height: 24, thickness: 1, color: Color(0xFFF1F5F9)),
+
+        // Date Title and Add Note Button
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  getFullDateHeader(_selectedCalendarDate),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => _showAddNoteDialog(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.add_rounded, size: 16, color: AppTheme.primary),
+                      SizedBox(width: 4),
+                      Text(
+                        'Thêm ghi chú',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Timeline Agenda list
+        Expanded(
+          child: events.isEmpty
+              ? Center(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 40,
+                            color: AppTheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Trống lịch trình',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Không có địa điểm hay ghi chú nào cho ngày này.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.subtitleText,
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
+                  itemCount: events.length,
+                  itemBuilder: (context, index) {
+                    final event = events[index];
+                    final tripTitle = event['tripTitle'] as String?;
+                    final place = event['place'];
+                    final startTime = event['startTime'] as String?;
+                    final noteText = event['noteText'] as String?;
+                    final isCustomNote = event['isCustomNote'] == true;
+
+                    final hasImage = place != null &&
+                        place['image'] != null &&
+                        place['image'].toString().isNotEmpty &&
+                        !place['image'].toString().contains('placeholder');
+
+                    return IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Left side: Time
+                          SizedBox(
+                            width: 65,
+                            child: Column(
+                              children: [
+                                Text(
+                                  startTime ?? 'Chưa hẹn',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: isCustomNote ? Colors.blueGrey : AppTheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Expanded(
+                                  child: Container(
+                                    width: 2,
+                                    color: AppTheme.border,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          // Timeline Node
+                          Column(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                margin: const EdgeInsets.only(top: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isCustomNote ? Colors.blueGrey : AppTheme.primary,
+                                    width: 3,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Container(
+                                  width: 2,
+                                  color: index == events.length - 1
+                                      ? Colors.transparent
+                                      : AppTheme.border,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 14),
+
+                          // Right side: Event Card
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                if (place != null) {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (context) => PlaceDetailBottomSheet(
+                                      place: place,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.all(12),
+                                decoration: AppTheme.premiumCardDecoration(),
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Container(
+                                        width: 50,
+                                        height: 50,
+                                        color: isCustomNote ? Colors.blueGrey.withOpacity(0.1) : Colors.grey[200],
+                                        child: isCustomNote
+                                            ? const Icon(Icons.event_note_rounded, color: Colors.blueGrey)
+                                            : hasImage
+                                                ? Image.network(
+                                                    place['image'].toString(),
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (c, e, s) =>
+                                                        const Icon(Icons.place_rounded, color: Colors.grey),
+                                                  )
+                                                : const Icon(Icons.place_rounded, color: Colors.grey),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            isCustomNote
+                                                ? event['title'] ?? 'Ghi chú'
+                                                : place != null ? place['name']?.toString() ?? 'Ghi chú' : 'Ghi chú',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.darkText,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            isCustomNote
+                                                ? 'Nhắc nhở cá nhân'
+                                                : 'Thuộc: $tripTitle',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: AppTheme.subtitleText,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (noteText != null && noteText.trim().isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              noteText,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontStyle: FontStyle.italic,
+                                                color: isCustomNote ? Colors.black87 : Colors.black54,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    if (isCustomNote) ...[
+                                      GestureDetector(
+                                        onTap: () => _deleteNote(event['id'] as int),
+                                        child: const Icon(
+                                          Icons.delete_outline_rounded,
+                                          color: Colors.redAccent,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ] else ...[
+                                      Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: AppTheme.subtitleText,
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
@@ -1454,7 +2124,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               _buildInfoRow(
                 Icons.verified_rounded,
                 'Vai trò',
-                widget.user.role ? 'Quản trị viên' : 'Thành viên PRO',
+                widget.user.role ? 'Quản trị viên' : 'Thành viên',
                 AppTheme.amber,
               ),
             ],
