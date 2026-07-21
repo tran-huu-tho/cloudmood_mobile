@@ -8,6 +8,7 @@ import '../utils/time_utils.dart';
 import '../utils/string_utils.dart';
 import '../services/auth_service.dart';
 import 'save_to_trip_bottom_sheet.dart';
+import '../screens/place_ai_chat_screen.dart';
 
 class PlaceDetailBottomSheet extends StatefulWidget {
   final Map<String, dynamic> place;
@@ -472,6 +473,14 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 'Hỏi AI',
                 Colors.red[50]!,
                 Colors.red,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PlaceAIChatScreen(placeName: widget.place['name'] ?? 'Địa điểm'),
+                    ),
+                  );
+                },
               ),
             ],
           ),

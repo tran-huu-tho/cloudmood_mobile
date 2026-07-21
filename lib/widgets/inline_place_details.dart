@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:async';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
 import '../theme/app_theme.dart';
+import '../screens/place_ai_chat_screen.dart';
 import '../services/database_service.dart';
 import '../utils/time_utils.dart';
 import '../utils/string_utils.dart';
@@ -547,7 +549,14 @@ class InlinePlaceBottomInfo extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildActionButton(Icons.search, 'Hỏi AI', true, context),
+                _buildActionButton(Icons.search, 'Hỏi AI', true, context, onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PlaceAIChatScreen(placeName: place['name'] ?? 'Địa điểm'),
+                    ),
+                  );
+                }),
                 const SizedBox(width: 8),
                 _buildActionButton(
                   Icons.map_outlined,

@@ -10,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/database_service.dart';
 import '../theme/app_theme.dart';
+import 'place_ai_chat_screen.dart';
 import '../utils/time_utils.dart';
 import '../widgets/section_style_sheet.dart';
 import '../widgets/itinerary_style_sheet.dart';
@@ -4594,31 +4595,42 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.auto_awesome,
-                          color: AppTheme.darkText,
-                          size: 16,
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PlaceAIChatScreen(placeName: p['placeName'] ?? p['name'] ?? 'Địa điểm'),
                         ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Hỏi AI',
-                          style: TextStyle(
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.auto_awesome,
                             color: AppTheme.darkText,
-                            fontWeight: FontWeight.bold,
+                            size: 16,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 4),
+                          Text(
+                            'Hỏi AI',
+                            style: TextStyle(
+                              color: AppTheme.darkText,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

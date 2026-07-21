@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
+import 'place_ai_chat_screen.dart';
 import '../utils/time_utils.dart';
 
 class ExplorePostMapScreen extends StatefulWidget {
@@ -369,18 +370,29 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                               const SizedBox(width: 8),
                               
                               // Hỏi AI
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  children: const [
-                                    Icon(Icons.auto_awesome, color: Colors.black87, size: 16),
-                                    SizedBox(width: 6),
-                                    Text('Hỏi AI', style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600)),
-                                  ],
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => PlaceAIChatScreen(placeName: place['name'] ?? 'Địa điểm'),
+                                    ),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    children: const [
+                                      Icon(Icons.auto_awesome, color: Colors.black87, size: 16),
+                                      SizedBox(width: 6),
+                                      Text('Hỏi AI', style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
