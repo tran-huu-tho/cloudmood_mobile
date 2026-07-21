@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import 'explore_post_detail_screen.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -2517,6 +2519,85 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     }
   }
 
+  Map<String, dynamic> _buildPostData() {
+    final List<Map<String, dynamic>> items = [];
+
+    for (final section in _sectionNames) {
+      items.add({'itemType': 'SECTION_HEADER', 'content': section});
+
+      final sectionDetails = _savedPlaces
+          .where((d) => d['section'] == section)
+          .toList();
+      sectionDetails.sort(
+        (a, b) => (a['sortOrder'] ?? 0).compareTo(b['sortOrder'] ?? 0),
+      );
+
+      for (final detail in sectionDetails) {
+        if (detail['place'] != null) {
+          final place = detail['place'];
+          String content = detail['content'] ?? '';
+          if (content.trim().isEmpty && place['description'] != null) {
+            content = place['description'];
+          }
+          items.add({
+            'itemType': 'PLACE',
+            'placeId': place['id'],
+            'place': place,
+            'content': content,
+          });
+        } else if (detail['noteText'] != null) {
+          final String text = detail['noteText'] ?? detail['notetext'] ?? '';
+          final bool isTodo = text.startsWith('[TODO]');
+          if (isTodo) {
+            items.add({
+              'itemType': 'TODO',
+              'content': jsonEncode({
+                'title': text.replaceFirst('[TODO]', '').trim(),
+                'items': detail['todoItems'] ?? detail['todoitems'] ?? [],
+              }),
+            });
+          } else {
+            items.add({'itemType': 'NOTE', 'content': text});
+          }
+        }
+      }
+    }
+
+    return {
+      'title': _itineraryData['title'] ?? 'Hướng dẫn của tôi',
+      'description': _itineraryData['description'] ?? '',
+      'destination': _itineraryData['destination'] ?? '',
+      'coverImage':
+          _itineraryData['coverImage'] ?? 'https://via.placeholder.com/800x400',
+      'postType': 'USER_CURATION',
+      'items': items,
+    };
+  }
+
+  void _previewGuide() {
+    final user = AuthService().currentUser.value;
+    final postData = _buildPostData();
+
+    final mockPost = {
+      ...postData,
+      'id': _itineraryData['id'] ?? 'preview',
+      'author': {
+        'fullName': user?.fullName ?? 'Người dùng',
+        'avatar': user?.avatar ?? 'https://via.placeholder.com/150',
+      },
+    };
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ExplorePostDetailScreen(
+          post: mockPost,
+          title: mockPost['title'] as String,
+        ),
+      ),
+    );
+  }
+
   void _showChangeImageSheet() {
     _webImagesPage = 1;
     _isLoadingMoreWebImages = false;
@@ -3400,6 +3481,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
+                                    if (_itineraryData['isGuide'] == true)
+                                      GestureDetector(
+                                        onTap: _previewGuide,
+                                        child: Container(
+                                          width: 32,
+                                          color: Colors.transparent,
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.visibility_rounded,
+                                              color: AppTheme.darkText,
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                     GestureDetector(
                                       onTap: _showChangeImageSheet,
                                       child: Container(
