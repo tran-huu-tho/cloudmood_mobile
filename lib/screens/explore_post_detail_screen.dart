@@ -882,7 +882,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                     color: Color(0xFFE2E8F0),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.fact_check_outlined,
                                     color: AppTheme.subtitleText,
                                     size: 16,
