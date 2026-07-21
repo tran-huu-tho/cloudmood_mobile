@@ -277,7 +277,7 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                       vertical: 4,
                     ),
                     title: Text(
-                      itin['name'] ?? 'Chuyến đi chưa đặt tên',
+                      itin['title'] ?? 'Chuyến đi chưa đặt tên',
                       style: TextStyle(
                         fontSize: 16,
                         color: AppTheme.bodyText,

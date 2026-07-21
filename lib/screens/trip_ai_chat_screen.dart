@@ -441,10 +441,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                 CircleAvatar(
                   backgroundColor: Colors.white,
                   child: IconButton(
-                    icon: Icon(
-                      Icons.layers_outlined,
-                      color: AppTheme.darkText,
-                    ),
+                    icon: Icon(Icons.layers_outlined, color: AppTheme.darkText),
                     onPressed: () {},
                   ),
                 ),
@@ -481,10 +478,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                             ],
                     ),
                     child: IconButton(
-                      icon: Icon(
-                        Icons.arrow_back,
-                        color: AppTheme.darkText,
-                      ),
+                      icon: Icon(Icons.arrow_back, color: AppTheme.darkText),
                       onPressed: () {
                         Navigator.pop(context);
                       },

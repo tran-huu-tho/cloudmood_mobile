@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../services/database_service.dart';
 import '../utils/time_utils.dart';
 import '../utils/string_utils.dart';
+import '../services/auth_service.dart';
 import 'save_to_trip_bottom_sheet.dart';
 
 class PlaceDetailBottomSheet extends StatefulWidget {
@@ -82,6 +83,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     _localSavedCount = widget.savedCount;
     _tabController = TabController(length: 3, vsync: this);
     _loadReviews();
+    _refreshSavedCount();
   }
 
   Future<void> _loadReviews() async {
@@ -105,29 +107,44 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
   }
 
   Future<void> _refreshSavedCount() async {
-    if (widget.currentItinerary != null) {
-      final details = await DatabaseService().fetchItineraryById(
-        widget.currentItinerary!['id'],
+    final user = AuthService().currentUser.value;
+    if (user != null) {
+      final trips = await DatabaseService().fetchUserItineraries(
+        int.parse(user.id.toString()),
+        isGuide: false,
       );
-      if (mounted && details != null) {
-        int count = 0;
+      if (mounted) {
+        int tripsCount = 0;
         final targetId = widget.place['id'];
-        final savedPlaces = details['savedPlaces'] as List? ?? [];
-        final detailsList = details['details'] as List? ?? [];
 
-        for (var d in savedPlaces) {
-          if ((d['placeId'] ?? d['place']?['id']) == targetId &&
-              (d['section'] != null && d['section'].toString().isNotEmpty))
-            count++;
-        }
-        for (var d in detailsList) {
-          if ((d['placeId'] ?? d['place']?['id']) == targetId &&
-              d['day'] != null)
-            count++;
+        for (var trip in trips) {
+          bool foundInTrip = false;
+          final savedPlaces = trip['savedPlaces'] as List? ?? [];
+          final detailsList = trip['details'] as List? ?? [];
+
+          for (var d in savedPlaces) {
+            if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+                (d['section'] != null && d['section'].toString().isNotEmpty)) {
+              foundInTrip = true;
+              break;
+            }
+          }
+          if (!foundInTrip) {
+            for (var d in detailsList) {
+              if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+                  d['day'] != null) {
+                foundInTrip = true;
+                break;
+              }
+            }
+          }
+          if (foundInTrip) {
+            tripsCount++;
+          }
         }
 
         setState(() {
-          _localSavedCount = count;
+          _localSavedCount = tripsCount;
         });
       }
     }
@@ -290,11 +307,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
         Expanded(
           child: TabBarView(
             controller: _tabController,
-            children: [
-              _buildIntroTab(),
-              _buildReviewsTab(),
-              _buildPhotosTab(),
-            ],
+            children: [_buildIntroTab(), _buildReviewsTab(), _buildPhotosTab()],
           ),
         ),
       ],
@@ -307,7 +320,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     final double rating = (widget.place['rating'] as num?)?.toDouble() ?? 0.0;
     final int userRatingCount =
         (widget.place['userRatingCount'] as num?)?.toInt() ?? 0;
-    final String address = StringUtils.cleanAddress(widget.place['address'] ?? '');
+    final String address = StringUtils.cleanAddress(
+      widget.place['address'] ?? '',
+    );
 
     final String? phone =
         widget.place['internationalPhoneNumber'] ??
@@ -320,13 +335,16 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     final String? priceLevel = widget.place['priceLevel'];
 
     String? openingHours;
-    final hoursRaw = widget.place['regularOpeningHours'] ?? widget.place['openingHours'];
+    final hoursRaw =
+        widget.place['regularOpeningHours'] ?? widget.place['openingHours'];
     if (hoursRaw != null) {
       openingHours = TimeUtils.getOpeningHoursText(hoursRaw);
     }
 
     final cat = widget.place['category'];
-    final String? mainCategory = cat != null && cat['name'] != null ? cat['name'].toString() : null;
+    final String? mainCategory = cat != null && cat['name'] != null
+        ? cat['name'].toString()
+        : null;
 
     final List<String> amenities = [];
     final rawSub =
@@ -387,20 +405,24 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: (imageUrl.startsWith('data:image/') && imageUrl.contains('base64,'))
+                      child:
+                          (imageUrl.startsWith('data:image/') &&
+                              imageUrl.contains('base64,'))
                           ? Image.memory(
                               base64Decode(imageUrl.split('base64,').last),
                               width: 90,
                               height: 90,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                              errorBuilder: (_, _, _) =>
+                                  const SizedBox.shrink(),
                             )
                           : Image.network(
                               imageUrl,
                               width: 90,
                               height: 90,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                              errorBuilder: (_, _, _) =>
+                                  const SizedBox.shrink(),
                             ),
                     ),
                   ),
@@ -414,20 +436,19 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
               _localSavedCount > 0
                   ? _buildActionButton(
                       Icons.bookmark,
-                      'Đã thêm vào $_localSavedCount danh sách',
+                      'Đã thêm vào $_localSavedCount chuyến đi',
                       Colors.grey[200]!,
                       Colors.black,
                       suffixIcon: Icons.keyboard_arrow_down,
                       onTap: () async {
-                        if (widget.currentItinerary != null) {
-                          await SaveToTripBottomSheet.show(
-                            context,
-                            widget.place,
-                            onSaved: widget.onTripUpdated ?? () {},
-                            initialItinerary: widget.currentItinerary,
-                          );
-                          _refreshSavedCount();
-                        }
+                        // User can be saving to different trips, no longer strictly bounded to currentItinerary
+                        await SaveToTripBottomSheet.show(
+                          context,
+                          widget.place,
+                          onSaved: widget.onTripUpdated ?? () {},
+                          initialItinerary: widget.currentItinerary,
+                        );
+                        _refreshSavedCount();
                       },
                     )
                   : _buildActionButton(
@@ -436,15 +457,13 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       AppTheme.primary,
                       Colors.white,
                       onTap: () async {
-                        if (widget.currentItinerary != null) {
-                          await SaveToTripBottomSheet.show(
-                            context,
-                            widget.place,
-                            onSaved: widget.onTripUpdated ?? () {},
-                            initialItinerary: widget.currentItinerary,
-                          );
-                          _refreshSavedCount();
-                        }
+                        await SaveToTripBottomSheet.show(
+                          context,
+                          widget.place,
+                          onSaved: widget.onTripUpdated ?? () {},
+                          initialItinerary: widget.currentItinerary,
+                        );
+                        _refreshSavedCount();
                       },
                     ),
               const SizedBox(width: 8),
@@ -484,7 +503,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [...amenities.map((t) => _buildTag(t.toString(), isAmenity: true))],
+              children: [
+                ...amenities.map(
+                  (t) => _buildTag(t.toString(), isAmenity: true),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
           ],
@@ -533,7 +556,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.location_on_rounded, color: AppTheme.primary, size: 20),
+                    const Icon(
+                      Icons.location_on_rounded,
+                      color: AppTheme.primary,
+                      size: 20,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: GestureDetector(
@@ -561,7 +588,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                           const SnackBar(content: Text('Đã sao chép địa chỉ')),
                         );
                       },
-                      child: Icon(Icons.copy_rounded, color: AppTheme.subtitleText, size: 16),
+                      child: Icon(
+                        Icons.copy_rounded,
+                        color: AppTheme.subtitleText,
+                        size: 16,
+                      ),
                     ),
                   ],
                 ),
@@ -571,7 +602,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                   const Divider(height: 24, thickness: 1),
                   Row(
                     children: [
-                      const Icon(Icons.phone_rounded, color: AppTheme.primary, size: 20),
+                      const Icon(
+                        Icons.phone_rounded,
+                        color: AppTheme.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: GestureDetector(
@@ -598,7 +633,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                   const Divider(height: 24, thickness: 1),
                   Row(
                     children: [
-                      const Icon(Icons.language_rounded, color: AppTheme.primary, size: 20),
+                      const Icon(
+                        Icons.language_rounded,
+                        color: AppTheme.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: GestureDetector(
@@ -623,11 +662,16 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 ],
 
                 // Price / Price Level
-                if ((price != null && price.isNotEmpty) || (priceLevel != null && priceLevel.isNotEmpty)) ...[
+                if ((price != null && price.isNotEmpty) ||
+                    (priceLevel != null && priceLevel.isNotEmpty)) ...[
                   const Divider(height: 24, thickness: 1),
                   Row(
                     children: [
-                      const Icon(Icons.monetization_on_rounded, color: AppTheme.primary, size: 20),
+                      const Icon(
+                        Icons.monetization_on_rounded,
+                        color: AppTheme.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 10),
                       const Text(
                         'Mức giá: ',
@@ -648,9 +692,13 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
               ],
             ),
           ),
-          if (widget.place['openingHours'] != null || widget.place['regularOpeningHours'] != null) ...[
+          if (widget.place['openingHours'] != null ||
+              widget.place['regularOpeningHours'] != null) ...[
             const SizedBox(height: 12),
-            _buildFullOpeningHours(widget.place['regularOpeningHours'] ?? widget.place['openingHours']),
+            _buildFullOpeningHours(
+              widget.place['regularOpeningHours'] ??
+                  widget.place['openingHours'],
+            ),
           ],
           const SizedBox(height: 24),
           // Open in
@@ -667,7 +715,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 'assets/images/googlemap.png',
                 'Google Maps',
                 () async {
-                  final String query = (widget.place['name'] ?? '') + (address.isNotEmpty ? ' ' + address : '');
+                  final String query =
+                      (widget.place['name'] ?? '') +
+                      (address.isNotEmpty ? ' ' + address : '');
                   final url = Uri.parse(
                     'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}',
                   );
@@ -679,7 +729,10 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 'Tripadvisor',
                 () async {
                   final String? urlString = widget.place['tripadvisorUrl'];
-                  final String suffix = address.toLowerCase().contains('cần thơ') ? ' Cần Thơ' : '';
+                  final String suffix =
+                      address.toLowerCase().contains('cần thơ')
+                      ? ' Cần Thơ'
+                      : '';
                   final String query = (widget.place['name'] ?? '') + suffix;
                   final url = Uri.parse(
                     (urlString != null && urlString.isNotEmpty)
@@ -693,8 +746,12 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 'assets/images/google.png',
                 'Google',
                 () async {
-                  final String suffix = address.toLowerCase().contains('cần thơ') ? ' Cần Thơ' : '';
-                  final String query = (widget.place['name'] ?? '') + suffix + ' wikipedia';
+                  final String suffix =
+                      address.toLowerCase().contains('cần thơ')
+                      ? ' Cần Thơ'
+                      : '';
+                  final String query =
+                      (widget.place['name'] ?? '') + suffix + ' wikipedia';
                   final url = Uri.parse(
                     'https://www.google.com/search?q=${Uri.encodeComponent(query)}',
                   );
@@ -745,7 +802,6 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     final int userRatingCount =
         (widget.place['userRatingCount'] as num?)?.toInt() ?? 156;
 
-
     // Simulate rating distribution
     int count5 = (userRatingCount * 0.65).toInt();
     int count4 = (userRatingCount * 0.20).toInt();
@@ -762,8 +818,6 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-
           // Tripadvisor Rating Card
           Container(
             padding: const EdgeInsets.all(20),
@@ -1099,7 +1153,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
       decoration: BoxDecoration(
         color: isAmenity ? AppTheme.accentLight : const Color(0xFFF3F4F6),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isAmenity ? AppTheme.accent.withOpacity(0.3) : Colors.grey[200]!),
+        border: Border.all(
+          color: isAmenity
+              ? AppTheme.accent.withOpacity(0.3)
+              : Colors.grey[200]!,
+        ),
       ),
       child: Text(
         text,
@@ -1366,8 +1424,6 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     );
   }
 
-
-
   Widget _buildFullOpeningHours(dynamic hoursData) {
     if (hoursData == null) return const SizedBox.shrink();
 
@@ -1375,7 +1431,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     if (schedule.isEmpty) {
       final hoursText = TimeUtils.getOpeningHoursText(hoursData);
       if (hoursText.isEmpty) return const SizedBox.shrink();
-      
+
       final isClosed = hoursText.toLowerCase().contains('đóng cửa');
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1417,7 +1473,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                           width: 24,
                           height: 24,
                           decoration: BoxDecoration(
-                            color: isToday ? Colors.blueAccent : Colors.blueAccent.withOpacity(0.1),
+                            color: isToday
+                                ? Colors.blueAccent
+                                : Colors.blueAccent.withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
@@ -1436,8 +1494,20 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                             '${day['dayName']}: ${day['time']}',
                             style: TextStyle(
                               fontSize: 13,
-                              color: day['time'].toString().toLowerCase().contains('đóng cửa') ? Colors.red : (isToday ? Colors.black87 : Colors.black54),
-                              fontWeight: (isToday || day['time'].toString().toLowerCase().contains('đóng cửa')) ? FontWeight.w600 : FontWeight.normal,
+                              color:
+                                  day['time'].toString().toLowerCase().contains(
+                                    'đóng cửa',
+                                  )
+                                  ? Colors.red
+                                  : (isToday ? Colors.black87 : Colors.black54),
+                              fontWeight:
+                                  (isToday ||
+                                      day['time']
+                                          .toString()
+                                          .toLowerCase()
+                                          .contains('đóng cửa'))
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
                             ),
                           ),
                         ),
@@ -1452,6 +1522,4 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
       ],
     );
   }
-
 }
-

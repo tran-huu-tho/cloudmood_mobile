@@ -818,10 +818,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                 ),
                 const SizedBox(height: 8),
                 ListTile(
-                  leading: Icon(
-                    Icons.edit_outlined,
-                    color: AppTheme.darkText,
-                  ),
+                  leading: Icon(Icons.edit_outlined, color: AppTheme.darkText),
                   title: const Text('Chỉnh sửa tiêu đề phụ'),
                   onTap: () {
                     Navigator.pop(context);
@@ -914,10 +911,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                   },
                 ),
                 ListTile(
-                  leading: Icon(
-                    Icons.sort_rounded,
-                    color: AppTheme.darkText,
-                  ),
+                  leading: Icon(Icons.sort_rounded, color: AppTheme.darkText),
                   title: const Text('Sắp xếp lại các phần'),
                   onTap: () {
                     Navigator.pop(context);
@@ -1978,10 +1972,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                   Row(
                     children: [
                       IconButton(
-                        icon: Icon(
-                          Icons.arrow_back,
-                          color: AppTheme.darkText,
-                        ),
+                        icon: Icon(Icons.arrow_back, color: AppTheme.darkText),
                         onPressed: () => Navigator.pop(innerContext),
                       ),
                       Expanded(
@@ -2764,7 +2755,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                 height: MediaQuery.of(context).size.height * 0.8,
                 decoration: BoxDecoration(
                   color: Theme.of(context).scaffoldBackgroundColor,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -2784,7 +2777,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         'Thay đổi ảnh',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -2809,7 +2805,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 0,
+                                    ),
                                   ),
                                   onSubmitted: (val) {
                                     if (val.trim().isNotEmpty) {
@@ -2823,75 +2821,106 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                               ),
                               Expanded(
                                 child: isInitialLoading
-                                    ? const Center(child: CircularProgressIndicator())
+                                    ? const Center(
+                                        child: CircularProgressIndicator(),
+                                      )
                                     : _webImages.isEmpty
-                                        ? Center(
-                                            child: Text(
-                                              'Không tìm thấy ảnh cho "$_lastWebQuery"',
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(color: Colors.grey),
-                                            ),
-                                          )
-                                        : GridView.builder(
-                                            controller: scrollController,
-                                            padding: const EdgeInsets.all(16),
-                                            gridDelegate:
-                                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                    ? Center(
+                                        child: Text(
+                                          'Không tìm thấy ảnh cho "$_lastWebQuery"',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      )
+                                    : GridView.builder(
+                                        controller: scrollController,
+                                        padding: const EdgeInsets.all(16),
+                                        gridDelegate:
+                                            const SliverGridDelegateWithFixedCrossAxisCount(
                                               crossAxisCount: 2,
                                               crossAxisSpacing: 12,
                                               mainAxisSpacing: 12,
                                               childAspectRatio: 1,
                                             ),
-                                            itemCount: _webImages.length +
-                                                (_isLoadingMoreWebImages ? 1 : 0),
-                                            itemBuilder: (context, index) {
-                                              if (index == _webImages.length) {
-                                                return const Center(
-                                                    child: CircularProgressIndicator());
+                                        itemCount:
+                                            _webImages.length +
+                                            (_isLoadingMoreWebImages ? 1 : 0),
+                                        itemBuilder: (context, index) {
+                                          if (index == _webImages.length) {
+                                            return const Center(
+                                              child:
+                                                  CircularProgressIndicator(),
+                                            );
+                                          }
+                                          final imageUrl =
+                                              _webImages[index]['url']
+                                                  as String? ??
+                                              '';
+                                          if (imageUrl.isEmpty)
+                                            return const SizedBox();
+                                          return GestureDetector(
+                                            onTap: () async {
+                                              final itineraryId =
+                                                  _itineraryData['id'];
+                                              if (itineraryId != null) {
+                                                final updated =
+                                                    await DatabaseService()
+                                                        .updateItinerary(
+                                                          itineraryId,
+                                                          {
+                                                            'coverImage':
+                                                                imageUrl,
+                                                          },
+                                                        );
+                                                if (updated) {
+                                                  setState(() {
+                                                    _itineraryData['coverImage'] =
+                                                        imageUrl;
+                                                  });
+                                                }
                                               }
-                                              final imageUrl =
-                                                  _webImages[index]['url'] as String? ?? '';
-                                              if (imageUrl.isEmpty) return const SizedBox();
-                                              return GestureDetector(
-                                                onTap: () async {
-                                                  final itineraryId = _itineraryData['id'];
-                                                  if (itineraryId != null) {
-                                                    final updated =
-                                                        await DatabaseService().updateItinerary(
-                                                      itineraryId,
-                                                      {'coverImage': imageUrl},
-                                                    );
-                                                    if (updated) {
-                                                      setState(() {
-                                                        _itineraryData['coverImage'] = imageUrl;
-                                                      });
-                                                    }
-                                                  }
-                                                  if (mounted) Navigator.pop(context);
-                                                },
-                                                child: ClipRRect(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  child: Image.network(
-                                                    imageUrl,
-                                                    fit: BoxFit.cover,
-                                                    loadingBuilder: (context, child, progress) {
-                                                      if (progress == null) return child;
+                                              if (mounted)
+                                                Navigator.pop(context);
+                                            },
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              child: Image.network(
+                                                imageUrl,
+                                                fit: BoxFit.cover,
+                                                loadingBuilder:
+                                                    (context, child, progress) {
+                                                      if (progress == null)
+                                                        return child;
                                                       return Container(
                                                         color: Colors.grey[100],
                                                         child: const Center(
-                                                            child: CircularProgressIndicator(strokeWidth: 2)),
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                strokeWidth: 2,
+                                                              ),
+                                                        ),
                                                       );
                                                     },
-                                                    errorBuilder: (context, error, stackTrace) =>
-                                                        Container(
+                                                errorBuilder:
+                                                    (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) => Container(
                                                       color: Colors.grey[200],
-                                                      child: const Icon(Icons.broken_image_outlined),
+                                                      child: const Icon(
+                                                        Icons
+                                                            .broken_image_outlined,
+                                                      ),
                                                     ),
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
                               ),
                             ],
                           ),
@@ -4255,10 +4284,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                     (i) {
                       final dayNum = i + 1;
                       return ListTile(
-                        leading: Icon(
-                          Icons.location_on,
-                          color: AppTheme.amber,
-                        ),
+                        leading: Icon(Icons.location_on, color: AppTheme.amber),
                         title: Text('Ngày $dayNum'),
                         onTap: () {
                           final dayPlaces = _details
@@ -8119,10 +8145,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
             if (info != null)
               Text(
                 info,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.subtitleText,
-                ),
+                style: TextStyle(fontSize: 14, color: AppTheme.subtitleText),
               ),
           ],
         ),
@@ -9202,10 +9225,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Chi tiết chi tiêu',
-                style: AppTheme.sectionTitleStyle,
-              ),
+              Text('Chi tiết chi tiêu', style: AppTheme.sectionTitleStyle),
               TextButton.icon(
                 icon: Icon(Icons.add, size: 16, color: AppTheme.primary),
                 label: Text(

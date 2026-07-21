@@ -1503,10 +1503,11 @@ class _ProfileDashboardState extends State<ProfileDashboard>
       return '$dayName, Ngày ${date.day} tháng ${date.month}, ${date.year}';
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Month Navigation Row
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Month Navigation Row
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
           child: Row(
@@ -1687,9 +1688,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         ),
 
         // Timeline Agenda list
-        Expanded(
-          child: events.isEmpty
-              ? Center(
+        events.isEmpty
+            ? Center(
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1729,6 +1729,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                   ),
                 )
               : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
                   itemCount: events.length,
                   itemBuilder: (context, index) {
@@ -1911,9 +1913,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     );
                   },
                 ),
-        ),
       ],
-    );
+    ));
   }
 
   Widget _buildTripChip(String label, IconData icon, Color bg, Color fg) {

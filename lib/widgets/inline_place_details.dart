@@ -564,12 +564,7 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                   context,
                 ),
                 const SizedBox(width: 8),
-                _buildActionButton(
-                  null,
-                  'Giới thiệu',
-                  false,
-                  context,
-                ),
+                _buildActionButton(null, 'Giới thiệu', false, context),
                 const SizedBox(width: 8),
                 _buildActionButton(Icons.build, 'Hướng dẫn', false, context),
               ],
@@ -589,220 +584,225 @@ class InlinePlaceBottomInfo extends StatelessWidget {
 
           // Info Card
           Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (rating > 0) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.star_rounded,
-                            color: Colors.amber[700],
-                            size: 20,
-                          ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (rating > 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.star_rounded,
+                          color: Colors.amber[700],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$rating',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber[900],
+                              ),
+                        ),
+                        if (userRatingCount > 0) ...[
                           const SizedBox(width: 4),
                           Text(
-                            '$rating',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
+                            '($userRatingCount)',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: AppTheme.subtitleText),
+                          ),
+                        ],
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.grey[300]!,
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                'assets/images/tripadvisor.jpg',
+                                width: 24,
+                                height: 24,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Tripadvisor',
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.amber[900],
+                                  color: Color(0xFF333333),
+                                  fontSize: 13,
                                 ),
-                          ),
-                          if (userRatingCount > 0) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              '($userRatingCount)',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: AppTheme.subtitleText),
-                            ),
-                          ],
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.grey[300]!,
-                                width: 1.2,
                               ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Image.asset(
-                                  'assets/images/tripadvisor.jpg',
-                                  width: 24,
-                                  height: 24,
-                                ),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'Tripadvisor',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF333333),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  ],
-
-                  if (description.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        description,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.darkText,
-                          height: 1.5,
                         ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                ],
+
+                if (description.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      description,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.darkText,
+                        height: 1.5,
                       ),
                     ),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  ],
+                  ),
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                ],
 
-                  if (duration.isNotEmpty || hoursText.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          if (duration.isNotEmpty)
-                            _buildInfoRow(
-                              Icons.timer_outlined,
-                              'Mọi người thường dành $duration ở đây',
-                              context,
-                            ),
-                          if (duration.isNotEmpty && place['openingHours'] != null)
+                if (duration.isNotEmpty || hoursText.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        if (duration.isNotEmpty)
+                          _buildInfoRow(
+                            Icons.timer_outlined,
+                            'Mọi người thường dành $duration ở đây',
+                            context,
+                          ),
+                        if (duration.isNotEmpty &&
+                            place['openingHours'] != null)
+                          const SizedBox(height: 12),
+                        if (place['openingHours'] != null)
+                          ExpandableOpeningHours(
+                            hoursData: place['openingHours'],
+                          ),
+                      ],
+                    ),
+                  ),
+
+                if (address.isNotEmpty ||
+                    website.isNotEmpty ||
+                    phone.isNotEmpty ||
+                    price.isNotEmpty ||
+                    priceLevel.isNotEmpty) ...[
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        if (price.isNotEmpty || priceLevel.isNotEmpty) ...[
+                          _buildInfoRow(
+                            Icons.attach_money_rounded,
+                            'Mức giá: $price${priceLevel.isNotEmpty ? ' ($priceLevel)' : ''}',
+                            context,
+                          ),
+                          if (address.isNotEmpty ||
+                              website.isNotEmpty ||
+                              phone.isNotEmpty)
                             const SizedBox(height: 12),
-                          if (place['openingHours'] != null)
-                            ExpandableOpeningHours(hoursData: place['openingHours']),
                         ],
-                      ),
-                    ),
-
-                  if (address.isNotEmpty ||
-                      website.isNotEmpty ||
-                      phone.isNotEmpty ||
-                      price.isNotEmpty ||
-                      priceLevel.isNotEmpty) ...[
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          if (price.isNotEmpty || priceLevel.isNotEmpty) ...[
-                            _buildInfoRow(
-                              Icons.attach_money_rounded,
-                              'Mức giá: $price${priceLevel.isNotEmpty ? ' ($priceLevel)' : ''}',
+                        if (address.isNotEmpty)
+                          GestureDetector(
+                            onTap: () async {
+                              final url = Uri.parse(
+                                'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address)}',
+                              );
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(url);
+                              }
+                            },
+                            child: _buildInfoRow(
+                              Icons.location_on_outlined,
+                              address,
                               context,
-                            ),
-                            if (address.isNotEmpty || website.isNotEmpty || phone.isNotEmpty)
-                              const SizedBox(height: 12),
-                          ],
-                          if (address.isNotEmpty)
-                            GestureDetector(
-                              onTap: () async {
-                                final url = Uri.parse(
-                                  'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(address)}',
-                                );
-                                if (await canLaunchUrl(url)) {
-                                  await launchUrl(url);
-                                }
-                              },
-                              child: _buildInfoRow(
-                                Icons.location_on_outlined,
-                                address,
-                                context,
-                                isLink: true,
-                                trailing: GestureDetector(
-                                  onTap: () {
-                                    Clipboard.setData(
-                                      ClipboardData(text: address),
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Đã sao chép địa chỉ'),
-                                        duration: Duration(seconds: 2),
-                                      ),
-                                    );
-                                  },
-                                  child: Icon(
-                                    Icons.copy,
-                                    size: 16,
-                                    color: AppTheme.subtitleText,
-                                  ),
+                              isLink: true,
+                              trailing: GestureDetector(
+                                onTap: () {
+                                  Clipboard.setData(
+                                    ClipboardData(text: address),
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Đã sao chép địa chỉ'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                child: Icon(
+                                  Icons.copy,
+                                  size: 16,
+                                  color: AppTheme.subtitleText,
                                 ),
                               ),
                             ),
-                          if (address.isNotEmpty && website.isNotEmpty)
-                            const SizedBox(height: 12),
-                          if (website.isNotEmpty)
-                            GestureDetector(
-                              onTap: () async {
-                                final url = Uri.parse(website);
-                                if (await canLaunchUrl(url)) {
-                                  await launchUrl(url);
-                                }
-                              },
-                              child: _buildInfoRow(
-                                Icons.public,
-                                website,
-                                context,
-                                isLink: true,
-                              ),
+                          ),
+                        if (address.isNotEmpty && website.isNotEmpty)
+                          const SizedBox(height: 12),
+                        if (website.isNotEmpty)
+                          GestureDetector(
+                            onTap: () async {
+                              final url = Uri.parse(website);
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(url);
+                              }
+                            },
+                            child: _buildInfoRow(
+                              Icons.public,
+                              website,
+                              context,
+                              isLink: true,
                             ),
-                          if (phone.isNotEmpty &&
-                              (address.isNotEmpty || website.isNotEmpty))
-                            const SizedBox(height: 12),
-                          if (phone.isNotEmpty)
-                            GestureDetector(
-                              onTap: () async {
-                                final url = Uri.parse('tel:$phone');
-                                if (await canLaunchUrl(url)) {
-                                  await launchUrl(url);
-                                }
-                              },
-                              child: _buildInfoRow(
-                                Icons.phone,
-                                phone,
-                                context,
-                                isLink: true,
-                              ),
+                          ),
+                        if (phone.isNotEmpty &&
+                            (address.isNotEmpty || website.isNotEmpty))
+                          const SizedBox(height: 12),
+                        if (phone.isNotEmpty)
+                          GestureDetector(
+                            onTap: () async {
+                              final url = Uri.parse('tel:$phone');
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(url);
+                              }
+                            },
+                            child: _buildInfoRow(
+                              Icons.phone,
+                              phone,
+                              context,
+                              isLink: true,
                             ),
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
-                  ],
+                  ),
                 ],
-              ),
+              ],
             ),
+          ),
         ],
       ),
     );
