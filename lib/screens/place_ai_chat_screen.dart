@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/api_client.dart';
+import '../services/ai_service.dart';
 import '../theme/app_theme.dart';
 
 class PlaceAIChatScreen extends StatefulWidget {
@@ -17,7 +18,12 @@ class PlaceAIChatScreen extends StatefulWidget {
 
 class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
   final _controller = TextEditingController();
-  final List<Map<String, String>> _messages = [];
+  final ScrollController _scrollController = ScrollController();
+
+  List<ChatMessage> _messages = [];
+  List<ChatSession> _sessions = [];
+  String? _sessionId;
+  String _currentTitle = 'Cuộc trò chuyện mới';
   bool _isLoading = false;
 
   bool _isFullScreen = true;
@@ -38,6 +44,140 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
   void initState() {
     super.initState();
     _fetchMapData();
+    _loadChatSessions();
+  }
+
+  Future<void> _loadChatSessions() async {
+    final sessions = await AiService.getChatSessions();
+    if (mounted) {
+      setState(() {
+        _sessions = sessions;
+      });
+    }
+  }
+
+  Future<void> _loadChatHistory(String sessionId, String title) async {
+    setState(() {
+      _isLoading = true;
+      _sessionId = sessionId;
+      _currentTitle = title;
+      _messages.clear();
+    });
+
+    final history = await AiService.getChatMessages(sessionId);
+
+    if (mounted) {
+      setState(() {
+        _messages = history;
+        _isLoading = false;
+      });
+      _scrollToBottom();
+    }
+  }
+
+  void _startNewConversation() {
+    setState(() {
+      _sessionId = null;
+      _messages.clear();
+      _currentTitle = 'Cuộc trò chuyện mới';
+    });
+  }
+
+  void _showHistorySheet() {
+    _loadChatSessions(); // Refresh list before showing
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateSheet) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Lịch sử trò chuyện',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFEEF2FF),
+                    child: Icon(Icons.add_comment, color: Color(0xFF4F46E5)),
+                  ),
+                  title: const Text(
+                    'Tạo cuộc trò chuyện mới',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _startNewConversation();
+                  },
+                ),
+                const Divider(),
+                Expanded(
+                  child: _sessions.isEmpty
+                      ? const Center(child: Text('Chưa có cuộc trò chuyện nào'))
+                      : ListView.builder(
+                          itemCount: _sessions.length,
+                          itemBuilder: (context, index) {
+                            final session = _sessions[index];
+                            final isSelected = session.id == _sessionId;
+                            return ListTile(
+                              leading: Icon(
+                                Icons.chat_bubble_outline,
+                                color: isSelected
+                                    ? AppTheme.primary
+                                    : Colors.grey,
+                              ),
+                              title: Text(
+                                session.title.isNotEmpty
+                                    ? session.title
+                                    : 'Cuộc trò chuyện',
+                                style: TextStyle(
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? AppTheme.primary
+                                      : AppTheme.darkText,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${session.updatedAt.day}/${session.updatedAt.month}/${session.updatedAt.year}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _loadChatHistory(session.id, session.title);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _fetchMapData() async {
@@ -66,52 +206,91 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
     }
   }
 
-  Future<void> _sendMessage(String text) async {
-    if (text.trim().isEmpty) return;
+  Future<void> _sendMessage([String? optionalText]) async {
+    final text = (optionalText ?? _controller.text).trim();
+    if (text.isEmpty || _isLoading) return;
 
+    _controller.clear();
     setState(() {
-      _messages.add({'role': 'user', 'text': text});
+      _messages.add(
+        ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          sessionId: _sessionId ?? '',
+          role: 'USER',
+          content: text,
+          createdAt: DateTime.now(),
+        ),
+      );
       _isLoading = true;
     });
-    _controller.clear();
+
+    _scrollToBottom();
 
     try {
-      final baseUrl = ApiClient.baseUrl;
-      final response = await http.post(
-        Uri.parse('$baseUrl/mobile/ai/ask-place'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'placeName': widget.placeName,
-          'message': text,
-        }),
+      final result = await AiService.sendChatMessage(
+        sessionId: _sessionId,
+        destination: widget.placeName,
+        message: text,
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
+      if (mounted) {
         setState(() {
-          _messages.add({'role': 'ai', 'text': data['reply'] ?? 'Xin lỗi, có lỗi xảy ra.'});
+          _sessionId = result['sessionId'];
+          // Reload sessions silently to get the updated title
+          _loadChatSessions().then((_) {
+            if (_currentTitle == 'Cuộc trò chuyện mới' &&
+                _sessions.isNotEmpty) {
+              final currentSession = _sessions.firstWhere(
+                (s) => s.id == _sessionId,
+                orElse: () => _sessions.first,
+              );
+              setState(() {
+                _currentTitle = currentSession.title;
+              });
+            }
+          });
+
+          _messages.add(
+            ChatMessage(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              sessionId: _sessionId!,
+              role: 'AI',
+              content: result['reply'],
+              createdAt: DateTime.now(),
+            ),
+          );
+          _isLoading = false;
         });
-      } else {
-        setState(() {
-          _messages.add({'role': 'ai', 'text': 'Xin lỗi, không thể kết nối đến máy chủ.'});
-        });
+        _scrollToBottom();
       }
     } catch (e) {
-      setState(() {
-        _messages.add({'role': 'ai', 'text': 'Xin lỗi, có lỗi xảy ra.'});
-      });
-    } finally {
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Lỗi khi gửi tin nhắn')));
       }
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      });
     }
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -189,7 +368,10 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
@@ -199,12 +381,19 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_rounded, color: AppTheme.subtitleText, size: 20),
+                        Icon(
+                          Icons.info_rounded,
+                          color: AppTheme.subtitleText,
+                          size: 20,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'Thông tin từ Trợ lý AI có thể không hoàn toàn chính xác.',
-                            style: TextStyle(color: AppTheme.subtitleText, fontSize: 13),
+                            style: TextStyle(
+                              color: AppTheme.subtitleText,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ],
@@ -236,24 +425,39 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                     alignment: Alignment.centerLeft,
                                     child: InkWell(
                                       onTap: () {
-                                        _sendMessage(s);
+                                        _controller.text = s;
+                                        _sendMessage();
                                       },
                                       borderRadius: BorderRadius.circular(24),
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFEEF2FF),
-                                          borderRadius: BorderRadius.circular(24),
+                                          borderRadius: BorderRadius.circular(
+                                            24,
+                                          ),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(Icons.subdirectory_arrow_right_rounded, color: Color(0xFF4F46E5), size: 18),
+                                            const Icon(
+                                              Icons
+                                                  .subdirectory_arrow_right_rounded,
+                                              color: Color(0xFF4F46E5),
+                                              size: 18,
+                                            ),
                                             const SizedBox(width: 8),
                                             Flexible(
                                               child: Text(
                                                 s,
-                                                style: const TextStyle(color: Color(0xFF4F46E5), fontSize: 14, fontWeight: FontWeight.w500),
+                                                style: const TextStyle(
+                                                  color: Color(0xFF4F46E5),
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
                                               ),
                                             ),
                                           ],
@@ -267,7 +471,11 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                           )
                         else
                           ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            controller: _scrollController,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             itemCount: _messages.length + (_isLoading ? 1 : 0),
                             itemBuilder: (context, index) {
                               if (index == _messages.length) {
@@ -280,20 +488,41 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                 );
                               }
                               final msg = _messages[index];
-                              final isUser = msg['role'] == 'user';
+                              final isUser = msg.role == 'USER';
                               return Align(
-                                alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                                alignment: isUser
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
                                 child: Container(
                                   margin: const EdgeInsets.only(bottom: 12),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: isUser ? AppTheme.primary : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(16),
+                                    color: isUser
+                                        ? AppTheme.primary
+                                        : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(16)
+                                        .copyWith(
+                                          bottomRight: isUser
+                                              ? const Radius.circular(0)
+                                              : const Radius.circular(16),
+                                          bottomLeft: !isUser
+                                              ? const Radius.circular(0)
+                                              : const Radius.circular(16),
+                                        ),
+                                    border: isUser
+                                        ? null
+                                        : Border.all(color: AppTheme.border),
                                   ),
                                   child: Text(
-                                    msg['text'] ?? '',
+                                    msg.content,
                                     style: TextStyle(
-                                      color: isUser ? Colors.white : AppTheme.darkText,
+                                      color: isUser
+                                          ? Colors.white
+                                          : AppTheme.darkText,
+                                      fontSize: 15,
                                     ),
                                   ),
                                 ),
@@ -313,7 +542,10 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                               },
                               backgroundColor: const Color(0xFF1E293B),
                               elevation: 4,
-                              child: const Icon(Icons.map_outlined, color: Colors.white),
+                              child: const Icon(
+                                Icons.map_outlined,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                       ],
@@ -341,28 +573,6 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Còn lại 9 tin nhắn miễn phí',
-                              style: TextStyle(color: AppTheme.subtitleText, fontSize: 12),
-                            ),
-                            TextButton(
-                              onPressed: () {},
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(0, 0),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: Text(
-                                'Nhận thêm',
-                                style: TextStyle(color: AppTheme.darkText, fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -382,18 +592,25 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                 child: TextField(
                                   controller: _controller,
                                   decoration: InputDecoration(
-                                    hintText: 'Hỏi các câu hỏi liên quan đến du lịch',
-                                    hintStyle: TextStyle(color: AppTheme.subtitleText, fontSize: 14),
+                                    hintText:
+                                        'Hỏi các câu hỏi liên quan đến du lịch',
+                                    hintStyle: TextStyle(
+                                      color: AppTheme.subtitleText,
+                                      fontSize: 14,
+                                    ),
                                     border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 14,
+                                    ),
                                   ),
-                                  onSubmitted: _sendMessage,
+                                  onSubmitted: (_) => _sendMessage(),
                                 ),
                               ),
                               Padding(
                                 padding: const EdgeInsets.all(4.0),
                                 child: InkWell(
-                                  onTap: () => _sendMessage(_controller.text),
+                                  onTap: () => _sendMessage(),
                                   borderRadius: BorderRadius.circular(20),
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
@@ -401,7 +618,11 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                       color: Color(0xFFA5B4FC),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
+                                    child: const Icon(
+                                      Icons.arrow_upward_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -426,8 +647,12 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
     final headerHeight = topPadding + 56.0;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    final double defaultHeight = _isFullScreen ? (screenHeight - headerHeight) : 45.0;
-    final double targetSheetHeight = (_isDragging && _dragHeight != null) ? _dragHeight! : defaultHeight;
+    final double defaultHeight = _isFullScreen
+        ? (screenHeight - headerHeight)
+        : 45.0;
+    final double targetSheetHeight = (_isDragging && _dragHeight != null)
+        ? _dragHeight!
+        : defaultHeight;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -436,12 +661,20 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
           Positioned.fill(
             child: _mapCenter != null
                 ? FlutterMap(
-                    options: MapOptions(initialCenter: _mapCenter!, initialZoom: 13.0),
+                    options: MapOptions(
+                      initialCenter: _mapCenter!,
+                      initialZoom: 13.0,
+                    ),
                     children: [
-                      TileLayer(urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff'),
+                      TileLayer(
+                        urlTemplate:
+                            'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff',
+                      ),
                     ],
                   )
-                : const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+                : const Center(
+                    child: CircularProgressIndicator(color: AppTheme.primary),
+                  ),
           ),
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
@@ -452,12 +685,18 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
               children: [
                 CircleAvatar(
                   backgroundColor: Colors.white,
-                  child: IconButton(icon: Icon(Icons.search, color: AppTheme.darkText), onPressed: () {}),
+                  child: IconButton(
+                    icon: Icon(Icons.search, color: AppTheme.darkText),
+                    onPressed: () {},
+                  ),
                 ),
                 const SizedBox(height: 12),
                 CircleAvatar(
                   backgroundColor: Colors.white,
-                  child: IconButton(icon: Icon(Icons.layers_outlined, color: AppTheme.darkText), onPressed: () {}),
+                  child: IconButton(
+                    icon: Icon(Icons.layers_outlined, color: AppTheme.darkText),
+                    onPressed: () {},
+                  ),
                 ),
               ],
             ),
@@ -479,7 +718,14 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                     decoration: BoxDecoration(
                       color: _isFullScreen ? Colors.transparent : Colors.white,
                       shape: BoxShape.circle,
-                      boxShadow: _isFullScreen ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
+                      boxShadow: _isFullScreen
+                          ? []
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 4,
+                              ),
+                            ],
                     ),
                     child: IconButton(
                       icon: Icon(Icons.arrow_back, color: AppTheme.darkText),
@@ -487,22 +733,50 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                     ),
                   ),
                   const Spacer(),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOutCubic,
-                    padding: EdgeInsets.symmetric(horizontal: _isFullScreen ? 0 : 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _isFullScreen ? Colors.transparent : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: _isFullScreen ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Cuộc trò chuyện mới', style: TextStyle(color: AppTheme.darkText, fontSize: 14, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 4),
-                        Icon(Icons.arrow_drop_down, color: AppTheme.darkText.withValues(alpha: 0.7)),
-                      ],
+                  GestureDetector(
+                    onTap: _showHistorySheet,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: _isFullScreen ? 0 : 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _isFullScreen
+                            ? Colors.transparent
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: _isFullScreen
+                            ? []
+                            : [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _currentTitle,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppTheme.darkText,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_drop_down,
+                            color: AppTheme.darkText.withValues(alpha: 0.7),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const Spacer(),
@@ -514,18 +788,29 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
           Align(
             alignment: Alignment.bottomCenter,
             child: AnimatedContainer(
-              duration: _isDragging ? Duration.zero : const Duration(milliseconds: 300),
+              duration: _isDragging
+                  ? Duration.zero
+                  : const Duration(milliseconds: 300),
               curve: Curves.easeOutCubic,
               height: targetSheetHeight,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: _isFullScreen ? BorderRadius.zero : const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: _isFullScreen
+                    ? BorderRadius.zero
+                    : const BorderRadius.vertical(top: Radius.circular(20)),
                 boxShadow: [
-                  if (!_isFullScreen) BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -5)),
+                  if (!_isFullScreen)
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, -5),
+                    ),
                 ],
               ),
               child: ClipRRect(
-                borderRadius: _isFullScreen ? BorderRadius.zero : const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: _isFullScreen
+                    ? BorderRadius.zero
+                    : const BorderRadius.vertical(top: Radius.circular(20)),
                 child: _buildChatBody(),
               ),
             ),

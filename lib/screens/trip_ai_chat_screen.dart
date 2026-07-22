@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
+import '../services/ai_service.dart';
 
 class TripAIChatScreen extends StatefulWidget {
   final String destination;
@@ -22,6 +23,13 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
   double? _dragHeight;
   LatLng? _mapCenter;
 
+  List<ChatMessage> _messages = [];
+  List<ChatSession> _sessions = [];
+  String? _sessionId;
+  String _currentTitle = 'Cuộc trò chuyện mới';
+  bool _isLoading = false;
+  final ScrollController _scrollController = ScrollController();
+
   late final _suggestions = [
     'Địa điểm ăn uống tốt nhất ở ${widget.destination}',
     'Lịch trình 3 ngày đi ${widget.destination}',
@@ -32,6 +40,140 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
   void initState() {
     super.initState();
     _fetchMapData();
+    _loadChatSessions();
+  }
+
+  Future<void> _loadChatSessions() async {
+    final sessions = await AiService.getChatSessions();
+    if (mounted) {
+      setState(() {
+        _sessions = sessions;
+      });
+    }
+  }
+
+  Future<void> _loadChatHistory(String sessionId, String title) async {
+    setState(() {
+      _isLoading = true;
+      _sessionId = sessionId;
+      _currentTitle = title;
+      _messages.clear();
+    });
+
+    final history = await AiService.getChatMessages(sessionId);
+
+    if (mounted) {
+      setState(() {
+        _messages = history;
+        _isLoading = false;
+      });
+      _scrollToBottom();
+    }
+  }
+
+  void _startNewConversation() {
+    setState(() {
+      _sessionId = null;
+      _messages.clear();
+      _currentTitle = 'Cuộc trò chuyện mới';
+    });
+  }
+
+  void _showHistorySheet() {
+    _loadChatSessions(); // Refresh list before showing
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateSheet) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Lịch sử trò chuyện',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFEEF2FF),
+                    child: Icon(Icons.add_comment, color: Color(0xFF4F46E5)),
+                  ),
+                  title: const Text(
+                    'Tạo cuộc trò chuyện mới',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _startNewConversation();
+                  },
+                ),
+                const Divider(),
+                Expanded(
+                  child: _sessions.isEmpty
+                      ? const Center(child: Text('Chưa có cuộc trò chuyện nào'))
+                      : ListView.builder(
+                          itemCount: _sessions.length,
+                          itemBuilder: (context, index) {
+                            final session = _sessions[index];
+                            final isSelected = session.id == _sessionId;
+                            return ListTile(
+                              leading: Icon(
+                                Icons.chat_bubble_outline,
+                                color: isSelected
+                                    ? AppTheme.primary
+                                    : Colors.grey,
+                              ),
+                              title: Text(
+                                session.title.isNotEmpty
+                                    ? session.title
+                                    : 'Cuộc trò chuyện',
+                                style: TextStyle(
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? AppTheme.primary
+                                      : AppTheme.darkText,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${session.updatedAt.day}/${session.updatedAt.month}/${session.updatedAt.year}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _loadChatHistory(session.id, session.title);
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _fetchMapData() async {
@@ -64,7 +206,89 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _isLoading) return;
+
+    _controller.clear();
+    setState(() {
+      _messages.add(
+        ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          sessionId: _sessionId ?? '',
+          role: 'USER',
+          content: text,
+          createdAt: DateTime.now(),
+        ),
+      );
+      _isLoading = true;
+    });
+
+    _scrollToBottom();
+
+    try {
+      final result = await AiService.sendChatMessage(
+        sessionId: _sessionId,
+        destination: widget.destination,
+        message: text,
+      );
+
+      if (mounted) {
+        setState(() {
+          _sessionId = result['sessionId'];
+          // Reload sessions silently to get the updated title
+          _loadChatSessions().then((_) {
+            if (_currentTitle == 'Cuộc trò chuyện mới' &&
+                _sessions.isNotEmpty) {
+              final currentSession = _sessions.firstWhere(
+                (s) => s.id == _sessionId,
+                orElse: () => _sessions.first,
+              );
+              setState(() {
+                _currentTitle = currentSession.title;
+              });
+            }
+          });
+
+          _messages.add(
+            ChatMessage(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              sessionId: _sessionId!,
+              role: 'AI',
+              content: result['reply'],
+              createdAt: DateTime.now(),
+            ),
+          );
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Lỗi khi gửi tin nhắn')));
+      }
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      });
+    }
   }
 
   Widget _buildChatBody() {
@@ -178,68 +402,133 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                   Expanded(
                     child: Stack(
                       children: [
-                        ListView(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          children: [
-                            const SizedBox(height: 8),
-                            Text(
-                              'Không biết hỏi gì? Thử một số ví dụ sau:',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.darkText,
-                                height: 1.2,
+                        if (_messages.isEmpty)
+                          ListView(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            children: [
+                              const SizedBox(height: 8),
+                              Text(
+                                'Không biết hỏi gì? Thử một số ví dụ sau:',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.darkText,
+                                  height: 1.2,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            ..._suggestions.map(
-                              (s) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: InkWell(
-                                    onTap: () {
-                                      _controller.text = s;
-                                    },
-                                    borderRadius: BorderRadius.circular(24),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEEF2FF),
-                                        borderRadius: BorderRadius.circular(24),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons
-                                                .subdirectory_arrow_right_rounded,
-                                            color: Color(0xFF4F46E5),
-                                            size: 18,
+                              const SizedBox(height: 24),
+                              ..._suggestions.map(
+                                (s) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: InkWell(
+                                      onTap: () {
+                                        _controller.text = s;
+                                        _sendMessage();
+                                      },
+                                      borderRadius: BorderRadius.circular(24),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEEF2FF),
+                                          borderRadius: BorderRadius.circular(
+                                            24,
                                           ),
-                                          const SizedBox(width: 8),
-                                          Flexible(
-                                            child: Text(
-                                              s,
-                                              style: const TextStyle(
-                                                color: Color(0xFF4F46E5),
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons
+                                                  .subdirectory_arrow_right_rounded,
+                                              color: Color(0xFF4F46E5),
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Flexible(
+                                              child: Text(
+                                                s,
+                                                style: const TextStyle(
+                                                  color: Color(0xFF4F46E5),
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
+                            ],
+                          )
+                        else
+                          ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
                             ),
-                          ],
-                        ),
+                            itemCount: _messages.length + (_isLoading ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == _messages.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                );
+                              }
+                              final msg = _messages[index];
+                              final isUser = msg.role == 'USER';
+                              return Align(
+                                alignment: isUser
+                                    ? Alignment.centerRight
+                                    : Alignment.centerLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isUser
+                                        ? AppTheme.primary
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(16)
+                                        .copyWith(
+                                          bottomRight: isUser
+                                              ? const Radius.circular(0)
+                                              : const Radius.circular(16),
+                                          bottomLeft: !isUser
+                                              ? const Radius.circular(0)
+                                              : const Radius.circular(16),
+                                        ),
+                                    border: isUser
+                                        ? null
+                                        : Border.all(color: AppTheme.border),
+                                  ),
+                                  child: Text(
+                                    msg.content,
+                                    style: TextStyle(
+                                      color: isUser
+                                          ? Colors.white
+                                          : AppTheme.darkText,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         if (_isFullScreen)
                           Positioned(
                             right: 16,
@@ -286,35 +575,6 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Còn lại 9 tin nhắn miễn phí',
-                              style: TextStyle(
-                                color: AppTheme.subtitleText,
-                                fontSize: 12,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {},
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(0, 0),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: Text(
-                                'Nhận thêm',
-                                style: TextStyle(
-                                  color: AppTheme.darkText,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -333,6 +593,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                               Expanded(
                                 child: TextField(
                                   controller: _controller,
+                                  onSubmitted: (_) => _sendMessage(),
                                   decoration: InputDecoration(
                                     hintText:
                                         'Hỏi các câu hỏi liên quan đến du lịch',
@@ -351,7 +612,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                               Padding(
                                 padding: const EdgeInsets.all(4.0),
                                 child: InkWell(
-                                  onTap: () {},
+                                  onTap: _sendMessage,
                                   borderRadius: BorderRadius.circular(20),
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
@@ -488,42 +749,50 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                   const Spacer(),
 
                   // Title Pill
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOutCubic,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: _isFullScreen ? 0 : 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _isFullScreen ? Colors.transparent : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: _isFullScreen
-                          ? []
-                          : [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 4,
+                  GestureDetector(
+                    onTap: _showHistorySheet,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: _isFullScreen ? 0 : 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _isFullScreen
+                            ? Colors.transparent
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: _isFullScreen
+                            ? []
+                            : [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _currentTitle,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppTheme.darkText,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
                               ),
-                            ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Cuộc trò chuyện mới',
-                          style: TextStyle(
-                            color: AppTheme.darkText,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_drop_down,
-                          color: AppTheme.darkText.withValues(alpha: 0.7),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_drop_down,
+                            color: AppTheme.darkText.withValues(alpha: 0.7),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
 
