@@ -6,11 +6,17 @@ import 'package:latlong2/latlong.dart';
 import '../services/api_client.dart';
 import '../services/ai_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/place_detail_bottom_sheet.dart';
+import '../widgets/save_to_trip_bottom_sheet.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/auth_service.dart';
+import '../services/database_service.dart';
 
 class PlaceAIChatScreen extends StatefulWidget {
   final String placeName;
+  final Map<String, dynamic>? placeInfo;
 
-  const PlaceAIChatScreen({super.key, required this.placeName});
+  const PlaceAIChatScreen({super.key, required this.placeName, this.placeInfo});
 
   @override
   State<PlaceAIChatScreen> createState() => _PlaceAIChatScreenState();
@@ -25,6 +31,8 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
   String? _sessionId;
   String _currentTitle = 'Cuộc trò chuyện mới';
   bool _isLoading = false;
+  bool _isChatHidden = false;
+  int _savedCount = 0;
 
   bool _isFullScreen = true;
   bool _isDragging = false;
@@ -45,6 +53,51 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
     super.initState();
     _fetchMapData();
     _loadChatSessions();
+    _fetchSavedCount();
+  }
+
+  Future<void> _fetchSavedCount() async {
+    final user = AuthService().currentUser.value;
+    if (user != null && widget.placeInfo != null) {
+      final trips = await DatabaseService().fetchUserItineraries(
+        int.parse(user.id.toString()),
+        isGuide: false,
+      );
+      if (mounted) {
+        int tripsCount = 0;
+        final targetId = widget.placeInfo!['id'];
+
+        for (var trip in trips) {
+          bool foundInTrip = false;
+          final savedPlaces = trip['savedPlaces'] as List? ?? [];
+          final detailsList = trip['details'] as List? ?? [];
+
+          for (var d in savedPlaces) {
+            if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+                (d['section'] != null && d['section'].toString().isNotEmpty)) {
+              foundInTrip = true;
+              break;
+            }
+          }
+          if (!foundInTrip) {
+            for (var d in detailsList) {
+              if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+                  d['day'] != null) {
+                foundInTrip = true;
+                break;
+              }
+            }
+          }
+          if (foundInTrip) {
+            tripsCount++;
+          }
+        }
+
+        setState(() {
+          _savedCount = tripsCount;
+        });
+      }
+    }
   }
 
   Future<void> _loadChatSessions() async {
@@ -199,10 +252,27 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
               _mapCenter = LatLng(lat, lon);
             });
           }
+        } else {
+          if (mounted) {
+            setState(() {
+              _mapCenter = const LatLng(16.047079, 108.206230);
+            });
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _mapCenter = const LatLng(16.047079, 108.206230);
+          });
         }
       }
     } catch (e) {
       debugPrint('Error fetching map: $e');
+      if (mounted) {
+        setState(() {
+          _mapCenter = const LatLng(16.047079, 108.206230);
+        });
+      }
     }
   }
 
@@ -670,37 +740,57 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                         urlTemplate:
                             'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff',
                       ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _mapCenter!,
+                            width: 56.0,
+                            height: 56.0,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _isChatHidden = true;
+                                });
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 3,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black87.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.location_on_rounded,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   )
                 : const Center(
                     child: CircularProgressIndicator(color: AppTheme.primary),
                   ),
           ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutCubic,
-            top: topPadding + 70,
-            right: _isFullScreen ? -60 : 16,
-            child: Column(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: IconButton(
-                    icon: Icon(Icons.search, color: AppTheme.darkText),
-                    onPressed: () {},
-                  ),
-                ),
-                const SizedBox(height: 12),
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: IconButton(
-                    icon: Icon(Icons.layers_outlined, color: AppTheme.darkText),
-                    onPressed: () {},
-                  ),
-                ),
-              ],
-            ),
-          ),
+
+          if (_isChatHidden) _buildMapPlaceBottomSheet(),
+
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOutCubic,
@@ -729,7 +819,13 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                     ),
                     child: IconButton(
                       icon: Icon(Icons.arrow_back, color: AppTheme.darkText),
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () {
+                        if (_isChatHidden) {
+                          setState(() => _isChatHidden = false);
+                        } else {
+                          Navigator.pop(context);
+                        }
+                      },
                     ),
                   ),
                   const Spacer(),
@@ -792,7 +888,7 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                   ? Duration.zero
                   : const Duration(milliseconds: 300),
               curve: Curves.easeOutCubic,
-              height: targetSheetHeight,
+              height: _isChatHidden ? 0 : targetSheetHeight,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: _isFullScreen
@@ -811,11 +907,251 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                 borderRadius: _isFullScreen
                     ? BorderRadius.zero
                     : const BorderRadius.vertical(top: Radius.circular(20)),
-                child: _buildChatBody(),
+                child: _isChatHidden
+                    ? const SizedBox()
+                    : SingleChildScrollView(
+                        physics: const NeverScrollableScrollPhysics(),
+                        child: SizedBox(
+                          height: targetSheetHeight,
+                          child: _buildChatBody(),
+                        ),
+                      ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMapPlaceBottomSheet() {
+    final p =
+        widget.placeInfo ??
+        {'name': widget.placeName, 'description': '', 'image': ''};
+    final name = p['name'] ?? widget.placeName;
+    final description = p['description'] ?? p['editorialSummary'] ?? '';
+    String imageUrl = p['image'] ?? '';
+
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 16.0,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF3B5998),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    '1',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (description.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Mô tả: $description',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.subtitleText,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (imageUrl.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      imageUrl,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 60,
+                        height: 60,
+                        color: Colors.grey[200],
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      SaveToTripBottomSheet.show(
+                        context,
+                        p,
+                        onSaved: () {
+                          _fetchSavedCount();
+                        },
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _savedCount > 0
+                            ? Colors.grey[200]
+                            : AppTheme.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _savedCount > 0
+                                ? Icons.bookmark
+                                : Icons.bookmark_border,
+                            color: _savedCount > 0
+                                ? Colors.black
+                                : Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _savedCount > 0
+                                ? 'Đã thêm vào $_savedCount chuyến đi'
+                                : 'Thêm vào chuyến đi',
+                            style: TextStyle(
+                              color: _savedCount > 0
+                                  ? Colors.black
+                                  : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (_savedCount > 0) ...[
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Colors.black,
+                              size: 16,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      PlaceDetailBottomSheet.show(
+                        context,
+                        p,
+                        icon: const IconData(
+                          0xe4eb,
+                          fontFamily: 'MaterialIcons',
+                        ),
+                        color: const Color(0xFF3B5998),
+                        text: '1',
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Chi tiết',
+                        style: TextStyle(
+                          color: AppTheme.darkText,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      if (p['latitude'] != null && p['longitude'] != null) {
+                        final lat = p['latitude'];
+                        final lon = p['longitude'];
+                        final url = Uri.parse(
+                          'https://www.google.com/maps/dir/?api=1&destination=$lat,$lon',
+                        );
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url);
+                        }
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.directions,
+                        color: AppTheme.darkText,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

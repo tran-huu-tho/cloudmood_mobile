@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import 'place_ai_chat_screen.dart';
 import '../utils/time_utils.dart';
+import '../widgets/place_detail_bottom_sheet.dart';
+import '../widgets/save_to_trip_bottom_sheet.dart';
 
 class ExplorePostMapScreen extends StatefulWidget {
   final String title;
   final List<dynamic> items; // The items list from ExplorePost
+  final List<dynamic>? sections; // Custom sections with colorCode and iconCode
+  final int? initialPlaceId; // Place ID to focus on initially
 
   const ExplorePostMapScreen({
     Key? key,
     required this.title,
     required this.items,
+    this.sections,
+    this.initialPlaceId,
   }) : super(key: key);
 
   @override
@@ -21,7 +28,7 @@ class ExplorePostMapScreen extends StatefulWidget {
 
 class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
   final MapController _mapController = MapController();
-  final PageController _pageController = PageController(viewportFraction: 0.9);
+  late final PageController _pageController;
   
   List<Map<String, dynamic>> _places = [];
   int _selectedIndex = 0;
@@ -31,30 +38,116 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
   void initState() {
     super.initState();
     _extractPlaces();
+    _pageController = PageController(initialPage: _selectedIndex, viewportFraction: 0.9);
+    
+    if (_places.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          final loc = _places[_selectedIndex]['location'] as LatLng;
+          _mapController.move(loc, widget.initialPlaceId != null ? 16.0 : 14.5);
+        }
+      });
+    }
+  }
+
+  String _resolveSectionName(int placeIndex) {
+    if (placeIndex < 0 || placeIndex >= _places.length) return '';
+    final item = _places[placeIndex]['item'];
+    final place = _places[placeIndex]['place'];
+    if (item['section'] != null && item['section'].toString().isNotEmpty) return item['section'].toString();
+    if (place != null && place['section'] != null && place['section'].toString().isNotEmpty) return place['section'].toString();
+    final itemIndex = widget.items.indexOf(item);
+    for (int i = itemIndex; i >= 0; i--) {
+      if (i < widget.items.length && widget.items[i]['itemType'] == 'SECTION_HEADER' && widget.items[i]['content'] != null) {
+        return widget.items[i]['content'].toString();
+      }
+    }
+    return '';
+  }
+
+  Color _getMarkerColor(int placeIndex) {
+    final secName = _resolveSectionName(placeIndex);
+    final sections = widget.sections ?? [];
+    for (var sec in sections) {
+      if (sec is Map) {
+        final name = (sec['name'] ?? '').toString();
+        if ((secName.isNotEmpty && name.toLowerCase().trim() == secName.toLowerCase().trim()) || (secName.isEmpty && sections.length == 1)) {
+          if (sec['colorCode'] != null) {
+            try { return Color(int.parse(sec['colorCode'].toString())); } catch (_) {}
+          }
+        }
+      }
+    }
+    final item = _places[placeIndex]['item'];
+    final place = _places[placeIndex]['place'];
+    final directColor = item['colorCode'] ?? place?['colorCode'];
+    if (directColor != null) {
+      try { return Color(int.parse(directColor.toString())); } catch (_) {}
+    }
+    return AppTheme.primary;
+  }
+
+  IconData? _getMarkerIcon(int placeIndex) {
+    final secName = _resolveSectionName(placeIndex);
+    final sections = widget.sections ?? [];
+    for (var sec in sections) {
+      if (sec is Map) {
+        final name = (sec['name'] ?? '').toString();
+        if ((secName.isNotEmpty && name.toLowerCase().trim() == secName.toLowerCase().trim()) || (secName.isEmpty && sections.length == 1)) {
+          if (sec['iconCode'] != null) {
+            try {
+              final rawCode = int.parse(sec['iconCode'].toString());
+              if (rawCode != 983363 && rawCode != 58055 && rawCode != 0) {
+                return IconData(rawCode, fontFamily: 'MaterialIcons');
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    }
+    final item = _places[placeIndex]['item'];
+    final place = _places[placeIndex]['place'];
+    final directIcon = item['iconCode'] ?? place?['iconCode'];
+    if (directIcon != null) {
+      try {
+        final rawCode = int.parse(directIcon.toString());
+        if (rawCode != 983363 && rawCode != 58055 && rawCode != 0) {
+          return IconData(rawCode, fontFamily: 'MaterialIcons');
+        }
+      } catch (_) {}
+    }
+    return null;
   }
 
   void _extractPlaces() {
     int counter = 1;
+    int targetIndex = 0;
     for (var item in widget.items) {
       if (item['itemType'] == 'PLACE' && item['place'] != null) {
         final place = item['place'];
-        if (place['latitude'] != null && place['longitude'] != null) {
+        double? lat = double.tryParse(place['latitude']?.toString() ?? '');
+        double? lng = double.tryParse(place['longitude']?.toString() ?? '');
+        
+        if (lat != null && lng != null) {
+          final placeId = place['id'] as int?;
+          if (widget.initialPlaceId != null && placeId == widget.initialPlaceId) {
+            targetIndex = _places.length;
+          }
           _places.add({
-            'index': counter,
+            'index': counter++,
             'item': item,
             'place': place,
-            'lat': (place['latitude'] as num).toDouble(),
-            'lng': (place['longitude'] as num).toDouble(),
+            'location': LatLng(lat, lng),
           });
         }
-        counter++;
       }
     }
-    
+
+    _selectedIndex = targetIndex;
     if (_places.isNotEmpty) {
-      _mapCenter = LatLng(_places[0]['lat'], _places[0]['lng']);
+      _mapCenter = _places[_selectedIndex]['location'];
     } else {
-      _mapCenter = const LatLng(21.028511, 105.804817); // Default Hanoi
+      _mapCenter = const LatLng(10.0452, 105.7469); // Default Can Tho
     }
   }
 
@@ -62,141 +155,101 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
     setState(() {
       _selectedIndex = index;
     });
-    final lat = _places[index]['lat'];
-    final lng = _places[index]['lng'];
-    _mapController.move(LatLng(lat, lng), 16.0);
+    final loc = _places[index]['location'] as LatLng;
+    _mapController.move(loc, 15.0);
   }
 
-  Widget _buildReviewStars(double rating) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(5, (index) {
-        if (index < rating.floor()) {
-          return const Icon(Icons.star, color: Colors.amber, size: 14);
-        } else if (index < rating && (rating - rating.floor()) >= 0.5) {
-          return const Icon(Icons.star_half, color: Colors.amber, size: 14);
-        } else {
-          return const Icon(Icons.star_border, color: Colors.amber, size: 14);
-        }
-      }),
+  void _onMarkerTapped(int index) {
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
     );
-  }
-
-  Widget _buildTag(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w500),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
-
-  String _getSubCategoryText(dynamic subCategory) {
-    if (subCategory is String) return subCategory;
-    if (subCategory is Map) return subCategory['name']?.toString() ?? subCategory.values.first.toString();
-    return subCategory.toString();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        elevation: 0.5,
       ),
       body: Stack(
         children: [
-          // The Map
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _mapCenter!,
-              initialZoom: 15.5,
-              onTap: (_, __) {}, // Optional
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff',
+          // FlutterMap
+          if (_mapCenter != null)
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _mapCenter!,
+                initialZoom: 14.5,
               ),
-              MarkerLayer(
-                markers: _places.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final placeData = entry.value;
-                  final isSelected = idx == _selectedIndex;
-                  final lat = placeData['lat'];
-                  final lng = placeData['lng'];
-                  final placeIndex = placeData['index'];
-
-                  final markerSize = isSelected ? 48.0 : 36.0;
-
-                  return Marker(
-                    point: LatLng(lat, lng),
-                    width: markerSize,
-                    height: markerSize,
-                    child: GestureDetector(
-                      onTap: () {
-                        _pageController.animateToPage(
-                          idx,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE53935), // Red
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: isSelected ? 3 : 2,
-                          ),
-                          boxShadow: [
-                            if (isSelected)
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff',
+                  userAgentPackageName: 'com.cloudmood.app',
+                ),
+                MarkerLayer(
+                  markers: _places.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final placeData = entry.value;
+                    final isSelected = index == _selectedIndex;
+                    final markerColor = _getMarkerColor(index);
+                    final markerIcon = _getMarkerIcon(index);
+                    
+                    return Marker(
+                      point: placeData['location'],
+                      width: isSelected ? 48 : 36,
+                      height: isSelected ? 48 : 36,
+                      child: GestureDetector(
+                        onTap: () => _onMarkerTapped(index),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: BoxDecoration(
+                            color: markerColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: isSelected ? 3.0 : 2.0),
+                            boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 8,
-                                spreadRadius: 2,
+                                color: markerColor.withAlpha(isSelected ? 100 : 60),
+                                blurRadius: isSelected ? 12 : 4,
+                                offset: const Offset(0, 3),
                               ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            '$placeIndex',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: isSelected ? 18 : 14,
-                            ),
+                            ],
+                          ),
+                          child: Center(
+                            child: markerIcon != null
+                                ? Icon(
+                                    markerIcon,
+                                    color: Colors.white,
+                                    size: isSelected ? 24 : 18,
+                                  )
+                                : Text(
+                                    '${placeData['index']}',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: isSelected ? 18 : 14,
+                                    ),
+                                  ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
           
           // Bottom Place Cards
           if (_places.isNotEmpty)
             Positioned(
               left: 0,
               right: 0,
-              bottom: 30, // Some padding from bottom
-              height: 280, // Increased height to fit new buttons
+              bottom: 24,
+              height: 270,
               child: PageView.builder(
                 controller: _pageController,
                 onPageChanged: _onPageChanged,
@@ -204,13 +257,14 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                 itemBuilder: (context, index) {
                   final placeData = _places[index];
                   final item = placeData['item'];
-                  final place = placeData['place'];
+                  final place = placeData['place'] as Map<String, dynamic>;
                   
-                  final placeName = place['name'] ?? '';
-                  final placeImage = place['image'] ?? 'https://via.placeholder.com/300x200';
-                  final category = place['category']?['name'] ?? 'Địa điểm';
-                  final content = item['content'] ?? '';
+                  final placeName = (place['name'] ?? '').toString();
+                  final placeImage = (place['image'] ?? place['coverImage'] ?? '').toString();
+                  final content = (item['content'] ?? '').toString();
                   final placeIndex = placeData['index'];
+                  final cardColor = _getMarkerColor(index);
+                  final cardIcon = _getMarkerIcon(index);
                   
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 8),
@@ -220,9 +274,9 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
+                          color: Colors.black.withAlpha(25),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
                         ),
                       ],
                     ),
@@ -233,19 +287,26 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            CircleAvatar(
-                              radius: 12,
-                              backgroundColor: const Color(0xFFE53935),
-                              child: Text(
-                                '$placeIndex',
-                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: cardColor,
+                                shape: BoxShape.circle,
                               ),
+                              alignment: Alignment.center,
+                              child: cardIcon != null
+                                  ? Icon(cardIcon, color: Colors.white, size: 15)
+                                  : Text(
+                                      '$placeIndex',
+                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 placeName,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -262,23 +323,33 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  content.isNotEmpty ? content : (place['description']?.toString().isNotEmpty == true ? place['description'] : 'Đang cập nhật thông tin...'),
-                                  style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+                                  content.isNotEmpty
+                                      ? content
+                                      : (place['description']?.toString().isNotEmpty == true
+                                          ? place['description'].toString()
+                                          : 'Đang cập nhật thông tin địa điểm...'),
+                                  style: TextStyle(fontSize: 13, color: AppTheme.subtitleText, height: 1.4),
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  placeImage,
-                                  width: 60,
-                                  height: 60,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: Colors.grey[200]),
+                              if (placeImage.isNotEmpty)
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.network(
+                                    placeImage,
+                                    width: 64,
+                                    height: 64,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 64,
+                                      height: 64,
+                                      color: Colors.grey[200],
+                                      child: const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 20),
+                                    ),
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         ),
@@ -286,14 +357,17 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                         // Rating and Tripadvisor logo
                         Row(
                           children: [
-                            const Icon(Icons.star, color: Colors.orange, size: 16),
+                            const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
                             const SizedBox(width: 4),
                             Text(
-                              '${place['rating'] ?? 4.5} (${place['userRatingCount'] ?? 7609})',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                              '${place['rating'] ?? 4.5} (${place['userRatingCount'] ?? 1035})',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.darkText),
                             ),
                             const SizedBox(width: 8),
-                            Image.asset('assets/images/tripadvisor.jpg', width: 16, height: 16, fit: BoxFit.contain),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: Image.asset('assets/images/tripadvisor.jpg', width: 16, height: 16, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -301,7 +375,7 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                         // Time
                         Row(
                           children: [
-                            const Icon(Icons.access_time_filled, color: Colors.grey, size: 14),
+                            Icon(Icons.access_time_rounded, color: Colors.grey[600], size: 15),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Builder(
@@ -311,14 +385,14 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                                   return Text(
                                     hoursText,
                                     style: TextStyle(
-                                      fontSize: 13, 
-                                      color: isClosed ? Colors.red : Colors.black87,
+                                      fontSize: 12.5, 
+                                      color: isClosed ? Colors.red[700] : AppTheme.darkText,
                                       fontWeight: isClosed ? FontWeight.w600 : FontWeight.normal,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   );
-                                }
+                                },
                               ),
                             ),
                           ],
@@ -330,46 +404,91 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
-                              // Lưu
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF05141),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  children: const [
-                                    Icon(Icons.bookmark_border, color: Colors.white, size: 16),
-                                    SizedBox(width: 6),
-                                    Text('Lưu', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                                  ],
+                              // 1. Nút Lưu (Save to trip bottom sheet)
+                              InkWell(
+                                onTap: () {
+                                  SaveToTripBottomSheet.show(
+                                    context,
+                                    place,
+                                    onSaved: () {},
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.primary.withAlpha(60),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: const [
+                                      Icon(Icons.bookmark_border_rounded, color: Colors.white, size: 16),
+                                      SizedBox(width: 4),
+                                      Text('Lưu', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               
-                              // Chi tiết
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(20),
+                              // 2. Nút Chi tiết (Place detail bottom sheet)
+                              InkWell(
+                                onTap: () {
+                                  PlaceDetailBottomSheet.show(context, place);
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text('Chi tiết', style: TextStyle(color: AppTheme.darkText, fontSize: 13, fontWeight: FontWeight.bold)),
                                 ),
-                                child: const Text('Chi tiết', style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600)),
                               ),
                               const SizedBox(width: 8),
                               
-                              // Direction
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(20),
+                              // 3. Nút Chỉ đường (Google Maps / OpenStreetMap directions)
+                              InkWell(
+                                onTap: () async {
+                                  final name = (place['name'] ?? '').toString();
+                                  final address = (place['address'] ?? '').toString();
+                                  final lat = place['latitude'];
+                                  final lon = place['longitude'];
+                                  final destinationQuery = (lat != null && lon != null)
+                                      ? '$lat,$lon'
+                                      : (name.isNotEmpty ? '$name $address' : 'Cần Thơ');
+                                  final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(destinationQuery)}');
+                                  try {
+                                    if (await canLaunchUrl(url)) {
+                                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                                    } else {
+                                      await launchUrl(url);
+                                    }
+                                  } catch (e) {
+                                    debugPrint('Error launching directions: $e');
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFF1F5F9),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(Icons.directions_rounded, color: AppTheme.darkText, size: 18),
                                 ),
-                                child: const Icon(Icons.directions, color: Colors.black87, size: 16),
                               ),
                               const SizedBox(width: 8),
                               
-                              // Hỏi AI
+                              // 4. Nút Hỏi AI (AI Chat screen)
                               InkWell(
                                 onTap: () {
                                   Navigator.push(
@@ -381,16 +500,16 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                                 },
                                 borderRadius: BorderRadius.circular(20),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey[200],
+                                    color: const Color(0xFFF1F5F9),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Row(
-                                    children: const [
-                                      Icon(Icons.auto_awesome, color: Colors.black87, size: 16),
-                                      SizedBox(width: 6),
-                                      Text('Hỏi AI', style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600)),
+                                    children: [
+                                      Icon(Icons.auto_awesome, color: AppTheme.darkText, size: 16),
+                                      const SizedBox(width: 4),
+                                      Text('Hỏi AI', style: TextStyle(color: AppTheme.darkText, fontSize: 13, fontWeight: FontWeight.bold)),
                                     ],
                                   ),
                                 ),

@@ -553,7 +553,10 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => PlaceAIChatScreen(placeName: place['name'] ?? 'Địa điểm'),
+                      builder: (context) => PlaceAIChatScreen(
+                        placeName: place['name'] ?? 'Địa điểm',
+                        placeInfo: place,
+                      ),
                     ),
                   );
                 }),

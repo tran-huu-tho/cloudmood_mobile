@@ -4,22 +4,29 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'explore_post_map_screen.dart';
 import '../utils/time_utils.dart';
 import '../utils/string_utils.dart';
 import '../widgets/expandable_opening_hours.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/database_service.dart';
+import '../widgets/save_to_trip_bottom_sheet.dart';
+
 class ExplorePostDetailScreen extends StatefulWidget {
   final int? postId;
   final String title;
   final Map<String, dynamic>? post;
+  final Map<String, dynamic>? initialItinerary;
 
   const ExplorePostDetailScreen({
     Key? key,
     this.postId,
     required this.title,
     this.post,
+    this.initialItinerary,
   }) : super(key: key);
 
   @override
@@ -31,18 +38,23 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
   bool _isLoading = true;
   final Set<int> _expandedPlaces = {};
   final Set<String> _collapsedSections = {};
+  Map<int, int> _savedCounts = {};
   
   bool _isLiked = false;
   int _likeCount = 0;
   int _viewCount = 0;
 
+  String _privacySetting = 'public';
+
   @override
   void initState() {
     super.initState();
+    _loadPrivacySetting();
     if (widget.post != null) {
       _post = widget.post;
       _isLoading = false;
       _initStats();
+      _fetchSavedCounts();
       if (widget.postId != null) {
         _fetchPostDetail(silent: true);
       }
@@ -51,6 +63,145 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
     } else {
       _isLoading = false;
     }
+  }
+
+  Future<void> _loadPrivacySetting() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final itineraryId = widget.initialItinerary?['id'] ?? _post?['itineraryId'] ?? _post?['id'];
+      if (itineraryId != null) {
+        final saved = prefs.getString('privacy_$itineraryId');
+        if (saved != null && saved.isNotEmpty) {
+          if (mounted) setState(() => _privacySetting = saved);
+          return;
+        }
+      }
+      final rawPrivacy = widget.post?['privacy'] ?? widget.initialItinerary?['privacy'];
+      if (rawPrivacy != null && rawPrivacy.toString().isNotEmpty) {
+        if (mounted) setState(() => _privacySetting = rawPrivacy.toString());
+        return;
+      }
+      final isPublic = widget.initialItinerary?['isPublic'] ?? widget.post?['isPublic'];
+      if (isPublic == false) {
+        if (mounted) setState(() => _privacySetting = 'friends');
+      } else {
+        if (mounted) setState(() => _privacySetting = 'public');
+      }
+    } catch (_) {}
+  }
+
+  String get _privacyText {
+    switch (_privacySetting) {
+      case 'private':
+        return 'Chỉ mình tôi';
+      case 'friends':
+        return 'Bạn bè';
+      case 'public':
+      default:
+        return 'Công khai';
+    }
+  }
+
+  IconData get _privacyIcon {
+    switch (_privacySetting) {
+      case 'private':
+        return Icons.lock_rounded;
+      case 'friends':
+        return Icons.people_rounded;
+      case 'public':
+      default:
+        return Icons.public_rounded;
+    }
+  }
+
+  Color get _privacyColor {
+    switch (_privacySetting) {
+      case 'private':
+        return Colors.red[600]!;
+      case 'friends':
+        return const Color(0xFF16A34A);
+      case 'public':
+      default:
+        return const Color(0xFF0284C7);
+    }
+  }
+
+  List get _availableSections {
+    return widget.initialItinerary?['sections'] as List? ??
+        _post?['originalItinerary']?['sections'] as List? ??
+        _post?['itinerary']?['sections'] as List? ??
+        _post?['sections'] as List? ??
+        [];
+  }
+
+  String _resolveSectionName(List items, int itemIndex, dynamic item, dynamic place) {
+    if (item['section'] != null && item['section'].toString().isNotEmpty) {
+      return item['section'].toString();
+    }
+    if (place != null && place['section'] != null && place['section'].toString().isNotEmpty) {
+      return place['section'].toString();
+    }
+    for (int i = itemIndex; i >= 0; i--) {
+      if (i < items.length && items[i]['itemType'] == 'SECTION_HEADER' && items[i]['content'] != null) {
+        return items[i]['content'].toString();
+      }
+    }
+    return '';
+  }
+
+  Color _getSectionColor(List items, int itemIndex, dynamic item, dynamic place) {
+    final secName = _resolveSectionName(items, itemIndex, item, place);
+    final sections = _availableSections;
+    for (var sec in sections) {
+      if (sec is Map) {
+        final name = (sec['name'] ?? '').toString();
+        if ((secName.isNotEmpty && name.toLowerCase().trim() == secName.toLowerCase().trim()) || (secName.isEmpty && sections.length == 1)) {
+          if (sec['colorCode'] != null) {
+            try {
+              final val = int.parse(sec['colorCode'].toString());
+              return Color(val);
+            } catch (_) {}
+          }
+        }
+      }
+    }
+    final directColor = item['colorCode'] ?? place?['colorCode'];
+    if (directColor != null) {
+      try {
+        return Color(int.parse(directColor.toString()));
+      } catch (_) {}
+    }
+    return AppTheme.primary;
+  }
+
+  IconData? _getSectionIcon(List items, int itemIndex, dynamic item, dynamic place) {
+    final secName = _resolveSectionName(items, itemIndex, item, place);
+    final sections = _availableSections;
+    for (var sec in sections) {
+      if (sec is Map) {
+        final name = (sec['name'] ?? '').toString();
+        if ((secName.isNotEmpty && name.toLowerCase().trim() == secName.toLowerCase().trim()) || (secName.isEmpty && sections.length == 1)) {
+          if (sec['iconCode'] != null) {
+            try {
+              final rawCode = int.parse(sec['iconCode'].toString());
+              if (rawCode != 983363 && rawCode != 58055 && rawCode != 0) {
+                return IconData(rawCode, fontFamily: 'MaterialIcons');
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    }
+    final directIcon = item['iconCode'] ?? place?['iconCode'];
+    if (directIcon != null) {
+      try {
+        final rawCode = int.parse(directIcon.toString());
+        if (rawCode != 983363 && rawCode != 58055 && rawCode != 0) {
+          return IconData(rawCode, fontFamily: 'MaterialIcons');
+        }
+      } catch (_) {}
+    }
+    return null;
   }
   
   void _initStats() {
@@ -65,24 +216,111 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
     }
   }
 
+  Future<void> _fetchSavedCounts() async {
+    final user = AuthService().currentUser.value;
+    if (user != null && _post != null) {
+      final newCounts = <int, int>{};
+      final itemsRaw = _post!['items'] as List? ?? [];
+
+      if (widget.initialItinerary != null) {
+        // If initialItinerary is provided, count occurrences in its lists
+        final trip = widget.initialItinerary!;
+        final savedPlaces = trip['savedPlaces'] as List? ?? [];
+        final detailsList = trip['details'] as List? ?? [];
+        
+        for (final item in itemsRaw) {
+          if (item['itemType'] == 'PLACE') {
+            final place = item['place'];
+            if (place != null && place['id'] != null) {
+              final targetId = place['id'];
+              int listCount = 0;
+              for (var d in savedPlaces) {
+                if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+                    (d['section'] != null && d['section'].toString().isNotEmpty)) {
+                  listCount++;
+                }
+              }
+              for (var d in detailsList) {
+                if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+                    d['day'] != null) {
+                  listCount++;
+                }
+              }
+              newCounts[targetId as int] = listCount;
+            }
+          }
+        }
+      } else {
+        // Otherwise, fetch all trips and count trips
+        final trips = await DatabaseService().fetchUserItineraries(
+          int.parse(user.id.toString()),
+          isGuide: false,
+        );
+        for (final item in itemsRaw) {
+          if (item['itemType'] == 'PLACE') {
+            final place = item['place'];
+            if (place != null && place['id'] != null) {
+              final targetId = place['id'];
+              int tripsCount = 0;
+              for (var trip in trips) {
+                bool foundInTrip = false;
+                final savedPlaces = trip['savedPlaces'] as List? ?? [];
+                final detailsList = trip['details'] as List? ?? [];
+
+                for (var d in savedPlaces) {
+                  if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+                      (d['section'] != null && d['section'].toString().isNotEmpty)) {
+                    foundInTrip = true;
+                    break;
+                  }
+                }
+                if (!foundInTrip) {
+                  for (var d in detailsList) {
+                    if ((d['placeId'] ?? d['place']?['id']) == targetId &&
+                        d['day'] != null) {
+                      foundInTrip = true;
+                      break;
+                    }
+                  }
+                }
+                if (foundInTrip) {
+                  tripsCount++;
+                }
+              }
+              newCounts[targetId as int] = tripsCount;
+            }
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _savedCounts = newCounts;
+        });
+      }
+    }
+  }
+
   Future<void> _fetchPostDetail({bool silent = false}) async {
     try {
       if (!silent) {
-        setState(() => _isLoading = true);
+        if (mounted) setState(() => _isLoading = true);
       }
       final response = await ApiClient.get('/explore/${widget.postId}');
+      if (!mounted) return;
       if (response.statusCode == 200) {
         setState(() {
           _post = jsonDecode(response.body);
           _initStats();
           _isLoading = false;
         });
+        _fetchSavedCounts();
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
       print('Error fetching post details: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -146,7 +384,9 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
       );
     }
 
-    final coverImage = _post!['coverImage'] ?? 'https://via.placeholder.com/800x400';
+    final coverImage = (_post!['coverImage'] != null && _post!['coverImage'].toString().isNotEmpty && !_post!['coverImage'].toString().contains('via.placeholder.com')) 
+        ? _post!['coverImage'] 
+        : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80';
     final title = _post!['title'] ?? '';
     final description = _post!['description'] ?? '';
     
@@ -158,9 +398,12 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
         ? platformName 
         : (_post!['author']?['fullName'] ?? 'Người dùng Ẩn danh');
     
+    final authorAvatar = _post!['author']?['avatar']?.toString() ?? '';
     final avatarUrl = isPlatform 
         ? platformLogo 
-        : (_post!['author']?['avatar'] ?? 'https://via.placeholder.com/150');
+        : (authorAvatar.isNotEmpty && !authorAvatar.contains('via.placeholder.com')
+            ? authorAvatar 
+            : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80');
 
     final itemsRaw = _post!['items'] as List? ?? [];
     
@@ -181,24 +424,47 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
     int placeCounter = 1;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFC),
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
-          // Header with Cover Image and Overlaid Title
+          // 1. Hero Header with Cover Image and Overlaid Title
           SliverAppBar(
-            expandedHeight: 250,
+            expandedHeight: 280,
             pinned: true,
             backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
+            foregroundColor: Colors.white,
             elevation: 0,
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(90),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.arrow_circle_down),
-                onPressed: () {},
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(90),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_circle_down_rounded, color: Colors.white, size: 20),
+                    onPressed: () {},
+                  ),
+                ),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 16, bottom: 16, right: 16),
+              titlePadding: const EdgeInsets.only(left: 56, bottom: 16, right: 56),
               title: Text(
                 title,
                 style: const TextStyle(
@@ -208,11 +474,13 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                   shadows: [
                     Shadow(
                       offset: Offset(0, 1),
-                      blurRadius: 3.0,
-                      color: Color.fromARGB(255, 0, 0, 0),
+                      blurRadius: 4.0,
+                      color: Colors.black87,
                     ),
                   ],
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               background: Stack(
                 fit: StackFit.expand,
@@ -220,19 +488,20 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                   Image.network(
                     coverImage,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: Colors.grey[300]),
+                    errorBuilder: (_, __, ___) => Container(color: Colors.grey[800]),
                   ),
-                  // Gradient for better text readability
+                  // Dark Gradient Overlay for readability
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
+                          Colors.black.withAlpha(60),
                           Colors.transparent,
-                          Colors.black.withOpacity(0.7),
+                          Colors.black.withAlpha(220),
                         ],
-                        stops: const [0.6, 1.0],
+                        stops: const [0.0, 0.4, 1.0],
                       ),
                     ),
                   ),
@@ -241,71 +510,156 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
             ),
           ),
           
-          // Platform / Author Info Row
+          // 2. Author / Platform Info Row
           SliverToBoxAdapter(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(8),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(color: AppTheme.border.withAlpha(120)),
+              ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: Colors.grey[200],
-                    child: isPlatform 
-                        ? const Text('G', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))
-                        : null,
-                    backgroundImage: !isPlatform ? NetworkImage(avatarUrl) : null,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppTheme.primary.withAlpha(100), width: 1.5),
+                    ),
+                    child: ClipOval(
+                      child: isPlatform
+                          ? Container(
+                              color: AppTheme.primaryContainer,
+                              child: const Icon(Icons.verified_rounded, color: AppTheme.primary, size: 20),
+                            )
+                          : Image.network(
+                              avatarUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.person, color: Colors.grey),
+                              ),
+                            ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      isPlatform 
-                          ? (authorName.toLowerCase().startsWith('từ ') ? authorName : 'Từ $authorName') 
-                          : authorName,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[700],
-                        fontStyle: isPlatform ? FontStyle.italic : FontStyle.normal,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isPlatform 
+                              ? (authorName.toLowerCase().startsWith('từ ') ? authorName : 'Từ $authorName') 
+                              : authorName,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isPlatform ? 'Nguồn tổng hợp từ đối tác' : 'Tác giả bài viết',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.subtitleText,
+                          ),
+                        ),
+                        if (!isPlatform) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(_privacyIcon, size: 12, color: _privacyColor),
+                              const SizedBox(width: 4),
+                              Text(
+                                _privacyText,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: _privacyColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   if (isPlatform)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: AppTheme.primaryContainer.withAlpha(120),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Mở bài viết',
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary,
                         ),
                       ),
                     )
                   else
                     Row(
                       children: [
-                        GestureDetector(
+                        InkWell(
                           onTap: _toggleLike,
-                          child: Icon(
-                            _isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: _isLiked ? Colors.red : Colors.grey[600],
-                            size: 20,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _isLiked ? Colors.red.withAlpha(20) : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                  color: _isLiked ? Colors.red : Colors.grey[600],
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$_likeCount',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isLiked ? Colors.red : Colors.grey[800],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$_likeCount',
-                          style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-                        ),
-                        const SizedBox(width: 16),
-                        Icon(Icons.visibility_outlined, size: 20, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$_viewCount',
-                          style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.remove_red_eye_rounded, size: 16, color: Colors.grey[600]),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$_viewCount',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[800]),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -314,48 +668,68 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
             ),
           ),
           
-          // Description
+          // 3. Description Section
           if (description.isNotEmpty && !isPlatform)
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.border.withAlpha(100)),
+                ),
                 child: Text(
                   description,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: Colors.black87,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.darkText,
                     height: 1.5,
                   ),
                 ),
               ),
             ),
           
-          // List of Places/Items
+          // 4. List of Items (Places / Headers / Notes)
           SliverList(
             delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final item = items[index];
-                  final itemType = item['itemType'];
+              (context, index) {
+                final item = items[index];
+                final itemType = item['itemType'];
+                
+                if (itemType == 'PLACE') {
+                  final place = item['place'];
+                  if (place == null) return const SizedBox();
                   
-                  if (itemType == 'PLACE') {
-                    final place = item['place'];
-                    if (place == null) return const SizedBox();
-                    
-                    final placeName = place['name'] ?? '';
-                    final placeImage = place['image'] ?? 'https://via.placeholder.com/300x200';
-                    final category = place['category']?['name'] ?? 'Địa điểm';
-                    final featuredReview = item['featuredReview'];
-                    String content = item['content'] ?? '';
-                    if (content.isEmpty) {
-                      content = place['description'] ?? '';
-                    }
-                    
-                    final currentIndex = placeCounter++;
-                    int currentReviewIndex = 0;
+                  final placeName = place['name'] ?? '';
+                  final placeImage = place['image'] ?? 'https://via.placeholder.com/300x200';
+                  final category = place['category']?['name'] ?? 'Địa điểm';
+                  final featuredReview = item['featuredReview'];
+                  String content = item['content'] ?? '';
+                  if (content.isEmpty) {
+                    content = place['description'] ?? '';
+                  }
+                  
+                  final currentIndex = placeCounter++;
+                  int currentReviewIndex = 0;
 
-                    final isExpanded = _expandedPlaces.contains(currentIndex);
+                  final isExpanded = _expandedPlaces.contains(currentIndex);
 
-                    return GestureDetector(
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14, left: 16, right: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.border.withAlpha(120)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(6),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: InkWell(
                       onTap: () {
                         setState(() {
                           if (isExpanded) {
@@ -365,62 +739,128 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                           }
                         });
                       },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Padding(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey.shade200),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Column(
+                                child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Header: Index circle, Name, Thêm button
+                            // Header: Index badge, Place Name, Save Button
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CircleAvatar(
-                                  radius: 12,
-                                  backgroundColor: const Color(0xFFE53935),
-                                  child: Text(
-                                    '$currentIndex',
-                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                Builder(
+                                  builder: (context) {
+                                    final secColor = _getSectionColor(items, index, item, place);
+                                    final secIcon = _getSectionIcon(items, index, item, place);
+                                    return Container(
+                                      width: 26,
+                                      height: 26,
+                                      decoration: BoxDecoration(
+                                        color: secColor,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: secColor.withAlpha(80),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Center(
+                                        child: (secIcon == null)
+                                            ? Text(
+                                                '$currentIndex',
+                                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                              )
+                                            : Icon(
+                                                secIcon,
+                                                color: Colors.white,
+                                                size: 14,
+                                              ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 2.0),
+                                    child: Text(
+                                      placeName,
+                                      style: TextStyle(
+                                        fontSize: 16, 
+                                        fontWeight: FontWeight.w700, 
+                                        color: AppTheme.darkText,
+                                        height: 1.25,
+                                      ),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    placeName,
-                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1E1E2C),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    children: const [
-                                      Icon(Icons.bookmark_border, color: Colors.white, size: 14),
-                                      SizedBox(width: 4),
-                                      Text('Thêm', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                                    ],
-                                  ),
+                                Builder(
+                                  builder: (context) {
+                                    final placeId = place['id'] as int?;
+                                    final savedCount = (placeId != null) ? (_savedCounts[placeId] ?? 0) : 0;
+                                    final isSaved = savedCount > 0;
+                                    
+                                    final isInsideTrip = widget.initialItinerary != null;
+                                    final savedText = isSaved
+                                        ? (savedCount > 1 ? 'Đã thêm ($savedCount)' : 'Đã thêm')
+                                        : (isInsideTrip ? 'Thêm vào' : 'Lưu');
+                                    
+                                    return GestureDetector(
+                                      onTap: () {
+                                        if (placeId != null) {
+                                          SaveToTripBottomSheet.show(
+                                            context,
+                                            place,
+                                            initialItinerary: widget.initialItinerary,
+                                            onSaved: () {
+                                              _fetchSavedCounts();
+                                            },
+                                          );
+                                        }
+                                      },
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 200),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                        decoration: BoxDecoration(
+                                          color: isSaved ? Colors.grey[200] : const Color(0xFF0F172A),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              isSaved ? Icons.bookmark : Icons.bookmark_border, 
+                                              color: isSaved ? Colors.black : Colors.white, 
+                                              size: 14,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              isSaved ? savedText : 'Thêm', 
+                                              style: TextStyle(
+                                                color: isSaved ? Colors.black : Colors.white, 
+                                                fontSize: 12, 
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            if (isSaved) ...[
+                                              const SizedBox(width: 2),
+                                              const Icon(Icons.keyboard_arrow_down, color: Colors.black, size: 14),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),
                             const SizedBox(height: 12),
                             
-                            // Tags
+                            // Category Tags & Status
                             Builder(
                               builder: (context) {
                                 final hoursText = TimeUtils.getOpeningHoursText(place['openingHours']);
@@ -439,47 +879,60 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                     ],
                                   ],
                                 );
-                              }
+                              },
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 14),
                             
-                            // Description and Image
+                            // Content text & Image Thumbnail
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
                                   child: Text(
                                     content.isNotEmpty ? content : (place['description']?.toString().isNotEmpty == true ? place['description'] : 'Đang cập nhật thông tin...'),
-                                    style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.4),
+                                    style: TextStyle(
+                                      fontSize: 14, 
+                                      color: AppTheme.darkText.withAlpha(220), 
+                                      height: 1.45,
+                                    ),
+                                    maxLines: isExpanded ? null : 3,
+                                    overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12),
                                   child: Image.network(
                                     placeImage,
-                                    width: 70,
-                                    height: 70,
+                                    width: 80,
+                                    height: 80,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(width: 70, height: 70, color: Colors.grey[200]),
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 80, 
+                                      height: 80, 
+                                      color: Colors.grey[200],
+                                      child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                             
-                            // Expanded Details
+                            // Expanded Section (Reviews & Details)
                             if (isExpanded) ...[
                               const SizedBox(height: 16),
-                              if ((place['reviews'] as List?)?.isNotEmpty == true)
+                              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                              const SizedBox(height: 14),
+                              
+                              if ((place['reviews'] as List?)?.isNotEmpty == true) ...[
                                 StatefulBuilder(
                                   builder: (context, setLocalState) {
                                     final reviews = place['reviews'] as List;
-                                    final maxDots = reviews.length > 5 ? 5 : reviews.length;
 
                                     return Column(
                                       children: [
                                         SizedBox(
-                                          height: 150, // Fixed height for page view
+                                          height: 140,
                                           child: PageView.builder(
                                             controller: PageController(viewportFraction: 1.0),
                                             onPageChanged: (idx) {
@@ -490,69 +943,57 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                             itemCount: reviews.length,
                                             itemBuilder: (context, idx) {
                                               final review = reviews[idx];
-                                              return Row(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  const Text('“', style: TextStyle(fontSize: 40, color: Color(0xFFDCDCDC), height: 1.1, fontWeight: FontWeight.bold)),
-                                                  const SizedBox(width: 8),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(
-                                                          review['comment'] ?? '',
-                                                          style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.4),
-                                                          maxLines: 4,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
-                                                        const SizedBox(height: 8),
-                                                        _buildReviewStars((review['rating'] ?? 5).toDouble()),
-                                                        const SizedBox(height: 6),
-                                                        Text(
-                                                          '${review['authorName'] ?? 'Người dùng'} — đánh giá Tripadvisor',
-                                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blueAccent),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        // Dot indicator
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: List.generate(
-                                            maxDots,
-                                            (dotIdx) {
-                                              int activeDot = currentReviewIndex;
-                                              if (reviews.length > 5) {
-                                                if (currentReviewIndex > 2 && currentReviewIndex < reviews.length - 2) {
-                                                  activeDot = 2; 
-                                                } else if (currentReviewIndex >= reviews.length - 2) {
-                                                  activeDot = maxDots - (reviews.length - currentReviewIndex);
-                                                }
-                                              }
-                                              return AnimatedContainer(
-                                                duration: const Duration(milliseconds: 300),
-                                                margin: const EdgeInsets.symmetric(horizontal: 4),
-                                                width: dotIdx == activeDot ? 8 : 6,
-                                                height: dotIdx == activeDot ? 8 : 6,
+                                              return Container(
+                                                padding: const EdgeInsets.all(12),
                                                 decoration: BoxDecoration(
-                                                  color: dotIdx == activeDot ? Colors.grey[700] : Colors.grey[300],
-                                                  shape: BoxShape.circle,
+                                                  color: const Color(0xFFF8FAFC),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  border: Border.all(color: AppTheme.border.withAlpha(80)),
+                                                ),
+                                                child: Row(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Text('“', style: TextStyle(fontSize: 32, color: AppTheme.primary, height: 1.0, fontWeight: FontWeight.bold)),
+                                                    const SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            review['comment'] ?? '',
+                                                            style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.35),
+                                                            maxLines: 3,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                          const Spacer(),
+                                                          Row(
+                                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                            children: [
+                                                              _buildReviewStars((review['rating'] ?? 5).toDouble()),
+                                                              const SizedBox(width: 4),
+                                                              Flexible(
+                                                                child: Text(
+                                                                  '${review['authorName'] ?? 'Người dùng'} (Tripadvisor)',
+                                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               );
                                             },
                                           ),
                                         ),
-                                        const SizedBox(height: 16),
                                       ],
                                     );
                                   },
-                                )
-                              else if (featuredReview != null) ...[
+                                ),
+                              ] else if (featuredReview != null) ...[
                                 // Fallback to featured review if no reviews fetched
                                 const SizedBox(height: 16),
                                 Row(
@@ -572,7 +1013,6 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                           ),
                                           const SizedBox(height: 8),
                                           _buildReviewStars((featuredReview['rating'] ?? 5).toDouble()),
-                                          const SizedBox(height: 6),
                                           Text(
                                             '${featuredReview['authorName'] ?? 'Người dùng'} — đánh giá Tripadvisor',
                                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blueAccent),
@@ -585,22 +1025,46 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                 const SizedBox(height: 16),
                               ],
                               
-                              // 'Giới thiệu' button
+                              // Interactive Map button to open map and zoom location
                               Align(
                                 alignment: Alignment.centerLeft,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFEBEE),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: const [
-                                      Icon(Icons.map_rounded, color: Color(0xFFE53935), size: 16),
-                                      SizedBox(width: 6),
-                                      Text('Giới thiệu', style: TextStyle(color: Color(0xFFE53935), fontSize: 13, fontWeight: FontWeight.bold)),
-                                    ],
+                                child: GestureDetector(
+                                  onTap: () {
+                                    final placeId = place['id'] as int?;
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ExplorePostMapScreen(
+                                          title: widget.title,
+                                          items: items,
+                                          sections: _availableSections,
+                                          initialPlaceId: placeId,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.map_rounded, color: Color(0xFF1D4ED8), size: 16),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'Bản đồ',
+                                          style: TextStyle(
+                                            color: Color(0xFF1D4ED8),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -652,55 +1116,89 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                             ),
                                           );
                                         },
-                                        child: const Icon(
-                                          Icons.copy,
-                                          size: 16,
-                                          color: Colors.grey,
-                                        ),
+                                        child: const Icon(Icons.copy, size: 16, color: Colors.grey),
                                       ),
                                     ],
                                   ),
                                 ),
-                              
+
                               // Website
-                              if (place['website']?.toString().isNotEmpty == true)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Icon(Icons.language, color: Colors.grey, size: 18),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          place['website'],
-                                          style: const TextStyle(fontSize: 14, color: Colors.blue, height: 1.3),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                              Builder(
+                                builder: (context) {
+                                  final website = (place['website'] ?? place['webUrl'] ?? '').toString();
+                                  if (website.isEmpty) return const SizedBox();
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(Icons.language, color: Colors.grey, size: 18),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: GestureDetector(
+                                            onTap: () async {
+                                              final Uri url = Uri.parse(website.startsWith('http') ? website : 'https://$website');
+                                              if (await canLaunchUrl(url)) {
+                                                await launchUrl(url, mode: LaunchMode.externalApplication);
+                                              }
+                                            },
+                                            child: Text(
+                                              website,
+                                              style: const TextStyle(fontSize: 14, color: Colors.blue, height: 1.3, decoration: TextDecoration.underline),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                               
                               // Phone
-                              if (place['phone']?.toString().isNotEmpty == true)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Icon(Icons.phone, color: Colors.grey, size: 18),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          place['phone'],
-                                          style: const TextStyle(fontSize: 14, color: Colors.blue, height: 1.3),
+                              Builder(
+                                builder: (context) {
+                                  final phone = (place['phone'] ?? place['phoneNumber'] ?? place['contactPhone'] ?? '').toString();
+                                  if (phone.isEmpty) return const SizedBox();
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(Icons.phone, color: Colors.grey, size: 18),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: GestureDetector(
+                                            onTap: () async {
+                                              final Uri phoneUri = Uri(scheme: 'tel', path: phone);
+                                              if (await canLaunchUrl(phoneUri)) {
+                                                await launchUrl(phoneUri);
+                                              }
+                                            },
+                                            child: Text(
+                                              phone,
+                                              style: const TextStyle(fontSize: 14, color: Colors.blue, height: 1.3),
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                        GestureDetector(
+                                          onTap: () {
+                                            Clipboard.setData(ClipboardData(text: phone));
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Đã sao chép số điện thoại'),
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+                                          },
+                                          child: const Icon(Icons.copy, size: 16, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                               
                               const SizedBox(height: 8),
                             ] else ...[
@@ -746,7 +1244,8 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                           ],
                         ),
                       ),
-                    );
+                    ),
+                  );
                   } else if (itemType == 'SECTION_HEADER') {
                     final bool isFirstSection = index == 0 || items.take(index).where((it) => it['itemType'] == 'SECTION_HEADER').isEmpty;
                     return Column(

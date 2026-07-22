@@ -196,10 +196,27 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
               _mapCenter = LatLng(lat, lon);
             });
           }
+        } else {
+          if (mounted) {
+            setState(() {
+              _mapCenter = const LatLng(16.047079, 108.206230);
+            });
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _mapCenter = const LatLng(16.047079, 108.206230);
+          });
         }
       }
     } catch (e) {
       debugPrint('Error fetching map: $e');
+      if (mounted) {
+        setState(() {
+          _mapCenter = const LatLng(16.047079, 108.206230);
+        });
+      }
     }
   }
 
@@ -683,32 +700,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                   ),
           ),
 
-          // 2. Map Action Buttons (Hidden when full screen)
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutCubic,
-            top: topPadding + 70,
-            right: _isFullScreen ? -60 : 16, // Slides in/out from the right
-            child: Column(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: IconButton(
-                    icon: Icon(Icons.search, color: AppTheme.darkText),
-                    onPressed: () {},
-                  ),
-                ),
-                const SizedBox(height: 12),
-                CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: IconButton(
-                    icon: Icon(Icons.layers_outlined, color: AppTheme.darkText),
-                    onPressed: () {},
-                  ),
-                ),
-              ],
-            ),
-          ),
+
 
           // 3. Dynamic Custom Header (AppBar / Floating Header)
           AnimatedContainer(

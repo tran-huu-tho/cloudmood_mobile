@@ -2116,9 +2116,9 @@ class _ProfileDashboardState extends State<ProfileDashboard>
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => GuideOverviewScreen(itinerary: guide),
+                builder: (context) => TripOverviewScreen(itinerary: guide),
               ),
-            );
+            ).then((_) => _loadData());
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 14),

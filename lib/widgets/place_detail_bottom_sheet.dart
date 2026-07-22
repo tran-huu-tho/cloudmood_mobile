@@ -413,7 +413,8 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: (imageUrl.startsWith('data:image/') &&
+                      child:
+                          (imageUrl.startsWith('data:image/') &&
                               imageUrl.contains('base64,'))
                           ? Image.memory(
                               base64Decode(imageUrl.split('base64,').last),
@@ -483,7 +484,10 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => PlaceAIChatScreen(placeName: widget.place['name'] ?? 'Địa điểm'),
+                      builder: (context) => PlaceAIChatScreen(
+                        placeName: widget.place['name'] ?? 'Địa điểm',
+                        placeInfo: widget.place,
+                      ),
                     ),
                   );
                 },

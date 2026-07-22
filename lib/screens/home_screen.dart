@@ -277,10 +277,7 @@ class MoodSelectorWidget extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: Row(
             children: [
-              Text(
-                'Tâm trạng hôm nay',
-                style: AppTheme.sectionTitleStyle,
-              ),
+              Text('Tâm trạng hôm nay', style: AppTheme.sectionTitleStyle),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -423,10 +420,7 @@ class FeaturedGuidesSection extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Hướng dẫn nổi bật',
-                style: AppTheme.sectionTitleStyle,
-              ),
+              Text('Hướng dẫn nổi bật', style: AppTheme.sectionTitleStyle),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -710,10 +704,7 @@ class WeekendTripsSection extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Chuyến đi cuối tuần',
-                style: AppTheme.sectionTitleStyle,
-              ),
+              Text('Chuyến đi cuối tuần', style: AppTheme.sectionTitleStyle),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
