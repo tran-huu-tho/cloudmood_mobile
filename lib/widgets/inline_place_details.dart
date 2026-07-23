@@ -8,6 +8,8 @@ import 'package:file_picker/file_picker.dart';
 import '../theme/app_theme.dart';
 import '../screens/place_ai_chat_screen.dart';
 import '../services/database_service.dart';
+import '../services/itinerary_socket_service.dart';
+import '../services/auth_service.dart';
 import '../utils/time_utils.dart';
 import '../utils/string_utils.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -169,8 +171,19 @@ class _InlinePlaceWhiteCardExtensionState
   }
 
   void _onNoteChanged(String val) {
+    final itinId = widget.detail['itineraryId'] as int?;
+    final detailId = widget.detail['id'] as int?;
+    if (itinId != null && detailId != null) {
+      ItinerarySocketService().sendTypingNote(
+        itineraryId: itinId,
+        noteId: detailId,
+        text: val,
+        isItineraryDetail: widget.isItineraryDetail,
+        userId: AuthService().currentUser.value?.id?.toString(),
+      );
+    }
     if (_noteDebounce?.isActive ?? false) _noteDebounce!.cancel();
-    _noteDebounce = Timer(const Duration(milliseconds: 1000), () {
+    _noteDebounce = Timer(const Duration(milliseconds: 800), () {
       _updateField({'noteText': val});
     });
   }

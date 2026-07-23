@@ -12,6 +12,7 @@ import 'screens/profile_screen.dart';
 import 'screens/create_itinerary_wizard_sheet.dart';
 import 'screens/create_guide_wizard_sheet.dart';
 import 'screens/trip_overview_screen.dart';
+import 'screens/trip_ai_chat_screen.dart';
 import 'services/database_service.dart';
 import 'services/auth_service.dart';
 
@@ -129,6 +130,12 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
         .then((result) {
           if (result == 'create_itinerary') {
             _openCreateItinerarySheet();
+          } else if (result == 'ai_chat') {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const TripAIChatScreen(destination: 'Đà Nẵng'),
+              ),
+            );
           } else if (result == 'create_guide') {
             _openCreateGuideSheet();
           }

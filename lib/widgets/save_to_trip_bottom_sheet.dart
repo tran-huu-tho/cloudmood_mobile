@@ -178,10 +178,12 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
     final daysToAdd = _localSelectedDays.difference(originalDayNums);
     final daysToRemove = originalDayNums.difference(_localSelectedDays);
 
+    final List<Future> tasks = [];
+
     for (var sec in sectionsToRemove) {
       final savedId = _originalSections[sec];
       if (savedId != null) {
-        await DatabaseService().deletePlaceFromSaved(savedId);
+        tasks.add(DatabaseService().deletePlaceFromSaved(savedId));
       }
     }
     for (var sec in sectionsToAdd) {
@@ -193,18 +195,18 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
         final ord = d['sortOrder'] ?? 0;
         if (ord > maxOrder) maxOrder = ord;
       }
-      await DatabaseService().addPlaceToSaved(
+      tasks.add(DatabaseService().addPlaceToSaved(
         itineraryId: _selectedItinerary!['id'],
         placeId: targetPlaceId,
         section: sec,
         sortOrder: maxOrder + 1,
-      );
+      ));
     }
 
     for (var day in daysToRemove) {
       final detailId = _originalDays[day];
       if (detailId != null) {
-        await DatabaseService().deletePlaceFromItinerary(detailId);
+        tasks.add(DatabaseService().deletePlaceFromItinerary(detailId));
       }
     }
     for (var day in daysToAdd) {
@@ -214,13 +216,16 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
         final ord = d['sortOrder'] ?? 0;
         if (ord > maxOrder) maxOrder = ord;
       }
-      await DatabaseService().addPlaceToItinerary(
+      tasks.add(DatabaseService().addPlaceToItinerary(
         itineraryId: _selectedItinerary!['id'],
         day: day,
         placeId: targetPlaceId,
         sortOrder: maxOrder + 1,
-      );
+      ));
     }
+
+    // Thực thi song song tất cả tác vụ cùng một lúc
+    await Future.wait(tasks);
 
     widget.onSaved();
     if (mounted) {

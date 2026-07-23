@@ -1005,30 +1005,6 @@ class CreateMenuOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, String>> templates = [
-      {
-        'title': 'Đà Lạt Mộng Mơ 3N2Đ',
-        'mood': '🏖️ Thư giãn',
-        'duration': '3 ngày',
-        'image':
-            'https://images.unsplash.com/photo-1583244532610-2a234e7c3eca?w=200&auto=format&fit=crop&q=80',
-      },
-      {
-        'title': 'Chinh Phục Mã Pí Lèng',
-        'mood': '⛰️ Phiêu lưu',
-        'duration': '4 ngày',
-        'image':
-            'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&auto=format&fit=crop&q=80',
-      },
-      {
-        'title': 'Bản Đồ Food Tour Hội An',
-        'mood': '🍲 Ẩm thực',
-        'duration': '2 ngày',
-        'image':
-            'https://images.unsplash.com/photo-1528127269322-539801943592?w=200&auto=format&fit=crop&q=80',
-      },
-    ];
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -1142,6 +1118,24 @@ class CreateMenuOverlay extends StatelessWidget {
                               const SizedBox(height: 14),
                               _buildOverlayCard(
                                 context: context,
+                                icon: Icons.auto_awesome_rounded,
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                title: 'Lên kế hoạch với trợ lý AI',
+                                subtitle:
+                                    'Trò chuyện cùng Trợ lý AI thông minh để gợi ý địa điểm, lịch trình tối ưu theo ý muốn.',
+                                actionText: 'Hỏi Trợ lý AI →',
+                                actionColor: const Color(0xFF8E2DE2),
+                                onTap: () {
+                                  Navigator.of(context).pop('ai_chat');
+                                },
+                              ),
+                              const SizedBox(height: 14),
+                              _buildOverlayCard(
+                                context: context,
                                 icon: Icons.explore_rounded,
                                 gradient: AppTheme.accentGradient,
                                 title: 'Viết hướng dẫn du lịch',
@@ -1156,173 +1150,9 @@ class CreateMenuOverlay extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 32),
                       ],
                     ),
-                  ),
-                ),
-                // Quick templates section
-                Container(
-                  padding: const EdgeInsets.fromLTRB(0, 20, 0, 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(190),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(32),
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withAlpha(200),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: AppTheme.lightAmber,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.bolt_rounded,
-                                color: AppTheme.amber,
-                                size: 16,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Bắt đầu nhanh với mẫu có sẵn',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.darkText,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        height: 95,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                          itemCount: templates.length,
-                          itemBuilder: (context, index) {
-                            final tmpl = templates[index];
-                            return GestureDetector(
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Đang tải mẫu: ${tmpl['title']}',
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                width: 225,
-                                margin: const EdgeInsets.only(right: 12),
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(10),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                  border: Border.all(
-                                    color: AppTheme.border,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        tmpl['image']!,
-                                        width: 60,
-                                        height: 75,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (c, e, s) => Container(
-                                          width: 60,
-                                          height: 75,
-                                          decoration: BoxDecoration(
-                                            gradient: AppTheme.primaryGradient,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            tmpl['title']!,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppTheme.darkText,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 5),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 7,
-                                              vertical: 3,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppTheme.surfaceVariant,
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              tmpl['mood']!,
-                                              style: TextStyle(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppTheme.bodyText,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            tmpl['duration']!,
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: AppTheme.subtitleText,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],

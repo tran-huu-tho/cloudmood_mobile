@@ -745,4 +745,107 @@ class DatabaseService {
       return [];
     }
   }
+
+  // --- API CHIA SẺ & QUẢN LÝ THÀNH VIÊN ---
+
+  /// Mời chỉnh sửa qua Email (EDITOR)
+  Future<Map<String, dynamic>?> inviteByEmail(int itineraryId, String email) async {
+    try {
+      final response = await ApiClient.post(
+        '/itineraries/$itineraryId/invite-email',
+        body: {'email': email},
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return {'success': false, 'message': jsonDecode(response.body)['message'] ?? 'Lỗi gửi lời mời'};
+    } catch (e) {
+      debugPrint('Error inviteByEmail: $e');
+      return {'success': false, 'message': 'Không thể kết nối đến máy chủ'};
+    }
+  }
+
+  /// Lấy Link chia sẻ qua Mạng xã hội (VIEWER)
+  Future<Map<String, dynamic>?> getShareLink(int itineraryId) async {
+    try {
+      final response = await ApiClient.post('/itineraries/$itineraryId/share-link');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getShareLink: $e');
+      return null;
+    }
+  }
+
+  /// Xác nhận lời mời (Token)
+  Future<Map<String, dynamic>?> acceptInvite(String token) async {
+    try {
+      final response = await ApiClient.get('/itineraries/accept-invite?token=$token');
+      if (response.statusCode == 200) {
+        refreshTrigger.value++;
+        return jsonDecode(response.body);
+      }
+      return {'success': false, 'message': jsonDecode(response.body)['message'] ?? 'Lỗi xác nhận'};
+    } catch (e) {
+      debugPrint('Error acceptInvite: $e');
+      return {'success': false, 'message': 'Không thể kết nối'};
+    }
+  }
+
+  /// Lấy danh sách thành viên chuyến đi
+  Future<Map<String, dynamic>?> getItineraryMembers(int itineraryId) async {
+    try {
+      final response = await ApiClient.get('/itineraries/$itineraryId/members');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getItineraryMembers: $e');
+      return null;
+    }
+  }
+
+  /// Cập nhật quyền hạn thành viên (OWNER)
+  Future<bool> updateMemberRole(int itineraryId, String targetUserId, String newRole) async {
+    try {
+      final response = await ApiClient.put(
+        '/itineraries/$itineraryId/members/$targetUserId',
+        body: {'role': newRole},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error updateMemberRole: $e');
+      return false;
+    }
+  }
+
+  /// Xóa thành viên khỏi chuyến đi (OWNER)
+  Future<bool> removeMember(int itineraryId, String targetUserId) async {
+    try {
+      final response = await ApiClient.delete('/itineraries/$itineraryId/members/$targetUserId');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error removeMember: $e');
+      return false;
+    }
+  }
+
+  /// Sao chép chuyến đi (Duplicate)
+  Future<Map<String, dynamic>?> duplicateItinerary(int itineraryId) async {
+    try {
+      final response = await ApiClient.post('/itineraries/$itineraryId/duplicate');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        refreshTrigger.value++;
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error duplicateItinerary: $e');
+      return null;
+    }
+  }
 }
+
