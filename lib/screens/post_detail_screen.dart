@@ -484,6 +484,19 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         });
         _commentFocusNode.unfocus();
         _fetchDetails();
+      } else {
+        String errorMsg = 'Gửi bình luận thất bại. Vui lòng thử lại.';
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData['message'] != null) {
+            errorMsg = errorData['message'].toString();
+          }
+        } catch (_) {}
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMsg)),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Error sending/editing comment: $e');
@@ -847,6 +860,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                                 color: Colors.grey[500],
                                               ),
                                             ),
+                                            if (comment['editedAt'] != null) ...[
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '• Đã chỉnh sửa',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.grey[500],
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                            ],
                                           ],
                                         ),
                                         if (AuthService().currentUser.value != null)

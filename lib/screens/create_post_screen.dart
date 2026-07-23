@@ -156,7 +156,21 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           Navigator.of(context).pop(true); // Trở về và báo cập nhật
         }
       } else {
-        throw Exception('Server returned ${response.statusCode}');
+        String errorMsg = 'Đăng bài thất bại. Vui lòng thử lại.';
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData['message'] != null) {
+            errorMsg = errorData['message'].toString();
+          }
+        } catch (_) {}
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMsg)),
+          );
+        }
+        setState(() {
+          _isUploading = false;
+        });
       }
     } catch (e) {
       debugPrint('Error creating post: $e');

@@ -1240,7 +1240,18 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
           }
         });
       } else {
-        throw Exception('Server returned ${response.statusCode}');
+        String errorMsg = 'Cập nhật bài viết thất bại.';
+        try {
+          final errorData = jsonDecode(response.body);
+          if (errorData['message'] != null) {
+            errorMsg = errorData['message'].toString();
+          }
+        } catch (_) {}
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMsg)),
+          );
+        }
       }
     } catch (e) {
       // Close loading dialog if open
