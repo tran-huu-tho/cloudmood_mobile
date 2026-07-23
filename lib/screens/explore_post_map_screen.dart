@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
 import '../theme/app_theme.dart';
 import 'place_ai_chat_screen.dart';
 import '../utils/time_utils.dart';
@@ -33,6 +34,70 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
   List<Map<String, dynamic>> _places = [];
   int _selectedIndex = 0;
   LatLng? _mapCenter;
+  LatLng? _userLocation;
+  bool _isLocating = false;
+
+  Future<void> _goToMyLocation() async {
+    setState(() {
+      _isLocating = true;
+    });
+
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        setState(() { _isLocating = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Dịch vụ vị trí bị tắt. Vui lòng bật GPS trên thiết bị.')),
+        );
+      }
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        if (mounted) {
+          setState(() { _isLocating = false; });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Quyền truy cập vị trí bị từ chối.')),
+          );
+        }
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        setState(() { _isLocating = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Quyền vị trí bị từ chối vĩnh viễn, hãy bật lại trong Cài đặt.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      if (mounted) {
+        final userLatLng = LatLng(position.latitude, position.longitude);
+        setState(() {
+          _userLocation = userLatLng;
+          _isLocating = false;
+        });
+        _mapController.move(userLatLng, 16.0);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() { _isLocating = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể lấy vị trí hiện tại: $e')),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -44,7 +109,8 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           final loc = _places[_selectedIndex]['location'] as LatLng;
-          _mapController.move(loc, widget.initialPlaceId != null ? 16.0 : 14.5);
+          final targetZoom = widget.initialPlaceId != null ? 16.0 : 14.5;
+          _mapController.move(_getAdjustedCenter(loc, zoom: targetZoom), targetZoom);
         }
       });
     }
@@ -119,6 +185,13 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
     return null;
   }
 
+  LatLng _getAdjustedCenter(LatLng loc, {double zoom = 15.0}) {
+    // Offset latitude south so the location renders higher up on the visible map screen area
+    // (above the bottom place card)
+    double latOffset = 0.0038 * (15.0 / zoom);
+    return LatLng(loc.latitude - latOffset, loc.longitude);
+  }
+
   void _extractPlaces() {
     int counter = 1;
     int targetIndex = 0;
@@ -145,7 +218,9 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
 
     _selectedIndex = targetIndex;
     if (_places.isNotEmpty) {
-      _mapCenter = _places[_selectedIndex]['location'];
+      final loc = _places[_selectedIndex]['location'] as LatLng;
+      final targetZoom = widget.initialPlaceId != null ? 16.0 : 14.5;
+      _mapCenter = _getAdjustedCenter(loc, zoom: targetZoom);
     } else {
       _mapCenter = const LatLng(10.0452, 105.7469); // Default Can Tho
     }
@@ -156,7 +231,7 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
       _selectedIndex = index;
     });
     final loc = _places[index]['location'] as LatLng;
-    _mapController.move(loc, 15.0);
+    _mapController.move(_getAdjustedCenter(loc, zoom: 15.0), 15.0);
   }
 
   void _onMarkerTapped(int index) {
@@ -170,12 +245,6 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0.5,
-      ),
       body: Stack(
         children: [
           // FlutterMap
@@ -192,56 +261,260 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                   userAgentPackageName: 'com.cloudmood.app',
                 ),
                 MarkerLayer(
-                  markers: _places.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final placeData = entry.value;
-                    final isSelected = index == _selectedIndex;
-                    final markerColor = _getMarkerColor(index);
-                    final markerIcon = _getMarkerIcon(index);
-                    
-                    return Marker(
-                      point: placeData['location'],
-                      width: isSelected ? 48 : 36,
-                      height: isSelected ? 48 : 36,
-                      child: GestureDetector(
-                        onTap: () => _onMarkerTapped(index),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                  markers: (() {
+                    final sortedEntries = _places.asMap().entries.toList();
+                    sortedEntries.sort((a, b) {
+                      if (a.key == _selectedIndex) return 1;
+                      if (b.key == _selectedIndex) return -1;
+                      return a.key.compareTo(b.key);
+                    });
+                    final list = sortedEntries.map((entry) {
+                      final index = entry.key;
+                      final placeData = entry.value;
+                      final isSelected = index == _selectedIndex;
+                      final markerColor = _getMarkerColor(index);
+                      final markerIcon = _getMarkerIcon(index);
+                      
+                      return Marker(
+                        point: placeData['location'],
+                        width: isSelected ? 48 : 36,
+                        height: isSelected ? 48 : 36,
+                        child: GestureDetector(
+                          onTap: () => _onMarkerTapped(index),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            decoration: BoxDecoration(
+                              color: markerColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: isSelected ? 3.0 : 2.0),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: markerColor.withAlpha(isSelected ? 100 : 60),
+                                  blurRadius: isSelected ? 12 : 4,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: markerIcon != null
+                                  ? Icon(
+                                      markerIcon,
+                                      color: Colors.white,
+                                      size: isSelected ? 24 : 18,
+                                    )
+                                  : Text(
+                                      '${placeData['index']}',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: isSelected ? 18 : 14,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList();
+
+                    if (_userLocation != null) {
+                      list.add(
+                        Marker(
+                          point: _userLocation!,
+                          width: 40,
+                          height: 40,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent.withAlpha(50),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 3),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black26,
+                                      blurRadius: 4,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return list;
+                  })(),
+                ),
+              ],
+            ),
+          
+          // Modern Floating Header Bar
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    // Back Button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => Navigator.maybePop(context),
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          width: 44,
+                          height: 44,
                           decoration: BoxDecoration(
-                            color: markerColor,
+                            color: Colors.white.withOpacity(0.92),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: isSelected ? 3.0 : 2.0),
+                            border: Border.all(color: Colors.white.withOpacity(0.8), width: 1.5),
                             boxShadow: [
                               BoxShadow(
-                                color: markerColor.withAlpha(isSelected ? 100 : 60),
-                                blurRadius: isSelected ? 12 : 4,
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.arrow_back_rounded,
+                              color: Color(0xFF1E293B),
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    
+                    // Title Card
+                    Expanded(
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.92),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.white.withOpacity(0.8), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.12),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [AppTheme.primary, AppTheme.primary.withRed(230)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.map_rounded,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.title,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A),
+                                      letterSpacing: 0.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (_places.isNotEmpty)
+                                    Text(
+                                      '${_places.length} địa điểm trên bản đồ',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppTheme.subtitleText,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    
+                    // Location Button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _isLocating ? null : _goToMyLocation,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.92),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white.withOpacity(0.8), width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 10,
                                 offset: const Offset(0, 3),
                               ),
                             ],
                           ),
                           child: Center(
-                            child: markerIcon != null
-                                ? Icon(
-                                    markerIcon,
-                                    color: Colors.white,
-                                    size: isSelected ? 24 : 18,
-                                  )
-                                : Text(
-                                    '${placeData['index']}',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isSelected ? 18 : 14,
+                            child: _isLocating
+                                ? SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppTheme.primary,
                                     ),
+                                  )
+                                : Icon(
+                                    Icons.my_location_rounded,
+                                    color: AppTheme.primary,
+                                    size: 20,
                                   ),
                           ),
                         ),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
+          ),
           
           // Bottom Place Cards
           if (_places.isNotEmpty)

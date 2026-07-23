@@ -67,11 +67,11 @@ class DatabaseService {
       if (amenities != null && amenities.isNotEmpty) {
         params.add('amenities=${Uri.encodeComponent(amenities.join(','))}');
       }
-      
+
       if (params.isNotEmpty) {
         endpoint += '?${params.join('&')}';
       }
-      
+
       final response = await ApiClient.get(endpoint);
       if (response.statusCode == 200) {
         return List<Map<String, dynamic>>.from(jsonDecode(response.body));
@@ -119,7 +119,8 @@ class DatabaseService {
         endpoint += '&categoryName=${Uri.encodeComponent(categoryName)}';
       }
       if (priceLevels != null && priceLevels.isNotEmpty) {
-        endpoint += '&priceLevels=${Uri.encodeComponent(priceLevels.join(','))}';
+        endpoint +=
+            '&priceLevels=${Uri.encodeComponent(priceLevels.join(','))}';
       }
       if (minRating != null) {
         endpoint += '&minRating=$minRating';
@@ -139,7 +140,10 @@ class DatabaseService {
   }
 
   /// Searches for images from the backend based on query and page
-  Future<Map<String, dynamic>> searchWebImages(String query, {int page = 1}) async {
+  Future<Map<String, dynamic>> searchWebImages(
+    String query, {
+    int page = 1,
+  }) async {
     try {
       final response = await ApiClient.get(
         '/explore/images/search?query=${Uri.encodeComponent(query)}&page=$page',
@@ -225,6 +229,21 @@ class DatabaseService {
       return false;
     } catch (e) {
       debugPrint('Error updating itinerary: $e');
+      return false;
+    }
+  }
+
+  /// Deletes an itinerary by id
+  Future<bool> deleteItinerary(int id) async {
+    try {
+      final response = await ApiClient.delete('/itineraries/$id');
+      if (response.statusCode == 200) {
+        refreshTrigger.value++;
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error deleting itinerary: $e');
       return false;
     }
   }
@@ -712,7 +731,9 @@ class DatabaseService {
   }
 
   /// Fetches explore posts mentioning a specific place by its ID
-  Future<List<Map<String, dynamic>>> fetchExplorePostsByPlace(int placeId) async {
+  Future<List<Map<String, dynamic>>> fetchExplorePostsByPlace(
+    int placeId,
+  ) async {
     try {
       final response = await ApiClient.get('/explore/by-place/$placeId');
       if (response.statusCode == 200) {

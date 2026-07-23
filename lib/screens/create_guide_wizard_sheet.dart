@@ -31,6 +31,10 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
 
   final List<Map<String, String>> _popularDestinations = [
     {
+      'name': 'Cần Thơ',
+      'image': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&auto=format&fit=crop&q=80',
+    },
+    {
       'name': 'Đà Nẵng',
       'image': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=200&auto=format&fit=crop&q=80',
     },
@@ -60,7 +64,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
     },
     {
       'name': 'Hà Nội',
-      'image': 'https://images.unsplash.com/photo-1591222405459-a1e2e0e5e97d?w=200&auto=format&fit=crop&q=80',
+      'image': 'https://images.unsplash.com/photo-1528127269322-539801943592?w=200&auto=format&fit=crop&q=80',
     },
     {
       'name': 'Hồ Chí Minh',
@@ -103,6 +107,63 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
       debugPrint('Error searching: $e');
     } finally {
       setState(() => _isLoadingSearch = false);
+    }
+  }
+
+  Future<void> _selectDestination(String destinationName) async {
+    setState(() => _isSaving = true);
+    final isSupported = await DatabaseService().isDestinationSupported(destinationName);
+    setState(() => _isSaving = false);
+
+    if (isSupported) {
+      setState(() {
+        _selectedDestination = destinationName;
+        _searchResults = [];
+        _searchController.clear();
+      });
+      _loadPlacesForDestination(destinationName);
+    } else {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: AppTheme.amber,
+                  size: 28,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Chưa Hỗ Trợ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Text(
+              'Rất tiếc, CloudMood hiện chưa hỗ trợ thiết lập hướng dẫn tại "$destinationName".\n\n'
+              'Hãy thử trải nghiệm các địa điểm đã có sẵn dữ liệu của chúng tôi như: Cần Thơ, Đà Nẵng, Hà Nội, Hội An, Đà Lạt, Bali, Singapore...',
+              style: const TextStyle(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Chọn địa điểm khác',
+                  style: TextStyle(
+                    color: AppTheme.amber,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -154,7 +215,55 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
       );
       return;
     }
+
     setState(() => _isSaving = true);
+    final isSupported = await DatabaseService().isDestinationSupported(_selectedDestination);
+    if (!isSupported) {
+      setState(() => _isSaving = false);
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: AppTheme.amber,
+                  size: 28,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Chưa Hỗ Trợ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Text(
+              'Rất tiếc, CloudMood hiện chưa hỗ trợ thiết lập hướng dẫn tại "$_selectedDestination".\n\n'
+              'Hãy thử trải nghiệm các địa điểm đã có sẵn dữ liệu của chúng tôi như: Cần Thơ, Đà Nẵng, Hà Nội, Hội An, Đà Lạt, Bali, Singapore...',
+              style: const TextStyle(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Chọn địa điểm khác',
+                  style: TextStyle(
+                    color: AppTheme.amber,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       final result = await DatabaseService().createUserItinerary(
         userId: widget.userId,
@@ -509,12 +618,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                              style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
                           ),
                           onTap: () {
-                            setState(() {
-                              _selectedDestination = shortName;
-                              _searchResults = [];
-                              _searchController.clear();
-                            });
-                            _loadPlacesForDestination(shortName);
+                            _selectDestination(shortName);
                           },
                         ),
                         );
@@ -559,7 +663,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                             ),
                           ),
 
-                        // Popular destinations chips
+                        // Popular destinations text chips
                         Text(
                           'Điểm đến phổ biến',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.subtitleText),
@@ -569,17 +673,17 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                           spacing: 10,
                           runSpacing: 10,
                           children: _popularDestinations.map((dest) {
-                            final isSelected = _selectedDestination == dest['name'];
+                            final String name = dest['name']!;
+                            final isSelected = _selectedDestination == name;
                             return GestureDetector(
                               onTap: () {
-                                setState(() => _selectedDestination = dest['name']!);
-                                _loadPlacesForDestination(dest['name']!);
+                                _selectDestination(name);
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 decoration: BoxDecoration(
                                   color: isSelected ? AppTheme.amber : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: isSelected ? AppTheme.amber : AppTheme.border,
                                     width: isSelected ? 2 : 1,
@@ -588,14 +692,17 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.place_rounded, size: 14,
-                                        color: isSelected ? Colors.white : AppTheme.subtitleText),
-                                    const SizedBox(width: 6),
+                                    Icon(
+                                      Icons.location_on_rounded,
+                                      size: 16,
+                                      color: isSelected ? Colors.white : AppTheme.amber,
+                                    ),
+                                    const SizedBox(width: 8),
                                     Text(
-                                      dest['name']!,
+                                      name,
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
                                         color: isSelected ? Colors.white : AppTheme.darkText,
                                       ),
                                     ),

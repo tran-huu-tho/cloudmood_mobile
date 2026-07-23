@@ -30,7 +30,8 @@ class ExplorePostDetailScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _ExplorePostDetailScreenState createState() => _ExplorePostDetailScreenState();
+  _ExplorePostDetailScreenState createState() =>
+      _ExplorePostDetailScreenState();
 }
 
 class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
@@ -39,7 +40,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
   final Set<int> _expandedPlaces = {};
   final Set<String> _collapsedSections = {};
   Map<int, int> _savedCounts = {};
-  
+
   bool _isLiked = false;
   int _likeCount = 0;
   int _viewCount = 0;
@@ -68,7 +69,10 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
   Future<void> _loadPrivacySetting() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final itineraryId = widget.initialItinerary?['id'] ?? _post?['itineraryId'] ?? _post?['id'];
+      final itineraryId =
+          widget.initialItinerary?['id'] ??
+          _post?['itineraryId'] ??
+          _post?['id'];
       if (itineraryId != null) {
         final saved = prefs.getString('privacy_$itineraryId');
         if (saved != null && saved.isNotEmpty) {
@@ -76,12 +80,14 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
           return;
         }
       }
-      final rawPrivacy = widget.post?['privacy'] ?? widget.initialItinerary?['privacy'];
+      final rawPrivacy =
+          widget.post?['privacy'] ?? widget.initialItinerary?['privacy'];
       if (rawPrivacy != null && rawPrivacy.toString().isNotEmpty) {
         if (mounted) setState(() => _privacySetting = rawPrivacy.toString());
         return;
       }
-      final isPublic = widget.initialItinerary?['isPublic'] ?? widget.post?['isPublic'];
+      final isPublic =
+          widget.initialItinerary?['isPublic'] ?? widget.post?['isPublic'];
       if (isPublic == false) {
         if (mounted) setState(() => _privacySetting = 'friends');
       } else {
@@ -134,28 +140,44 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
         [];
   }
 
-  String _resolveSectionName(List items, int itemIndex, dynamic item, dynamic place) {
+  String _resolveSectionName(
+    List items,
+    int itemIndex,
+    dynamic item,
+    dynamic place,
+  ) {
     if (item['section'] != null && item['section'].toString().isNotEmpty) {
       return item['section'].toString();
     }
-    if (place != null && place['section'] != null && place['section'].toString().isNotEmpty) {
+    if (place != null &&
+        place['section'] != null &&
+        place['section'].toString().isNotEmpty) {
       return place['section'].toString();
     }
     for (int i = itemIndex; i >= 0; i--) {
-      if (i < items.length && items[i]['itemType'] == 'SECTION_HEADER' && items[i]['content'] != null) {
+      if (i < items.length &&
+          items[i]['itemType'] == 'SECTION_HEADER' &&
+          items[i]['content'] != null) {
         return items[i]['content'].toString();
       }
     }
     return '';
   }
 
-  Color _getSectionColor(List items, int itemIndex, dynamic item, dynamic place) {
+  Color _getSectionColor(
+    List items,
+    int itemIndex,
+    dynamic item,
+    dynamic place,
+  ) {
     final secName = _resolveSectionName(items, itemIndex, item, place);
     final sections = _availableSections;
     for (var sec in sections) {
       if (sec is Map) {
         final name = (sec['name'] ?? '').toString();
-        if ((secName.isNotEmpty && name.toLowerCase().trim() == secName.toLowerCase().trim()) || (secName.isEmpty && sections.length == 1)) {
+        if ((secName.isNotEmpty &&
+                name.toLowerCase().trim() == secName.toLowerCase().trim()) ||
+            (secName.isEmpty && sections.length == 1)) {
           if (sec['colorCode'] != null) {
             try {
               final val = int.parse(sec['colorCode'].toString());
@@ -174,13 +196,20 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
     return AppTheme.primary;
   }
 
-  IconData? _getSectionIcon(List items, int itemIndex, dynamic item, dynamic place) {
+  IconData? _getSectionIcon(
+    List items,
+    int itemIndex,
+    dynamic item,
+    dynamic place,
+  ) {
     final secName = _resolveSectionName(items, itemIndex, item, place);
     final sections = _availableSections;
     for (var sec in sections) {
       if (sec is Map) {
         final name = (sec['name'] ?? '').toString();
-        if ((secName.isNotEmpty && name.toLowerCase().trim() == secName.toLowerCase().trim()) || (secName.isEmpty && sections.length == 1)) {
+        if ((secName.isNotEmpty &&
+                name.toLowerCase().trim() == secName.toLowerCase().trim()) ||
+            (secName.isEmpty && sections.length == 1)) {
           if (sec['iconCode'] != null) {
             try {
               final rawCode = int.parse(sec['iconCode'].toString());
@@ -203,12 +232,12 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
     }
     return null;
   }
-  
+
   void _initStats() {
     if (_post == null) return;
     _likeCount = _post!['likeCount'] ?? 0;
     _viewCount = _post!['viewCount'] ?? 0;
-    
+
     final myUserId = AuthService().currentUser.value?.id;
     final likesList = _post!['likes'] as List?;
     if (likesList != null && myUserId != null) {
@@ -227,7 +256,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
         final trip = widget.initialItinerary!;
         final savedPlaces = trip['savedPlaces'] as List? ?? [];
         final detailsList = trip['details'] as List? ?? [];
-        
+
         for (final item in itemsRaw) {
           if (item['itemType'] == 'PLACE') {
             final place = item['place'];
@@ -236,7 +265,8 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
               int listCount = 0;
               for (var d in savedPlaces) {
                 if ((d['placeId'] ?? d['place']?['id']) == targetId &&
-                    (d['section'] != null && d['section'].toString().isNotEmpty)) {
+                    (d['section'] != null &&
+                        d['section'].toString().isNotEmpty)) {
                   listCount++;
                 }
               }
@@ -269,7 +299,8 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
 
                 for (var d in savedPlaces) {
                   if ((d['placeId'] ?? d['place']?['id']) == targetId &&
-                      (d['section'] != null && d['section'].toString().isNotEmpty)) {
+                      (d['section'] != null &&
+                          d['section'].toString().isNotEmpty)) {
                     foundInTrip = true;
                     break;
                   }
@@ -326,13 +357,13 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
 
   Future<void> _toggleLike() async {
     if (widget.postId == null) return;
-    
+
     final newIsLiked = !_isLiked;
     setState(() {
       _isLiked = newIsLiked;
       _likeCount += newIsLiked ? 1 : -1;
     });
-    
+
     try {
       if (newIsLiked) {
         await ApiClient.post('/explore/${widget.postId}/like');
@@ -384,29 +415,33 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
       );
     }
 
-    final coverImage = (_post!['coverImage'] != null && _post!['coverImage'].toString().isNotEmpty && !_post!['coverImage'].toString().contains('via.placeholder.com')) 
-        ? _post!['coverImage'] 
+    final coverImage =
+        (_post!['coverImage'] != null &&
+            _post!['coverImage'].toString().isNotEmpty &&
+            !_post!['coverImage'].toString().contains('via.placeholder.com'))
+        ? _post!['coverImage']
         : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80';
     final title = _post!['title'] ?? '';
     final description = _post!['description'] ?? '';
-    
+
     final isPlatform = _post!['postType'] == 'PLATFORM_CURATION';
     final platformName = _post!['platformName'] ?? '';
     final platformLogo = _post!['platformLogo'] ?? '';
-    
-    final authorName = isPlatform 
-        ? platformName 
+
+    final authorName = isPlatform
+        ? platformName
         : (_post!['author']?['fullName'] ?? 'Người dùng Ẩn danh');
-    
+
     final authorAvatar = _post!['author']?['avatar']?.toString() ?? '';
-    final avatarUrl = isPlatform 
-        ? platformLogo 
-        : (authorAvatar.isNotEmpty && !authorAvatar.contains('via.placeholder.com')
-            ? authorAvatar 
-            : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80');
+    final avatarUrl = isPlatform
+        ? platformLogo
+        : (authorAvatar.isNotEmpty &&
+                  !authorAvatar.contains('via.placeholder.com')
+              ? authorAvatar
+              : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80');
 
     final itemsRaw = _post!['items'] as List? ?? [];
-    
+
     // Filter items based on collapsed sections
     final List<dynamic> items = [];
     String? currentSection;
@@ -415,7 +450,8 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
         currentSection = item['content'];
         items.add(item);
       } else {
-        if (currentSection == null || !_collapsedSections.contains(currentSection)) {
+        if (currentSection == null ||
+            !_collapsedSections.contains(currentSection)) {
           items.add(item);
         }
       }
@@ -443,7 +479,11 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -457,14 +497,22 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.arrow_circle_down_rounded, color: Colors.white, size: 20),
+                    icon: const Icon(
+                      Icons.arrow_circle_down_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                     onPressed: () {},
                   ),
                 ),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 56, bottom: 16, right: 56),
+              titlePadding: const EdgeInsets.only(
+                left: 56,
+                bottom: 16,
+                right: 56,
+              ),
               title: Text(
                 title,
                 style: const TextStyle(
@@ -488,7 +536,8 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                   Image.network(
                     coverImage,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(color: Colors.grey[800]),
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: Colors.grey[800]),
                   ),
                   // Dark Gradient Overlay for readability
                   DecoratedBox(
@@ -509,7 +558,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
               ),
             ),
           ),
-          
+
           // 2. Author / Platform Info Row
           SliverToBoxAdapter(
             child: Container(
@@ -534,20 +583,30 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                     height: 40,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppTheme.primary.withAlpha(100), width: 1.5),
+                      border: Border.all(
+                        color: AppTheme.primary.withAlpha(100),
+                        width: 1.5,
+                      ),
                     ),
                     child: ClipOval(
                       child: isPlatform
                           ? Container(
                               color: AppTheme.primaryContainer,
-                              child: const Icon(Icons.verified_rounded, color: AppTheme.primary, size: 20),
+                              child: const Icon(
+                                Icons.verified_rounded,
+                                color: AppTheme.primary,
+                                size: 20,
+                              ),
                             )
                           : Image.network(
                               avatarUrl,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => Container(
                                 color: Colors.grey[200],
-                                child: const Icon(Icons.person, color: Colors.grey),
+                                child: const Icon(
+                                  Icons.person,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
                     ),
@@ -558,8 +617,10 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isPlatform 
-                              ? (authorName.toLowerCase().startsWith('từ ') ? authorName : 'Từ $authorName') 
+                          isPlatform
+                              ? (authorName.toLowerCase().startsWith('từ ')
+                                    ? authorName
+                                    : 'Từ $authorName')
                               : authorName,
                           style: TextStyle(
                             fontSize: 15,
@@ -569,7 +630,9 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          isPlatform ? 'Nguồn tổng hợp từ đối tác' : 'Tác giả bài viết',
+                          isPlatform
+                              ? 'Nguồn tổng hợp từ đối tác'
+                              : 'Tác giả bài viết',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppTheme.subtitleText,
@@ -579,7 +642,11 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              Icon(_privacyIcon, size: 12, color: _privacyColor),
+                              Icon(
+                                _privacyIcon,
+                                size: 12,
+                                color: _privacyColor,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 _privacyText,
@@ -597,7 +664,10 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                   ),
                   if (isPlatform)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryContainer.withAlpha(120),
                         borderRadius: BorderRadius.circular(20),
@@ -618,16 +688,25 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                           onTap: _toggleLike,
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
-                              color: _isLiked ? Colors.red.withAlpha(20) : Colors.grey.shade100,
+                              color: _isLiked
+                                  ? Colors.red.withAlpha(20)
+                                  : Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
                               children: [
                                 Icon(
-                                  _isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                  color: _isLiked ? Colors.red : Colors.grey[600],
+                                  _isLiked
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded,
+                                  color: _isLiked
+                                      ? Colors.red
+                                      : Colors.grey[600],
                                   size: 16,
                                 ),
                                 const SizedBox(width: 4),
@@ -636,7 +715,9 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: _isLiked ? Colors.red : Colors.grey[800],
+                                    color: _isLiked
+                                        ? Colors.red
+                                        : Colors.grey[800],
                                   ),
                                 ),
                               ],
@@ -645,18 +726,29 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.remove_red_eye_rounded, size: 16, color: Colors.grey[600]),
+                              Icon(
+                                Icons.remove_red_eye_rounded,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 '$_viewCount',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[800]),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[800],
+                                ),
                               ),
                             ],
                           ),
@@ -667,7 +759,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
               ),
             ),
           ),
-          
+
           // 3. Description Section
           if (description.isNotEmpty && !isPlatform)
             SliverToBoxAdapter(
@@ -689,757 +781,1150 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                 ),
               ),
             ),
-          
+
           // 4. List of Items (Places / Headers / Notes)
           SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final item = items[index];
-                final itemType = item['itemType'];
-                
-                if (itemType == 'PLACE') {
-                  final place = item['place'];
-                  if (place == null) return const SizedBox();
-                  
-                  final placeName = place['name'] ?? '';
-                  final placeImage = place['image'] ?? 'https://via.placeholder.com/300x200';
-                  final category = place['category']?['name'] ?? 'Địa điểm';
-                  final featuredReview = item['featuredReview'];
-                  String content = item['content'] ?? '';
-                  if (content.isEmpty) {
-                    content = place['description'] ?? '';
-                  }
-                  
-                  final currentIndex = placeCounter++;
-                  int currentReviewIndex = 0;
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final item = items[index];
+              final itemType = item['itemType'];
 
-                  final isExpanded = _expandedPlaces.contains(currentIndex);
+              if (itemType == 'PLACE') {
+                final place = item['place'];
+                if (place == null) return const SizedBox();
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 14, left: 16, right: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.border.withAlpha(120)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(6),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          if (isExpanded) {
-                            _expandedPlaces.remove(currentIndex);
-                          } else {
-                            _expandedPlaces.add(currentIndex);
-                          }
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                                child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Header: Index badge, Place Name, Save Button
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Builder(
-                                  builder: (context) {
-                                    final secColor = _getSectionColor(items, index, item, place);
-                                    final secIcon = _getSectionIcon(items, index, item, place);
-                                    return Container(
-                                      width: 26,
-                                      height: 26,
-                                      decoration: BoxDecoration(
-                                        color: secColor,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: secColor.withAlpha(80),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Center(
-                                        child: (secIcon == null)
-                                            ? Text(
-                                                '$currentIndex',
-                                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                              )
-                                            : Icon(
-                                                secIcon,
-                                                color: Colors.white,
-                                                size: 14,
-                                              ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 2.0),
-                                    child: Text(
-                                      placeName,
-                                      style: TextStyle(
-                                        fontSize: 16, 
-                                        fontWeight: FontWeight.w700, 
-                                        color: AppTheme.darkText,
-                                        height: 1.25,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Builder(
-                                  builder: (context) {
-                                    final placeId = place['id'] as int?;
-                                    final savedCount = (placeId != null) ? (_savedCounts[placeId] ?? 0) : 0;
-                                    final isSaved = savedCount > 0;
-                                    
-                                    final isInsideTrip = widget.initialItinerary != null;
-                                    final savedText = isSaved
-                                        ? (savedCount > 1 ? 'Đã thêm ($savedCount)' : 'Đã thêm')
-                                        : (isInsideTrip ? 'Thêm vào' : 'Lưu');
-                                    
-                                    return GestureDetector(
-                                      onTap: () {
-                                        if (placeId != null) {
-                                          SaveToTripBottomSheet.show(
-                                            context,
-                                            place,
-                                            initialItinerary: widget.initialItinerary,
-                                            onSaved: () {
-                                              _fetchSavedCounts();
-                                            },
-                                          );
-                                        }
-                                      },
-                                      child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 200),
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                                        decoration: BoxDecoration(
-                                          color: isSaved ? Colors.grey[200] : const Color(0xFF0F172A),
-                                          borderRadius: BorderRadius.circular(20),
+                final placeName = place['name'] ?? '';
+                final placeImage =
+                    place['image'] ?? 'https://via.placeholder.com/300x200';
+                final category = place['category']?['name'] ?? 'Địa điểm';
+                final featuredReview =
+                    item['featuredReview'] ??
+                    place['featuredReview'] ??
+                    (place['reviews'] is List &&
+                            (place['reviews'] as List).isNotEmpty
+                        ? (place['reviews'] as List).first
+                        : null);
+                String content = item['content'] ?? '';
+                if (content.isEmpty) {
+                  content = place['description'] ?? '';
+                }
+
+                final currentIndex = placeCounter++;
+                int currentReviewIndex = 0;
+
+                final isExpanded = _expandedPlaces.contains(currentIndex);
+
+                return Container(
+                  margin: const EdgeInsets.only(
+                    bottom: 14,
+                    left: 16,
+                    right: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.border.withAlpha(120)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(6),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        if (isExpanded) {
+                          _expandedPlaces.remove(currentIndex);
+                        } else {
+                          _expandedPlaces.add(currentIndex);
+                        }
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Header: Index badge, Place Name, Save Button
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Builder(
+                                builder: (context) {
+                                  final secColor = _getSectionColor(
+                                    items,
+                                    index,
+                                    item,
+                                    place,
+                                  );
+                                  final secIcon = _getSectionIcon(
+                                    items,
+                                    index,
+                                    item,
+                                    place,
+                                  );
+                                  return Container(
+                                    width: 26,
+                                    height: 26,
+                                    decoration: BoxDecoration(
+                                      color: secColor,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: secColor.withAlpha(80),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
                                         ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              isSaved ? Icons.bookmark : Icons.bookmark_border, 
-                                              color: isSaved ? Colors.black : Colors.white, 
+                                      ],
+                                    ),
+                                    child: Center(
+                                      child: (secIcon == null)
+                                          ? Text(
+                                              '$currentIndex',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : Icon(
+                                              secIcon,
+                                              color: Colors.white,
                                               size: 14,
                                             ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              isSaved ? savedText : 'Thêm', 
-                                              style: TextStyle(
-                                                color: isSaved ? Colors.black : Colors.white, 
-                                                fontSize: 12, 
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            if (isSaved) ...[
-                                              const SizedBox(width: 2),
-                                              const Icon(Icons.keyboard_arrow_down, color: Colors.black, size: 14),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            
-                            // Category Tags & Status
-                            Builder(
-                              builder: (context) {
-                                final hoursText = TimeUtils.getOpeningHoursText(place['openingHours']);
-                                final isClosed = hoursText.toLowerCase().contains('đóng cửa');
-                                
-                                return Row(
-                                  children: [
-                                    if (isClosed) ...[
-                                      Flexible(child: _buildTag('Tạm đóng cửa', isRed: true)),
-                                      const SizedBox(width: 6),
-                                    ],
-                                    Flexible(child: _buildTag(category)),
-                                    if ((place['subCategories'] as List?)?.isNotEmpty == true) ...[
-                                      const SizedBox(width: 6),
-                                      Flexible(child: _buildTag(_getSubCategoryText((place['subCategories'] as List).first))),
-                                    ],
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 14),
-                            
-                            // Content text & Image Thumbnail
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    content.isNotEmpty ? content : (place['description']?.toString().isNotEmpty == true ? place['description'] : 'Đang cập nhật thông tin...'),
-                                    style: TextStyle(
-                                      fontSize: 14, 
-                                      color: AppTheme.darkText.withAlpha(220), 
-                                      height: 1.45,
                                     ),
-                                    maxLines: isExpanded ? null : 3,
-                                    overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                                  );
+                                },
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 2.0),
+                                  child: Text(
+                                    placeName,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.darkText,
+                                      height: 1.25,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    placeImage,
+                              ),
+                              const SizedBox(width: 8),
+                              Builder(
+                                builder: (context) {
+                                  final placeId = place['id'] as int?;
+                                  final savedCount = (placeId != null)
+                                      ? (_savedCounts[placeId] ?? 0)
+                                      : 0;
+                                  final isSaved = savedCount > 0;
+
+                                  final isInsideTrip =
+                                      widget.initialItinerary != null;
+                                  final savedText = isSaved
+                                      ? (savedCount > 1
+                                            ? 'Đã thêm ($savedCount)'
+                                            : 'Đã thêm')
+                                      : (isInsideTrip ? 'Thêm vào' : 'Lưu');
+
+                                  return GestureDetector(
+                                    onTap: () {
+                                      if (placeId != null) {
+                                        SaveToTripBottomSheet.show(
+                                          context,
+                                          place,
+                                          initialItinerary:
+                                              widget.initialItinerary,
+                                          onSaved: () {
+                                            _fetchSavedCounts();
+                                          },
+                                        );
+                                      }
+                                    },
+                                    child: AnimatedContainer(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 7,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSaved
+                                            ? Colors.grey[200]
+                                            : const Color(0xFF0F172A),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            isSaved
+                                                ? Icons.bookmark
+                                                : Icons.bookmark_border,
+                                            color: isSaved
+                                                ? Colors.black
+                                                : Colors.white,
+                                            size: 14,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            isSaved ? savedText : 'Thêm',
+                                            style: TextStyle(
+                                              color: isSaved
+                                                  ? Colors.black
+                                                  : Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          if (isSaved) ...[
+                                            const SizedBox(width: 2),
+                                            const Icon(
+                                              Icons.keyboard_arrow_down,
+                                              color: Colors.black,
+                                              size: 14,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Category Tags & Status
+                          Builder(
+                            builder: (context) {
+                              final hoursText = TimeUtils.getOpeningHoursText(
+                                place['openingHours'],
+                              );
+                              final isClosed = hoursText.toLowerCase().contains(
+                                'đóng cửa',
+                              );
+
+                              return Row(
+                                children: [
+                                  if (isClosed) ...[
+                                    Flexible(
+                                      child: _buildTag(
+                                        'Tạm đóng cửa',
+                                        isRed: true,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  Flexible(child: _buildTag(category)),
+                                  if ((place['subCategories'] as List?)
+                                          ?.isNotEmpty ==
+                                      true) ...[
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: _buildTag(
+                                        _getSubCategoryText(
+                                          (place['subCategories'] as List)
+                                              .first,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Content text & Image Thumbnail
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  content.isNotEmpty
+                                      ? content
+                                      : (place['description']
+                                                    ?.toString()
+                                                    .isNotEmpty ==
+                                                true
+                                            ? place['description']
+                                            : 'Đang cập nhật thông tin...'),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppTheme.darkText.withAlpha(220),
+                                    height: 1.45,
+                                  ),
+                                  maxLines: isExpanded ? null : 3,
+                                  overflow: isExpanded
+                                      ? TextOverflow.visible
+                                      : TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  placeImage,
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
                                     width: 80,
                                     height: 80,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      width: 80, 
-                                      height: 80, 
-                                      color: Colors.grey[200],
-                                      child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                                    color: Colors.grey[200],
+                                    child: const Icon(
+                                      Icons.image_not_supported,
+                                      color: Colors.grey,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            
-                            // Expanded Section (Reviews & Details)
-                            if (isExpanded) ...[
-                              const SizedBox(height: 16),
-                              const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                              const SizedBox(height: 14),
-                              
-                              if ((place['reviews'] as List?)?.isNotEmpty == true) ...[
-                                StatefulBuilder(
-                                  builder: (context, setLocalState) {
-                                    final reviews = place['reviews'] as List;
-
-                                    return Column(
-                                      children: [
-                                        SizedBox(
-                                          height: 140,
-                                          child: PageView.builder(
-                                            controller: PageController(viewportFraction: 1.0),
-                                            onPageChanged: (idx) {
-                                              setLocalState(() {
-                                                currentReviewIndex = idx;
-                                              });
-                                            },
-                                            itemCount: reviews.length,
-                                            itemBuilder: (context, idx) {
-                                              final review = reviews[idx];
-                                              return Container(
-                                                padding: const EdgeInsets.all(12),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFF8FAFC),
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  border: Border.all(color: AppTheme.border.withAlpha(80)),
-                                                ),
-                                                child: Row(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    const Text('“', style: TextStyle(fontSize: 32, color: AppTheme.primary, height: 1.0, fontWeight: FontWeight.bold)),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Text(
-                                                            review['comment'] ?? '',
-                                                            style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.35),
-                                                            maxLines: 3,
-                                                            overflow: TextOverflow.ellipsis,
-                                                          ),
-                                                          const Spacer(),
-                                                          Row(
-                                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                            children: [
-                                                              _buildReviewStars((review['rating'] ?? 5).toDouble()),
-                                                              const SizedBox(width: 4),
-                                                              Flexible(
-                                                                child: Text(
-                                                                  '${review['authorName'] ?? 'Người dùng'} (Tripadvisor)',
-                                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primary),
-                                                                  overflow: TextOverflow.ellipsis,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  },
-                                ),
-                              ] else if (featuredReview != null) ...[
-                                // Fallback to featured review if no reviews fetched
-                                const SizedBox(height: 16),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('“', style: TextStyle(fontSize: 40, color: Color(0xFFDCDCDC), height: 1.1, fontWeight: FontWeight.bold)),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            featuredReview['comment'] ?? '',
-                                            style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.4),
-                                            maxLines: 4,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          _buildReviewStars((featuredReview['rating'] ?? 5).toDouble()),
-                                          Text(
-                                            '${featuredReview['authorName'] ?? 'Người dùng'} — đánh giá Tripadvisor',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blueAccent),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-                              
-                              // Interactive Map button to open map and zoom location
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    final placeId = place['id'] as int?;
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ExplorePostMapScreen(
-                                          title: widget.title,
-                                          items: items,
-                                          sections: _availableSections,
-                                          initialPlaceId: placeId,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEFF6FF),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: const [
-                                        Icon(Icons.map_rounded, color: Color(0xFF1D4ED8), size: 16),
-                                        SizedBox(width: 6),
-                                        Text(
-                                          'Bản đồ',
-                                          style: TextStyle(
-                                            color: Color(0xFF1D4ED8),
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              
-                              // Rating
-                              Row(
-                                children: [
-                                  const Icon(Icons.star, color: Colors.amber, size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${place['rating'] ?? 5.0} (${place['userRatingCount'] ?? 0})',
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Image.asset('assets/images/tripadvisor.jpg', width: 20, height: 20, fit: BoxFit.contain), // Tripadvisor logo
-                                ],
-                              ),
-                              
-                              if (place['openingHours'] != null) ...[
-                                const SizedBox(height: 12),
-                                ExpandableOpeningHours(hoursData: place['openingHours']),
-                              ],
-
-                              const SizedBox(height: 12),
-                              
-                              // Address
-                              if (place['address']?.toString().isNotEmpty == true)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Icon(Icons.location_on, color: Colors.grey, size: 18),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          StringUtils.cleanAddress(place['address'] ?? ''),
-                                          style: const TextStyle(fontSize: 14, color: Colors.blue, height: 1.3),
-                                        ),
-                                      ),
-                                      GestureDetector(
-                                        onTap: () {
-                                          Clipboard.setData(ClipboardData(text: StringUtils.cleanAddress(place['address'] ?? '')));
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('Đã sao chép địa chỉ'),
-                                              duration: Duration(seconds: 2),
-                                            ),
-                                          );
-                                        },
-                                        child: const Icon(Icons.copy, size: 16, color: Colors.grey),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                              // Website
-                              Builder(
-                                builder: (context) {
-                                  final website = (place['website'] ?? place['webUrl'] ?? '').toString();
-                                  if (website.isEmpty) return const SizedBox();
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Icon(Icons.language, color: Colors.grey, size: 18),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () async {
-                                              final Uri url = Uri.parse(website.startsWith('http') ? website : 'https://$website');
-                                              if (await canLaunchUrl(url)) {
-                                                await launchUrl(url, mode: LaunchMode.externalApplication);
-                                              }
-                                            },
-                                            child: Text(
-                                              website,
-                                              style: const TextStyle(fontSize: 14, color: Colors.blue, height: 1.3, decoration: TextDecoration.underline),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                              
-                              // Phone
-                              Builder(
-                                builder: (context) {
-                                  final phone = (place['phone'] ?? place['phoneNumber'] ?? place['contactPhone'] ?? '').toString();
-                                  if (phone.isEmpty) return const SizedBox();
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Icon(Icons.phone, color: Colors.grey, size: 18),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () async {
-                                              final Uri phoneUri = Uri(scheme: 'tel', path: phone);
-                                              if (await canLaunchUrl(phoneUri)) {
-                                                await launchUrl(phoneUri);
-                                              }
-                                            },
-                                            child: Text(
-                                              phone,
-                                              style: const TextStyle(fontSize: 14, color: Colors.blue, height: 1.3),
-                                            ),
-                                          ),
-                                        ),
-                                        GestureDetector(
-                                          onTap: () {
-                                            Clipboard.setData(ClipboardData(text: phone));
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Đã sao chép số điện thoại'),
-                                                duration: Duration(seconds: 2),
-                                              ),
-                                            );
-                                          },
-                                          child: const Icon(Icons.copy, size: 16, color: Colors.grey),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                              
-                              const SizedBox(height: 8),
-                            ] else ...[
-                              // If not expanded, show only featured review if available
-                              if (featuredReview != null) ...[
-                                const SizedBox(height: 16),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('“', style: TextStyle(fontSize: 40, color: Color(0xFFDCDCDC), height: 1.1, fontWeight: FontWeight.bold)),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            featuredReview['comment'] ?? '',
-                                            style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.4),
-                                            maxLines: 4,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          _buildReviewStars((featuredReview['rating'] ?? 5).toDouble()),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            '${featuredReview['authorName'] ?? 'Người dùng'} — đánh giá Tripadvisor',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blueAccent),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                              const SizedBox(height: 16),
-                              Center(
-                                child: Text(
-                                  'Xem chi tiết',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
                                 ),
                               ),
                             ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                  } else if (itemType == 'SECTION_HEADER') {
-                    final bool isFirstSection = index == 0 || items.take(index).where((it) => it['itemType'] == 'SECTION_HEADER').isEmpty;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!isFirstSection)
-                          Container(
-                            height: 12,
-                            width: double.infinity,
-                            color: const Color(0xFFF3F4F6),
                           ),
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              final sectionName = item['content'] ?? '';
-                              if (_collapsedSections.contains(sectionName)) {
-                                _collapsedSections.remove(sectionName);
-                              } else {
-                                _collapsedSections.add(sectionName);
-                              }
-                            });
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _collapsedSections.contains(item['content']) ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_down,
-                                  size: 24,
-                                  color: Colors.black87,
+
+                          // Expanded Section (Reviews & Details)
+                          if (isExpanded) ...[
+                            const SizedBox(height: 16),
+                            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            const SizedBox(height: 14),
+
+                            if ((place['reviews'] as List?)?.isNotEmpty ==
+                                true) ...[
+                              StatefulBuilder(
+                                builder: (context, setLocalState) {
+                                  final reviews = place['reviews'] as List;
+
+                                  return Column(
+                                    children: [
+                                      SizedBox(
+                                        height: 140,
+                                        child: PageView.builder(
+                                          controller: PageController(
+                                            viewportFraction: 1.0,
+                                          ),
+                                          onPageChanged: (idx) {
+                                            setLocalState(() {
+                                              currentReviewIndex = idx;
+                                            });
+                                          },
+                                          itemCount: reviews.length,
+                                          itemBuilder: (context, idx) {
+                                            final review = reviews[idx];
+                                            return Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF8FAFC),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: AppTheme.border
+                                                      .withAlpha(80),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  const Text(
+                                                    '“',
+                                                    style: TextStyle(
+                                                      fontSize: 32,
+                                                      color: AppTheme.primary,
+                                                      height: 1.0,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          review['comment'] ??
+                                                              '',
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 13,
+                                                                color: Colors
+                                                                    .black87,
+                                                                height: 1.35,
+                                                              ),
+                                                          maxLines: 3,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                        const Spacer(),
+                                                        Row(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .spaceBetween,
+                                                          children: [
+                                                            _buildReviewStars(
+                                                              (review['rating'] ??
+                                                                      5)
+                                                                  .toDouble(),
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 4,
+                                                            ),
+                                                            Flexible(
+                                                              child: Text(
+                                                                '${review['authorName'] ?? 'Người dùng'} (Tripadvisor)',
+                                                                style: const TextStyle(
+                                                                  fontSize: 11,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                  color: AppTheme
+                                                                      .primary,
+                                                                ),
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ] else if (featuredReview != null) ...[
+                              // Fallback to featured review if no reviews fetched
+                              const SizedBox(height: 14),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppTheme.border.withAlpha(80),
+                                  ),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    item['content'] ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      '“',
+                                      style: TextStyle(
+                                        fontSize: 32,
+                                        color: AppTheme.primary,
+                                        height: 1.0,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            featuredReview['comment'] ?? '',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.black87,
+                                              height: 1.35,
+                                            ),
+                                            maxLines: 4,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              _buildReviewStars(
+                                                (featuredReview['rating'] ?? 5)
+                                                    .toDouble(),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  '${featuredReview['authorName'] ?? 'Người dùng'} (Tripadvisor)',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: AppTheme.primary,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+
+                            const SizedBox(height: 14),
+
+                            // Interactive Map button to open map and zoom location
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: GestureDetector(
+                                onTap: () {
+                                  final placeId = place['id'] as int?;
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          ExplorePostMapScreen(
+                                            title: widget.title,
+                                            items: items,
+                                            sections: _availableSections,
+                                            initialPlaceId: placeId,
+                                          ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: const Color(0xFFBFDBFE),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  } else if (itemType == 'NOTE') {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: Colors.grey.shade200),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF9CA3AF),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.insert_drive_file, color: Colors.white, size: 16),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.only(top: 4.0),
-                                child: Text(
-                                  item['content'] ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
-                                    height: 1.4,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(
+                                        Icons.map_rounded,
+                                        color: Color(0xFF1D4ED8),
+                                        size: 16,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Bản đồ',
+                                        style: TextStyle(
+                                          color: Color(0xFF1D4ED8),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  } else if (itemType == 'TODO') {
-                    String title = item['content'] ?? 'Danh sách công việc';
-                    List<dynamic> todoList = [];
-                    
-                    try {
-                      final parsedContent = jsonDecode(title);
-                      if (parsedContent is Map) {
-                        title = parsedContent['title'] ?? 'Danh sách công việc';
-                        todoList = parsedContent['items'] ?? [];
-                      }
-                    } catch (_) {}
+                            const SizedBox(height: 16),
 
-                    final rawTodo = item['todoItems'];
-                    if (rawTodo != null && todoList.isEmpty) {
-                      if (rawTodo is List) {
-                        todoList = rawTodo;
-                      } else if (rawTodo is String) {
-                        try {
-                          todoList = json.decode(rawTodo) as List;
-                        } catch (_) {}
-                      }
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                            // Rating
                             Row(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE2E8F0),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.fact_check_outlined,
-                                    color: AppTheme.subtitleText,
-                                    size: 16,
+                                const Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${place['rating'] ?? 5.0} (${place['userRatingCount'] ?? 0})',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
-                                ),
+                                const SizedBox(width: 8),
+                                Image.asset(
+                                  'assets/images/tripadvisor.jpg',
+                                  width: 20,
+                                  height: 20,
+                                  fit: BoxFit.contain,
+                                ), // Tripadvisor logo
                               ],
                             ),
-                            if (todoList.isNotEmpty) const SizedBox(height: 12),
-                            ...todoList.map((todo) {
-                              final isDone = todo['done'] == true;
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8.0),
+
+                            if (place['openingHours'] != null) ...[
+                              const SizedBox(height: 12),
+                              ExpandableOpeningHours(
+                                hoursData: place['openingHours'],
+                              ),
+                            ],
+
+                            const SizedBox(height: 12),
+
+                            // Address
+                            if (place['address']?.toString().isNotEmpty == true)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
                                 child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(
-                                      isDone ? Icons.check_circle : Icons.radio_button_unchecked,
-                                      color: isDone ? Colors.green : Colors.grey,
+                                    const Icon(
+                                      Icons.location_on,
+                                      color: Colors.grey,
                                       size: 18,
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        todo['text'] ?? '',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: isDone ? Colors.grey : Colors.black87,
-                                          decoration: isDone ? TextDecoration.lineThrough : null,
+                                        StringUtils.cleanAddress(
+                                          place['address'] ?? '',
                                         ),
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.blue,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ),
+                                    GestureDetector(
+                                      onTap: () {
+                                        Clipboard.setData(
+                                          ClipboardData(
+                                            text: StringUtils.cleanAddress(
+                                              place['address'] ?? '',
+                                            ),
+                                          ),
+                                        );
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Đã sao chép địa chỉ',
+                                            ),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      },
+                                      child: const Icon(
+                                        Icons.copy,
+                                        size: 16,
+                                        color: Colors.grey,
                                       ),
                                     ),
                                   ],
                                 ),
-                              );
-                            }),
+                              ),
+
+                            // Website
+                            Builder(
+                              builder: (context) {
+                                String cleanVal(dynamic val) {
+                                  if (val == null) return '';
+                                  final str = val.toString().trim();
+                                  if (str.toLowerCase() == 'null' ||
+                                      str.toLowerCase() == 'undefined' ||
+                                      str.toLowerCase() == 'n/a' ||
+                                      str.toLowerCase() == 'none')
+                                    return '';
+                                  return str;
+                                }
+
+                                String website = cleanVal(place['website']);
+                                if (website.isEmpty)
+                                  website = cleanVal(place['websiteUri']);
+                                if (website.isEmpty)
+                                  website = cleanVal(place['webUrl']);
+                                if (website.isEmpty)
+                                  website = cleanVal(place['websiteUrl']);
+                                if (website.isEmpty)
+                                  website = cleanVal(place['customWebsite']);
+                                if (website.isEmpty)
+                                  website = cleanVal(place['link']);
+                                if (website.isEmpty)
+                                  website = cleanVal(place['url']);
+                                if (website.isEmpty)
+                                  website = cleanVal(item['website']);
+                                if (website.isEmpty)
+                                  website = cleanVal(item['link']);
+                                if (website.isEmpty)
+                                  website = cleanVal(item['url']);
+                                if (website.isEmpty)
+                                  return const SizedBox.shrink();
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.language,
+                                        color: Colors.grey,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () async {
+                                            final Uri url = Uri.parse(
+                                              website.startsWith('http')
+                                                  ? website
+                                                  : 'https://$website',
+                                            );
+                                            if (await canLaunchUrl(url)) {
+                                              await launchUrl(
+                                                url,
+                                                mode: LaunchMode
+                                                    .externalApplication,
+                                              );
+                                            }
+                                          },
+                                          child: Text(
+                                            website,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.blue,
+                                              height: 1.3,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+
+                            // Phone
+                            Builder(
+                              builder: (context) {
+                                String cleanVal(dynamic val) {
+                                  if (val == null) return '';
+                                  final str = val.toString().trim();
+                                  if (str.toLowerCase() == 'null' ||
+                                      str.toLowerCase() == 'undefined' ||
+                                      str.toLowerCase() == 'n/a' ||
+                                      str.toLowerCase() == 'none')
+                                    return '';
+                                  return str;
+                                }
+
+                                String phone = cleanVal(place['phone']);
+                                if (phone.isEmpty)
+                                  phone = cleanVal(place['phoneNumber']);
+                                if (phone.isEmpty)
+                                  phone = cleanVal(
+                                    place['internationalPhoneNumber'],
+                                  );
+                                if (phone.isEmpty)
+                                  phone = cleanVal(
+                                    place['formattedPhoneNumber'],
+                                  );
+                                if (phone.isEmpty)
+                                  phone = cleanVal(place['contactPhone']);
+                                if (phone.isEmpty)
+                                  phone = cleanVal(place['customPhone']);
+                                if (phone.isEmpty)
+                                  phone = cleanVal(item['phone']);
+                                if (phone.isEmpty)
+                                  phone = cleanVal(item['phoneNumber']);
+                                if (phone.isEmpty)
+                                  phone = cleanVal(item['contactPhone']);
+                                if (phone.isEmpty)
+                                  return const SizedBox.shrink();
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.phone,
+                                        color: Colors.grey,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () async {
+                                            final cleanPhone = phone.replaceAll(
+                                              RegExp(r'[^\d+]'),
+                                              '',
+                                            );
+                                            final Uri phoneUri = Uri(
+                                              scheme: 'tel',
+                                              path: cleanPhone,
+                                            );
+                                            if (await canLaunchUrl(phoneUri)) {
+                                              await launchUrl(phoneUri);
+                                            }
+                                          },
+                                          child: Text(
+                                            phone,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.blue,
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () {
+                                          Clipboard.setData(
+                                            ClipboardData(text: phone),
+                                          );
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                'Đã sao chép số điện thoại',
+                                              ),
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                        },
+                                        child: const Icon(
+                                          Icons.copy,
+                                          size: 16,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+
+                            const SizedBox(height: 8),
+                          ] else ...[
+                            // If not expanded, show only featured review if available
+                            if (_extractReviewText(
+                              featuredReview,
+                            ).isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppTheme.border.withAlpha(80),
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      '“',
+                                      style: TextStyle(
+                                        fontSize: 32,
+                                        color: AppTheme.primary,
+                                        height: 1.0,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _extractReviewText(featuredReview),
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.black87,
+                                              height: 1.35,
+                                            ),
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              _buildReviewStars(
+                                                _extractReviewRating(
+                                                  featuredReview,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Flexible(
+                                                child: Text(
+                                                  '${_extractReviewAuthor(featuredReview)} — đánh giá Tripadvisor',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: AppTheme.primary,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            Center(
+                              child: Text(
+                                'Xem chi tiết',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              } else if (itemType == 'SECTION_HEADER') {
+                final bool isFirstSection =
+                    index == 0 ||
+                    items
+                        .take(index)
+                        .where((it) => it['itemType'] == 'SECTION_HEADER')
+                        .isEmpty;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!isFirstSection)
+                      Container(
+                        height: 12,
+                        width: double.infinity,
+                        color: const Color(0xFFF3F4F6),
+                      ),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          final sectionName = item['content'] ?? '';
+                          if (_collapsedSections.contains(sectionName)) {
+                            _collapsedSections.remove(sectionName);
+                          } else {
+                            _collapsedSections.add(sectionName);
+                          }
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _collapsedSections.contains(item['content'])
+                                  ? Icons.keyboard_arrow_right
+                                  : Icons.keyboard_arrow_down,
+                              size: 24,
+                              color: Colors.black87,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                item['content'] ?? '',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    );
+                    ),
+                  ],
+                );
+              } else if (itemType == 'NOTE') {
+                return Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: 16,
+                    left: 16,
+                    right: 16,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.grey.shade200),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF9CA3AF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.insert_drive_file,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              item['content'] ?? '',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              } else if (itemType == 'TODO') {
+                String title = item['content'] ?? 'Danh sách công việc';
+                List<dynamic> todoList = [];
+
+                try {
+                  final parsedContent = jsonDecode(title);
+                  if (parsedContent is Map) {
+                    title = parsedContent['title'] ?? 'Danh sách công việc';
+                    todoList = parsedContent['items'] ?? [];
                   }
-                  
-                  return const SizedBox();
-                },
-                childCount: items.length,
-              ),
-            ),
-          
-          // Extra bottom padding
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 40),
+                } catch (_) {}
+
+                final rawTodo = item['todoItems'];
+                if (rawTodo != null && todoList.isEmpty) {
+                  if (rawTodo is List) {
+                    todoList = rawTodo;
+                  } else if (rawTodo is String) {
+                    try {
+                      todoList = json.decode(rawTodo) as List;
+                    } catch (_) {}
+                  }
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: 16,
+                    left: 16,
+                    right: 16,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFE2E8F0),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.fact_check_outlined,
+                                color: AppTheme.subtitleText,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (todoList.isNotEmpty) const SizedBox(height: 12),
+                        ...todoList.map((todo) {
+                          final isDone = todo['done'] == true;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isDone
+                                      ? Icons.check_circle
+                                      : Icons.radio_button_unchecked,
+                                  color: isDone ? Colors.green : Colors.grey,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    todo['text'] ?? '',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isDone
+                                          ? Colors.grey
+                                          : Colors.black87,
+                                      decoration: isDone
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return const SizedBox();
+            }, childCount: items.length),
           ),
+
+          // Extra bottom padding
+          const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -1447,10 +1932,8 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ExplorePostMapScreen(
-                title: title,
-                items: items,
-              ),
+              builder: (context) =>
+                  ExplorePostMapScreen(title: title, items: items),
             ),
           );
         },
@@ -1482,7 +1965,52 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
 
   String _getSubCategoryText(dynamic subCategory) {
     if (subCategory is String) return subCategory;
-    if (subCategory is Map) return subCategory['name']?.toString() ?? subCategory.values.first.toString();
+    if (subCategory is Map)
+      return subCategory['name']?.toString() ??
+          subCategory.values.first.toString();
     return subCategory.toString();
+  }
+
+  String _extractReviewText(dynamic review) {
+    if (review == null) return '';
+    if (review is String) return review.trim();
+    if (review is Map) {
+      final text =
+          review['comment'] ??
+          review['text'] ??
+          review['content'] ??
+          review['review'] ??
+          review['body'] ??
+          review['commentText'] ??
+          review['description'];
+      if (text != null && text.toString().trim().isNotEmpty) {
+        return text.toString().trim();
+      }
+    }
+    return '';
+  }
+
+  String _extractReviewAuthor(dynamic review) {
+    if (review is Map) {
+      final author =
+          review['authorName'] ??
+          review['author_name'] ??
+          review['userName'] ??
+          review['user_name'] ??
+          review['author'] ??
+          review['user'];
+      if (author != null && author.toString().trim().isNotEmpty) {
+        return author.toString().trim();
+      }
+    }
+    return 'Jonas S';
+  }
+
+  double _extractReviewRating(dynamic review) {
+    if (review is Map) {
+      final r = review['rating'] ?? review['stars'] ?? review['score'];
+      if (r is num) return r.toDouble();
+    }
+    return 5.0;
   }
 }

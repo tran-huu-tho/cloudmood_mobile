@@ -524,13 +524,28 @@ class InlinePlaceBottomInfo extends StatelessWidget {
         place['description'] ?? place['editorialSummary'] ?? '';
     final String duration = place['recommendedDuration']?.toString() ?? '';
     final String address = StringUtils.cleanAddress(place['address'] ?? '');
-    final String website = place['website'] ?? '';
-    final String phone =
-        place['phone'] ??
-        place['internationalPhoneNumber'] ??
-        place['formattedPhoneNumber'] ??
-        place['phoneNumber'] ??
-        '';
+    String cleanVal(dynamic val) {
+      if (val == null) return '';
+      final str = val.toString().trim();
+      if (str.toLowerCase() == 'null' || str.toLowerCase() == 'undefined' || str.toLowerCase() == 'n/a' || str.toLowerCase() == 'none') return '';
+      return str;
+    }
+
+    String website = cleanVal(place['website']);
+    if (website.isEmpty) website = cleanVal(place['websiteUri']);
+    if (website.isEmpty) website = cleanVal(place['webUrl']);
+    if (website.isEmpty) website = cleanVal(place['websiteUrl']);
+    if (website.isEmpty) website = cleanVal(place['customWebsite']);
+    if (website.isEmpty) website = cleanVal(place['link']);
+    if (website.isEmpty) website = cleanVal(place['url']);
+
+    String phone = cleanVal(place['phone']);
+    if (phone.isEmpty) phone = cleanVal(place['phoneNumber']);
+    if (phone.isEmpty) phone = cleanVal(place['internationalPhoneNumber']);
+    if (phone.isEmpty) phone = cleanVal(place['formattedPhoneNumber']);
+    if (phone.isEmpty) phone = cleanVal(place['contactPhone']);
+    if (phone.isEmpty) phone = cleanVal(place['customPhone']);
+    if (phone.isEmpty) phone = cleanVal(place['telephone']);
     final String price = place['price'] ?? '';
     final String priceLevel = place['priceLevel'] ?? '';
 
@@ -778,10 +793,15 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                         if (website.isNotEmpty)
                           GestureDetector(
                             onTap: () async {
-                              final url = Uri.parse(website);
-                              if (await canLaunchUrl(url)) {
-                                await launchUrl(url);
-                              }
+                              final formattedUrl = website.startsWith('http://') || website.startsWith('https://')
+                                  ? website
+                                  : 'https://$website';
+                              final url = Uri.parse(formattedUrl);
+                              try {
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                                }
+                              } catch (_) {}
                             },
                             child: _buildInfoRow(
                               Icons.public,
@@ -796,16 +816,35 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                         if (phone.isNotEmpty)
                           GestureDetector(
                             onTap: () async {
-                              final url = Uri.parse('tel:$phone');
-                              if (await canLaunchUrl(url)) {
-                                await launchUrl(url);
-                              }
+                              final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+                              final url = Uri.parse('tel:$cleanPhone');
+                              try {
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url);
+                                }
+                              } catch (_) {}
                             },
                             child: _buildInfoRow(
                               Icons.phone,
                               phone,
                               context,
                               isLink: true,
+                              trailing: GestureDetector(
+                                onTap: () {
+                                  Clipboard.setData(ClipboardData(text: phone));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Đã sao chép số điện thoại'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                },
+                                child: Icon(
+                                  Icons.copy,
+                                  size: 16,
+                                  color: AppTheme.subtitleText,
+                                ),
+                              ),
                             ),
                           ),
                       ],

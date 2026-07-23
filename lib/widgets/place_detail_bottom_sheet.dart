@@ -326,12 +326,16 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     );
 
     final String? phone =
+        widget.place['phone'] ??
+        widget.place['phoneNumber'] ??
         widget.place['internationalPhoneNumber'] ??
         widget.place['nationalPhoneNumber'] ??
-        widget.place['phone'] ??
-        widget.place['phoneNumber'];
+        widget.place['contactPhone'];
     final String? website =
-        widget.place['websiteUri'] ?? widget.place['website'];
+        widget.place['website'] ??
+        widget.place['websiteUri'] ??
+        widget.place['webUrl'] ??
+        widget.place['websiteUrl'];
     final String? price = widget.place['price'];
     final String? priceLevel = widget.place['priceLevel'];
 

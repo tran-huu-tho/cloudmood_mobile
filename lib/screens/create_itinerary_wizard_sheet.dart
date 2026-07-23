@@ -35,6 +35,11 @@ class _CreateItineraryWizardSheetState
 
   final List<Map<String, String>> _popularDestinations = [
     {
+      'name': 'Cần Thơ',
+      'image':
+          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=200&auto=format&fit=crop&q=80',
+    },
+    {
       'name': 'Đà Nẵng',
       'image':
           'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=200&auto=format&fit=crop&q=80',
@@ -81,6 +86,7 @@ class _CreateItineraryWizardSheetState
 
   // Options Data
   final List<String> _destinations = [
+    'Cần Thơ',
     'Đà Nẵng',
     'Hội An',
     'Nha Trang',
@@ -312,6 +318,9 @@ class _CreateItineraryWizardSheetState
         );
         return;
       }
+      if (_titleController.text.trim().isEmpty) {
+        _titleController.text = 'Khám phá $_selectedDestination';
+      }
     } else if (_currentStep == 1) {
       if (_titleController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -319,18 +328,9 @@ class _CreateItineraryWizardSheetState
         );
         return;
       }
-    } else if (_currentStep == 2) {
-      if (_selectedCategories.length < 2 || _selectedCategories.length > 4) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Vui lòng chọn từ 2 đến 4 trải nghiệm mong muốn!'),
-          ),
-        );
-        return;
-      }
     }
 
-    if (_currentStep < 3) {
+    if (_currentStep < 2) {
       setState(() {
         _currentStep++;
       });
@@ -458,7 +458,7 @@ class _CreateItineraryWizardSheetState
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: LinearProgressIndicator(
-                      value: (_currentStep + 1) / 4,
+                      value: (_currentStep + 1) / 3,
                       minHeight: 6,
                       backgroundColor: AppTheme.border,
                       valueColor: const AlwaysStoppedAnimation<Color>(
@@ -479,7 +479,6 @@ class _CreateItineraryWizardSheetState
                   _buildStep0Destination(),
                   _buildStep1HardRules(),
                   _buildStep2SoftRules(),
-                  _buildStep3FineTuning(),
                 ],
               ),
             ),
@@ -552,7 +551,7 @@ class _CreateItineraryWizardSheetState
                                 ),
                               )
                             : Text(
-                                _currentStep == 3
+                                _currentStep == 2
                                     ? 'Hoàn tất & Tạo lịch trình'
                                     : 'Tiếp tục',
                                 style: const TextStyle(
@@ -775,7 +774,7 @@ class _CreateItineraryWizardSheetState
     );
   }
 
-  // STEP 2: Preferences & Style
+  // STEP 2: Preferences & Style (Combined Preferences, Companion, Pace & Amenities)
   Widget _buildStep2SoftRules() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -784,7 +783,7 @@ class _CreateItineraryWizardSheetState
         children: [
           const SizedBox(height: 8),
           Text(
-            'Bước 2: Sở thích & Phong cách trải nghiệm',
+            'Bước 3: Sở thích, Phong cách & Tiện ích',
             style: TextStyle(
               fontSize: 13,
               color: AppTheme.subtitleText,
@@ -795,10 +794,10 @@ class _CreateItineraryWizardSheetState
 
           // Categories Select (Tag Chips)
           Text(
-            'Bạn muốn trải nghiệm những gì? (Chọn 2 - 4 mục)',
+            'Trải nghiệm mong muốn?',
             style: AppTheme.bodyBoldStyle,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -822,17 +821,7 @@ class _CreateItineraryWizardSheetState
                 onSelected: (bool selected) {
                   setState(() {
                     if (selected) {
-                      if (_selectedCategories.length < 4) {
-                        _selectedCategories.add(cat['name']);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Chỉ được chọn tối đa 4 trải nghiệm!',
-                            ),
-                          ),
-                        );
-                      }
+                      _selectedCategories.add(cat['name']);
                     } else {
                       _selectedCategories.remove(cat['name']);
                     }
@@ -841,16 +830,21 @@ class _CreateItineraryWizardSheetState
               );
             }).toList(),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // Companion Select
-          Text('Bạn đi du lịch cùng ai?', style: AppTheme.bodyBoldStyle),
-          const SizedBox(height: 12),
-          ListView.separated(
+          // Companion Select Grid
+          Text('Bạn đi cùng ai?', style: AppTheme.bodyBoldStyle),
+          const SizedBox(height: 8),
+          GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 2.3,
+            ),
             itemCount: _companionsList.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final comp = _companionsList[index];
               final isSelected = _selectedCompanion == comp['id'];
@@ -861,14 +855,14 @@ class _CreateItineraryWizardSheetState
                   });
                 },
                 child: Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected ? AppTheme.primaryPeach : Colors.white,
                     border: Border.all(
                       color: isSelected ? AppTheme.primary : AppTheme.border,
                       width: isSelected ? 1.5 : 1,
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Row(
                     children: [
@@ -877,39 +871,22 @@ class _CreateItineraryWizardSheetState
                         color: isSelected
                             ? AppTheme.primary
                             : AppTheme.subtitleText,
-                        size: 28,
+                        size: 22,
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 8),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              comp['title'],
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: AppTheme.darkText,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              comp['subtitle'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.subtitleText,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          comp['title'],
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: AppTheme.darkText,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (isSelected)
-                        const Icon(
-                          Icons.check_circle_rounded,
-                          color: AppTheme.primary,
-                        ),
                     ],
                   ),
                 ),
@@ -917,101 +894,59 @@ class _CreateItineraryWizardSheetState
             },
           ),
           const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  // STEP 3: Pace & Amenities
-  Widget _buildStep3FineTuning() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 8),
-          Text(
-            'Bước 3: Nhịp độ & Yêu cầu tiện ích',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.subtitleText,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 16),
 
           // Pace Selection
           Text(
-            'Nhịp độ chuyến đi mong muốn?',
+            'Nhịp độ chuyến đi',
             style: AppTheme.bodyBoldStyle,
           ),
-          const SizedBox(height: 12),
-          Column(
+          const SizedBox(height: 8),
+          Row(
             children: _pacesList.map((pace) {
               final isSelected = _selectedPace == pace['id'];
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedPace = pace['id'];
-                  });
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppTheme.primaryPeach : Colors.white,
-                    border: Border.all(
-                      color: isSelected ? AppTheme.primary : AppTheme.border,
-                      width: isSelected ? 1.5 : 1,
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedPace = pace['id'];
+                    });
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppTheme.primaryPeach : Colors.white,
+                      border: Border.all(
+                        color: isSelected ? AppTheme.primary : AppTheme.border,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        pace['icon'] as IconData,
-                        color: isSelected
-                            ? AppTheme.primary
-                            : AppTheme.subtitleText,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              pace['title'],
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.w600,
-                                color: AppTheme.darkText,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              pace['desc'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.subtitleText,
-                              ),
-                            ),
-                          ],
+                    child: Column(
+                      children: [
+                        Icon(
+                          pace['icon'] as IconData,
+                          color: isSelected
+                              ? AppTheme.primary
+                              : AppTheme.subtitleText,
+                          size: 20,
                         ),
-                      ),
-                      if (isSelected)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 2.0),
-                          child: Icon(
-                            Icons.check_circle_rounded,
-                            color: AppTheme.primary,
-                            size: 20,
+                        const SizedBox(height: 4),
+                        Text(
+                          pace['title'].toString().split('/')[0],
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: AppTheme.darkText,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -1021,17 +956,17 @@ class _CreateItineraryWizardSheetState
 
           // Amenities Selection (Tag Chips)
           Text(
-            'Bạn có yêu cầu đặc biệt nào không?',
+            'Tiện ích đặc biệt (tùy chọn)',
             style: AppTheme.bodyBoldStyle,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: _amenitiesList.map((amenity) {
               final isSelected = _selectedAmenities.contains(amenity);
               return FilterChip(
-                label: Text(amenity),
+                label: Text(amenity, style: const TextStyle(fontSize: 12)),
                 selected: isSelected,
                 selectedColor: AppTheme.primaryPeach,
                 checkmarkColor: AppTheme.primary,
@@ -1180,57 +1115,48 @@ class _CreateItineraryWizardSheetState
             const SizedBox(height: 24),
             Text('Điểm đến phổ biến', style: AppTheme.bodyBoldStyle),
             const SizedBox(height: 12),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.3,
-              ),
-              itemCount: _popularDestinations.length,
-              itemBuilder: (context, index) {
-                final dest = _popularDestinations[index];
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _popularDestinations.map((dest) {
                 final String name = dest['name']!;
-                final String imageUrl = dest['image']!;
-
+                final isSelected = _selectedDestination == name;
                 return GestureDetector(
                   onTap: () {
                     _selectDestination(name);
                   },
                   child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      image: DecorationImage(
-                        image: NetworkImage(imageUrl),
-                        fit: BoxFit.cover,
-                        colorFilter: ColorFilter.mode(
-                          Colors.black.withAlpha(80),
-                          BlendMode.darken,
-                        ),
+                      color: isSelected ? AppTheme.primaryPeach : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected ? AppTheme.primary : AppTheme.border,
+                        width: isSelected ? 2 : 1,
                       ),
                     ),
-                    alignment: Alignment.bottomLeft,
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black45,
-                            blurRadius: 4,
-                            offset: Offset(0, 1),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.location_on_rounded,
+                          size: 16,
+                          color: isSelected ? AppTheme.primary : AppTheme.subtitleText,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: isSelected ? AppTheme.primary : AppTheme.darkText,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 );
-              },
+              }).toList(),
             ),
           ],
           const SizedBox(height: 24),

@@ -1568,9 +1568,13 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
       'description': _itineraryData['description'] ?? '',
       'destination': _itineraryData['destination'] ?? '',
       'coverImage':
-          (_itineraryData['coverImage'] != null && _itineraryData['coverImage'].toString().isNotEmpty && !_itineraryData['coverImage'].toString().contains('via.placeholder.com'))
-              ? _itineraryData['coverImage']
-              : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80',
+          (_itineraryData['coverImage'] != null &&
+              _itineraryData['coverImage'].toString().isNotEmpty &&
+              !_itineraryData['coverImage'].toString().contains(
+                'via.placeholder.com',
+              ))
+          ? _itineraryData['coverImage']
+          : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80',
       'postType': 'USER_CURATION',
       'items': items,
     };
@@ -1599,7 +1603,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
       'id': _itineraryData['id'] ?? 'preview',
       'author': {
         'fullName': user?.fullName ?? 'Người dùng',
-        'avatar': (user?.avatar != null && user!.avatar!.isNotEmpty && !user.avatar!.contains('via.placeholder.com'))
+        'avatar':
+            (user?.avatar != null &&
+                user!.avatar!.isNotEmpty &&
+                !user.avatar!.contains('via.placeholder.com'))
             ? user.avatar
             : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80',
       },
@@ -2646,15 +2653,39 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   }
 
   bool _isSightseeingPlace(Map<String, dynamic> place) {
-    final categoryName = (place['category']?['name'] ?? place['category'] ?? '').toString().toLowerCase();
+    final categoryName = (place['category']?['name'] ?? place['category'] ?? '')
+        .toString()
+        .toLowerCase();
     final placeName = (place['name'] ?? '').toString().toLowerCase();
-    final subCategories = (place['subCategories'] as List? ?? []).map((e) => e.toString().toLowerCase()).join(' ');
+    final subCategories = (place['subCategories'] as List? ?? [])
+        .map((e) => e.toString().toLowerCase())
+        .join(' ');
 
     final combined = '$categoryName $placeName $subCategories';
     final excluded = [
-      'spa', 'massage', 'quán', 'ăn', 'uống', 'nhà hàng', 'cà phê', 'cafe', 
-      'bình dân', 'ẩm thực', 'food', 'restaurant', 'dining', 'bar', 'pub', 
-      'tiệm', 'bánh', 'trà sữa', 'búp phê', 'buffet', 'lẩu', 'nướng', 'gà rán'
+      'spa',
+      'massage',
+      'quán',
+      'ăn',
+      'uống',
+      'nhà hàng',
+      'cà phê',
+      'cafe',
+      'bình dân',
+      'ẩm thực',
+      'food',
+      'restaurant',
+      'dining',
+      'bar',
+      'pub',
+      'tiệm',
+      'bánh',
+      'trà sữa',
+      'búp phê',
+      'buffet',
+      'lẩu',
+      'nướng',
+      'gà rán',
     ];
 
     for (final word in excluded) {
@@ -2680,18 +2711,22 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
 
       try {
         // 1. Fetch places for destination from backend DB
-        final dbPlaces = await DatabaseService().fetchPlacesByDestination(destination);
-        
+        final dbPlaces = await DatabaseService().fetchPlacesByDestination(
+          destination,
+        );
+
         // 2. Also gather places saved in the current itinerary
         final savedPlaces = _itineraryData['savedPlaces'] as List? ?? [];
         final details = _itineraryData['details'] as List? ?? [];
         final List<Map<String, dynamic>> tripPlaces = [];
-        
+
         for (final item in savedPlaces) {
-          if (item['place'] != null) tripPlaces.add(Map<String, dynamic>.from(item['place']));
+          if (item['place'] != null)
+            tripPlaces.add(Map<String, dynamic>.from(item['place']));
         }
         for (final item in details) {
-          if (item['place'] != null) tripPlaces.add(Map<String, dynamic>.from(item['place']));
+          if (item['place'] != null)
+            tripPlaces.add(Map<String, dynamic>.from(item['place']));
         }
 
         final combined = [...tripPlaces, ...dbPlaces];
@@ -2764,10 +2799,17 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
 
                     // Header
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
                       child: Row(
                         children: [
-                          const Icon(Icons.add_photo_alternate_rounded, color: AppTheme.primary, size: 22),
+                          const Icon(
+                            Icons.add_photo_alternate_rounded,
+                            color: AppTheme.primary,
+                            size: 22,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Thay đổi ảnh bìa',
@@ -2808,7 +2850,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                         ),
                         labelColor: Colors.white,
                         unselectedLabelColor: AppTheme.subtitleText,
-                        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        labelStyle: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                         indicatorSize: TabBarIndicatorSize.tab,
                         dividerColor: Colors.transparent,
                         tabs: const [
@@ -2847,13 +2892,28 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                           Column(
                             children: [
                               Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  4,
+                                  16,
+                                  8,
+                                ),
                                 child: TextField(
                                   decoration: InputDecoration(
                                     hintText: 'Tìm kiếm ảnh địa điểm...',
-                                    hintStyle: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                                    prefixIcon: Icon(Icons.search_rounded, size: 20, color: Colors.grey[500]),
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                                    hintStyle: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[400],
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.search_rounded,
+                                      size: 20,
+                                      color: Colors.grey[500],
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 0,
+                                      horizontal: 16,
+                                    ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
                                       borderSide: BorderSide.none,
@@ -2864,7 +2924,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                                      borderSide: const BorderSide(
+                                        color: AppTheme.primary,
+                                        width: 1.5,
+                                      ),
                                     ),
                                     filled: true,
                                     fillColor: Colors.grey[100],
@@ -2873,12 +2936,18 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                     setSheetState(() {
                                       searchQuery = val.trim().toLowerCase();
                                       if (searchQuery.isEmpty) {
-                                        filteredPlaceImages = List.from(placeImages);
+                                        filteredPlaceImages = List.from(
+                                          placeImages,
+                                        );
                                       } else {
-                                        filteredPlaceImages = placeImages.where((p) {
-                                          final name = (p['name'] ?? '').toString().toLowerCase();
-                                          return name.contains(searchQuery);
-                                        }).toList();
+                                        filteredPlaceImages = placeImages.where(
+                                          (p) {
+                                            final name = (p['name'] ?? '')
+                                                .toString()
+                                                .toLowerCase();
+                                            return name.contains(searchQuery);
+                                          },
+                                        ).toList();
                                       }
                                     });
                                   },
@@ -2886,127 +2955,193 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                               ),
                               Expanded(
                                 child: isInitialLoading
-                                    ? const Center(child: CircularProgressIndicator())
+                                    ? const Center(
+                                        child: CircularProgressIndicator(),
+                                      )
                                     : filteredPlaceImages.isEmpty
-                                        ? Center(
-                                            child: Text(
-                                              'Không tìm thấy ảnh địa điểm tham quan cho "$destination"',
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(color: Colors.grey, fontSize: 13),
-                                            ),
-                                          )
-                                        : GridView.builder(
-                                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    ? Center(
+                                        child: Text(
+                                          'Không tìm thấy ảnh địa điểm tham quan cho "$destination"',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      )
+                                    : GridView.builder(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          16,
+                                          4,
+                                          16,
+                                          16,
+                                        ),
+                                        gridDelegate:
+                                            const SliverGridDelegateWithFixedCrossAxisCount(
                                               crossAxisCount: 2,
                                               crossAxisSpacing: 12,
                                               mainAxisSpacing: 12,
                                               childAspectRatio: 1.15,
                                             ),
-                                            itemCount: filteredPlaceImages.length,
-                                            itemBuilder: (context, index) {
-                                              final place = filteredPlaceImages[index];
-                                              final imageUrl = (place['image'] ?? place['coverImage'] ?? '').toString();
-                                              final placeName = (place['name'] ?? 'Địa điểm').toString();
-                                              final isSelected = selectedCoverImage == imageUrl;
+                                        itemCount: filteredPlaceImages.length,
+                                        itemBuilder: (context, index) {
+                                          final place =
+                                              filteredPlaceImages[index];
+                                          final imageUrl =
+                                              (place['image'] ??
+                                                      place['coverImage'] ??
+                                                      '')
+                                                  .toString();
+                                          final placeName =
+                                              (place['name'] ?? 'Địa điểm')
+                                                  .toString();
+                                          final isSelected =
+                                              selectedCoverImage == imageUrl;
 
-                                              return GestureDetector(
-                                                onTap: () {
-                                                  setSheetState(() {
-                                                    selectedCoverImage = imageUrl;
-                                                  });
-                                                },
-                                                child: AnimatedContainer(
-                                                  duration: const Duration(milliseconds: 200),
-                                                  decoration: BoxDecoration(
-                                                    borderRadius: BorderRadius.circular(16),
-                                                    border: isSelected
-                                                        ? Border.all(color: AppTheme.primary, width: 3)
-                                                        : Border.all(color: Colors.transparent, width: 0),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: isSelected
-                                                            ? AppTheme.primary.withAlpha(60)
-                                                            : Colors.black.withAlpha(12),
-                                                        blurRadius: isSelected ? 10 : 6,
-                                                        offset: const Offset(0, 3),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  child: ClipRRect(
-                                                    borderRadius: BorderRadius.circular(13),
-                                                    child: Stack(
-                                                      fit: StackFit.expand,
-                                                      children: [
-                                                        Image.network(
-                                                          imageUrl,
-                                                          fit: BoxFit.cover,
-                                                          errorBuilder: (_, __, ___) => Container(
-                                                            color: Colors.grey[200],
-                                                            child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
-                                                          ),
-                                                        ),
-                                                        DecoratedBox(
-                                                          decoration: BoxDecoration(
-                                                            gradient: LinearGradient(
-                                                              begin: Alignment.topCenter,
-                                                              end: Alignment.bottomCenter,
-                                                              colors: [
-                                                                Colors.transparent,
-                                                                Colors.black.withAlpha(180),
-                                                              ],
-                                                              stops: const [0.45, 1.0],
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        Positioned(
-                                                          left: 10,
-                                                          right: 10,
-                                                          bottom: 10,
-                                                          child: Text(
-                                                            placeName,
-                                                            style: const TextStyle(
-                                                              color: Colors.white,
-                                                              fontWeight: FontWeight.bold,
-                                                              fontSize: 12,
-                                                              shadows: [
-                                                                Shadow(color: Colors.black54, blurRadius: 4),
-                                                              ],
-                                                            ),
-                                                            maxLines: 2,
-                                                            overflow: TextOverflow.ellipsis,
-                                                          ),
-                                                        ),
-                                                        if (isSelected)
-                                                          Positioned(
-                                                            top: 8,
-                                                            right: 8,
-                                                            child: Container(
-                                                              padding: const EdgeInsets.all(4),
-                                                              decoration: BoxDecoration(
-                                                                color: AppTheme.primary,
-                                                                shape: BoxShape.circle,
-                                                                boxShadow: [
-                                                                  BoxShadow(
-                                                                    color: Colors.black.withAlpha(60),
-                                                                    blurRadius: 4,
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                              child: const Icon(
-                                                                Icons.check_rounded,
-                                                                color: Colors.white,
-                                                                size: 14,
-                                                              ),
-                                                            ),
-                                                          ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                              );
+                                          return GestureDetector(
+                                            onTap: () {
+                                              setSheetState(() {
+                                                selectedCoverImage = imageUrl;
+                                              });
                                             },
-                                          ),
+                                            child: AnimatedContainer(
+                                              duration: const Duration(
+                                                milliseconds: 200,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                                border: isSelected
+                                                    ? Border.all(
+                                                        color: AppTheme.primary,
+                                                        width: 3,
+                                                      )
+                                                    : Border.all(
+                                                        color:
+                                                            Colors.transparent,
+                                                        width: 0,
+                                                      ),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: isSelected
+                                                        ? AppTheme.primary
+                                                              .withAlpha(60)
+                                                        : Colors.black
+                                                              .withAlpha(12),
+                                                    blurRadius: isSelected
+                                                        ? 10
+                                                        : 6,
+                                                    offset: const Offset(0, 3),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(13),
+                                                child: Stack(
+                                                  fit: StackFit.expand,
+                                                  children: [
+                                                    Image.network(
+                                                      imageUrl,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (
+                                                            _,
+                                                            __,
+                                                            ___,
+                                                          ) => Container(
+                                                            color: Colors
+                                                                .grey[200],
+                                                            child: const Icon(
+                                                              Icons
+                                                                  .broken_image_outlined,
+                                                              color:
+                                                                  Colors.grey,
+                                                            ),
+                                                          ),
+                                                    ),
+                                                    DecoratedBox(
+                                                      decoration: BoxDecoration(
+                                                        gradient: LinearGradient(
+                                                          begin: Alignment
+                                                              .topCenter,
+                                                          end: Alignment
+                                                              .bottomCenter,
+                                                          colors: [
+                                                            Colors.transparent,
+                                                            Colors.black
+                                                                .withAlpha(180),
+                                                          ],
+                                                          stops: const [
+                                                            0.45,
+                                                            1.0,
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Positioned(
+                                                      left: 10,
+                                                      right: 10,
+                                                      bottom: 10,
+                                                      child: Text(
+                                                        placeName,
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 12,
+                                                          shadows: [
+                                                            Shadow(
+                                                              color: Colors
+                                                                  .black54,
+                                                              blurRadius: 4,
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                    if (isSelected)
+                                                      Positioned(
+                                                        top: 8,
+                                                        right: 8,
+                                                        child: Container(
+                                                          padding:
+                                                              const EdgeInsets.all(
+                                                                4,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: AppTheme
+                                                                .primary,
+                                                            shape:
+                                                                BoxShape.circle,
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                color: Colors
+                                                                    .black
+                                                                    .withAlpha(
+                                                                      60,
+                                                                    ),
+                                                                blurRadius: 4,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          child: const Icon(
+                                                            Icons.check_rounded,
+                                                            color: Colors.white,
+                                                            size: 14,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
                               ),
                             ],
                           ),
@@ -3016,13 +3151,19 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                if (selectedCoverImage != null && selectedCoverImage!.startsWith('data:image')) ...[
+                                if (selectedCoverImage != null &&
+                                    selectedCoverImage!.startsWith(
+                                      'data:image',
+                                    )) ...[
                                   Container(
                                     width: 160,
                                     height: 120,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: AppTheme.primary, width: 3),
+                                      border: Border.all(
+                                        color: AppTheme.primary,
+                                        width: 3,
+                                      ),
                                       boxShadow: [
                                         BoxShadow(
                                           color: AppTheme.primary.withAlpha(60),
@@ -3037,7 +3178,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                         fit: StackFit.expand,
                                         children: [
                                           Image.memory(
-                                            base64Decode(selectedCoverImage!.split(',').last),
+                                            base64Decode(
+                                              selectedCoverImage!
+                                                  .split(',')
+                                                  .last,
+                                            ),
                                             fit: BoxFit.cover,
                                           ),
                                           Positioned(
@@ -3049,7 +3194,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                                 color: AppTheme.primary,
                                                 shape: BoxShape.circle,
                                               ),
-                                              child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
+                                              child: const Icon(
+                                                Icons.check_rounded,
+                                                color: Colors.white,
+                                                size: 14,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -3057,13 +3206,21 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                     ),
                                   ),
                                   const SizedBox(height: 14),
-                                  const Text('Đã chọn ảnh từ thiết bị', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 14)),
+                                  const Text(
+                                    'Đã chọn ảnh từ thiết bị',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
                                   const SizedBox(height: 14),
                                 ] else ...[
                                   Container(
                                     padding: const EdgeInsets.all(20),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.primaryContainer.withAlpha(70),
+                                      color: AppTheme.primaryContainer
+                                          .withAlpha(70),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
@@ -3097,14 +3254,17 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                   onPressed: () async {
                                     try {
                                       final picker = ImagePicker();
-                                      final XFile? pickedFile = await picker.pickImage(
-                                        source: ImageSource.gallery,
-                                        imageQuality: 85,
-                                      );
+                                      final XFile? pickedFile = await picker
+                                          .pickImage(
+                                            source: ImageSource.gallery,
+                                            imageQuality: 85,
+                                          );
 
                                       if (pickedFile != null) {
-                                        final bytes = await pickedFile.readAsBytes();
-                                        final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                                        final bytes = await pickedFile
+                                            .readAsBytes();
+                                        final base64Image =
+                                            'data:image/jpeg;base64,${base64Encode(bytes)}';
                                         setSheetState(() {
                                           selectedCoverImage = base64Image;
                                         });
@@ -3114,20 +3274,33 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.primaryContainer.withAlpha(120),
+                                    backgroundColor: AppTheme.primaryContainer
+                                        .withAlpha(120),
                                     foregroundColor: AppTheme.primary,
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 12,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
                                     ),
                                     elevation: 0,
                                   ),
-                                  icon: const Icon(Icons.photo_library_rounded, size: 18),
+                                  icon: const Icon(
+                                    Icons.photo_library_rounded,
+                                    size: 18,
+                                  ),
                                   label: Text(
-                                    selectedCoverImage != null && selectedCoverImage!.startsWith('data:image')
+                                    selectedCoverImage != null &&
+                                            selectedCoverImage!.startsWith(
+                                              'data:image',
+                                            )
                                         ? 'Đổi ảnh khác'
                                         : 'Chọn ảnh từ thư viện',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -3156,21 +3329,28 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                           width: double.infinity,
                           height: 48,
                           child: ElevatedButton(
-                            onPressed: (selectedCoverImage == null || isSavingImage)
+                            onPressed:
+                                (selectedCoverImage == null || isSavingImage)
                                 ? null
                                 : () async {
                                     setSheetState(() {
                                       isSavingImage = true;
                                     });
-                                    final itineraryId = _itineraryData['id'];
+                                    final rawId = _itineraryData['id'];
+                                    final itineraryId = (rawId is int)
+                                        ? rawId
+                                        : (rawId != null
+                                              ? int.tryParse(rawId.toString())
+                                              : null);
                                     if (itineraryId != null) {
-                                      final updated = await DatabaseService().updateItinerary(
-                                        itineraryId,
-                                        {'coverImage': selectedCoverImage},
-                                      );
+                                      final updated = await DatabaseService()
+                                          .updateItinerary(itineraryId, {
+                                            'coverImage': selectedCoverImage,
+                                          });
                                       if (updated) {
                                         setState(() {
-                                          _itineraryData['coverImage'] = selectedCoverImage;
+                                          _itineraryData['coverImage'] =
+                                              selectedCoverImage;
                                         });
                                         await _syncExplorePost();
                                         await _fetchExplorePosts();
@@ -4186,29 +4366,6 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                             size: 20,
                                           ),
                                         ),
-                                        const SizedBox(height: 8),
-                                        FloatingActionButton(
-                                          heroTag: 'add_btn',
-                                          onPressed: () async {
-                                            if (_tabController.index == 1) {
-                                              _showPremiumNotification(
-                                                title: 'Hướng dẫn',
-                                                message:
-                                                    'Vui lòng chọn địa điểm bên dưới để thêm!',
-                                                icon:
-                                                    Icons.info_outline_rounded,
-                                                color: AppTheme.primary,
-                                              );
-                                            } else {
-                                              _createNewSection();
-                                            }
-                                          },
-                                          backgroundColor: AppTheme.darkText,
-                                          child: const Icon(
-                                            Icons.add,
-                                            color: Colors.white,
-                                          ),
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -4874,7 +5031,8 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () async {
-                      final name = (p['placeName'] ?? p['name'] ?? '').toString();
+                      final name = (p['placeName'] ?? p['name'] ?? '')
+                          .toString();
                       final address = (p['address'] ?? '').toString();
                       final lat = p['latitude'];
                       final lon = p['longitude'];
@@ -4886,7 +5044,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                       );
                       try {
                         if (await canLaunchUrl(url)) {
-                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                          await launchUrl(
+                            url,
+                            mode: LaunchMode.externalApplication,
+                          );
                         } else {
                           await launchUrl(url);
                         }
@@ -9296,7 +9457,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   // ================= TAB 3: KHÁM PHÁ =================
   Widget _buildExploreTab() {
     if (_isLoadingExplore) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primary),
+      );
     }
 
     final destination = _itineraryData['destination'] ?? 'Cần Thơ';
@@ -9324,14 +9487,21 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryContainer.withAlpha(120),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.stars_rounded, color: AppTheme.primary, size: 14),
+                          Icon(
+                            Icons.stars_rounded,
+                            color: AppTheme.primary,
+                            size: 14,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Gợi ý',
@@ -9357,7 +9527,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.border.withAlpha(180), width: 1),
+                    border: Border.all(
+                      color: AppTheme.border.withAlpha(180),
+                      width: 1,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withAlpha(8),
@@ -9368,7 +9541,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.search_rounded, color: AppTheme.primary, size: 20),
+                      const Icon(
+                        Icons.search_rounded,
+                        color: AppTheme.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -9386,7 +9563,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                           color: Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(Icons.tune_rounded, color: AppTheme.subtitleText, size: 16),
+                        child: Icon(
+                          Icons.tune_rounded,
+                          color: AppTheme.subtitleText,
+                          size: 16,
+                        ),
                       ),
                     ],
                   ),
@@ -9410,7 +9591,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                       color: AppTheme.primaryContainer.withAlpha(80),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.explore_off_rounded, size: 40, color: AppTheme.primary.withAlpha(180)),
+                    child: Icon(
+                      Icons.explore_off_rounded,
+                      size: 40,
+                      color: AppTheme.primary.withAlpha(180),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(

@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'guide_overview_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
@@ -425,7 +427,11 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
                 'Hủy',
-                style: TextStyle(color: AppTheme.subtitleText, fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: AppTheme.subtitleText,
+                  fontFamily: 'SDK_SC_Web-Heavy',
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             FilledButton(
@@ -458,7 +464,13 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                   );
                 }
               },
-              child: const Text('Đổi mật khẩu', style: TextStyle(fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Đổi mật khẩu',
+                style: TextStyle(
+                  fontFamily: 'SDK_SC_Web-Heavy',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -498,7 +510,11 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
                 'Hủy',
-                style: TextStyle(color: AppTheme.subtitleText, fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: AppTheme.subtitleText,
+                  fontFamily: 'SDK_SC_Web-Heavy',
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             FilledButton(
@@ -523,7 +539,13 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
                   ),
                 );
               },
-              child: const Text('Đăng xuất', style: TextStyle(fontFamily: 'SDK_SC_Web-Heavy', fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Đăng xuất',
+                style: TextStyle(
+                  fontFamily: 'SDK_SC_Web-Heavy',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -740,7 +762,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     super.initState();
     _selectedCalendarDate = DateTime.now();
     _currentMonth = DateTime.now();
-    _tabController = TabController(length: widget.user.role ? 3 : 5, vsync: this);
+    _tabController = TabController(
+      length: widget.user.role ? 3 : 5,
+      vsync: this,
+    );
     _loadData();
     _loadNotes();
     DatabaseService.refreshTrigger.addListener(_loadData);
@@ -857,9 +882,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
   Widget build(BuildContext context) {
     final String joinDate =
         '${widget.user.createdAt.day}/${widget.user.createdAt.month}/${widget.user.createdAt.year}';
-    final String roleText = widget.user.role
-        ? 'Quản trị viên'
-        : 'Thành viên';
+    final String roleText = widget.user.role ? 'Quản trị viên' : 'Thành viên';
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -1080,6 +1103,153 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     );
   }
 
+  Widget _buildItineraryThumbnail(
+    Map<String, dynamic> item, {
+    required bool isGuide,
+  }) {
+    final rawCover =
+        item['coverImage'] ??
+        item['cover_image'] ??
+        item['image_url'] ??
+        item['image'];
+    final coverStr = rawCover is String ? rawCover.trim() : null;
+
+    Widget defaultIcon = isGuide
+        ? const Icon(Icons.menu_book_rounded, color: Colors.white, size: 28)
+        : const Icon(
+            Icons.flight_takeoff_rounded,
+            color: Colors.white70,
+            size: 28,
+          );
+
+    Gradient bgGradient = isGuide
+        ? LinearGradient(
+            colors: [AppTheme.amber.withAlpha(200), AppTheme.amber],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+        : AppTheme.primaryGradient;
+
+    Widget childWidget = defaultIcon;
+
+    if (coverStr != null && coverStr.isNotEmpty) {
+      if (coverStr.startsWith('http://') || coverStr.startsWith('https://')) {
+        childWidget = Image.network(
+          coverStr,
+          fit: BoxFit.cover,
+          errorBuilder: (c, e, s) => defaultIcon,
+        );
+      } else if (coverStr.startsWith('assets/')) {
+        childWidget = Image.asset(
+          coverStr,
+          fit: BoxFit.cover,
+          errorBuilder: (c, e, s) => defaultIcon,
+        );
+      } else {
+        try {
+          final file = File(coverStr);
+          if (file.existsSync()) {
+            childWidget = Image.file(
+              file,
+              fit: BoxFit.cover,
+              errorBuilder: (c, e, s) => defaultIcon,
+            );
+          }
+        } catch (_) {
+          childWidget = defaultIcon;
+        }
+      }
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(gradient: bgGradient),
+        child: childWidget,
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteItinerary(
+    Map<String, dynamic> item,
+    bool isGuide,
+  ) async {
+    final id = item['id'];
+    int? itineraryId;
+    if (id is int) {
+      itineraryId = id;
+    } else if (id != null) {
+      itineraryId = int.tryParse(id.toString());
+    }
+
+    if (itineraryId == null) return;
+
+    final title =
+        item['title'] as String? ?? (isGuide ? 'Hướng dẫn' : 'Hành trình');
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Text(
+          isGuide ? 'Xóa hướng dẫn' : 'Xóa hành trình',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.darkText,
+          ),
+        ),
+        content: Text(
+          isGuide
+              ? 'Bạn có chắc chắn muốn xóa hướng dẫn "$title" không?\n\nBài viết chia sẻ của hướng dẫn này trong cộng đồng Khám phá cũng sẽ được gỡ bỏ.'
+              : 'Bạn có chắc chắn muốn xóa lịch trình "$title" không?\n\nBài viết chia sẻ liên quan trên cộng đồng Khám phá cũng sẽ được gỡ bỏ.',
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Xóa',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final success = await DatabaseService().deleteItinerary(itineraryId);
+      if (success) {
+        _loadData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Đã xóa ${isGuide ? 'hướng dẫn' : 'lịch trình'} thành công',
+              ),
+              backgroundColor: AppTheme.primary,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Widget _buildItineraryTab() {
     if (_isLoading) {
       return const Center(
@@ -1153,115 +1323,159 @@ class _ProfileDashboardState extends State<ProfileDashboard>
       itemCount: _itineraries.length,
       itemBuilder: (context, index) {
         final trip = _itineraries[index];
-        return GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => TripOverviewScreen(itinerary: trip),
-              ),
-            );
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.all(16),
-            decoration: AppTheme.premiumCardDecoration(),
-            child: Row(
+        return Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          child: Slidable(
+            key: ValueKey('itinerary_${trip['id']}'),
+            startActionPane: ActionPane(
+              motion: const ScrollMotion(),
+              extentRatio: 0.25,
               children: [
-                // Image thumbnail
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: const BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                    ),
-                    child: trip['image_url'] != null
-                        ? Image.network(
-                            trip['image_url'] as String,
-                            fit: BoxFit.cover,
-                            errorBuilder: (c, e, s) => const Icon(
-                              Icons.flight_takeoff_rounded,
-                              color: Colors.white70,
-                              size: 28,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.flight_takeoff_rounded,
-                            color: Colors.white70,
-                            size: 28,
-                          ),
+                CustomSlidableAction(
+                  onPressed: (context) => _confirmDeleteItinerary(trip, false),
+                  backgroundColor: const Color(0xFFE53935),
+                  foregroundColor: Colors.white,
+                  borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(20),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      Icon(Icons.delete_outline, color: Colors.white, size: 24),
+                      SizedBox(height: 4),
                       Text(
-                        trip['title'] as String? ?? 'Hành trình',
+                        'Xóa',
                         style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.darkText,
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_rounded,
-                            size: 12,
-                            color: AppTheme.subtitleText,
-                          ),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              trip['destination'] as String? ?? 'Chưa xác định',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.subtitleText,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _buildTripChip(
-                            '${trip['days'] ?? '?'} ngày',
-                            Icons.calendar_today_rounded,
-                            AppTheme.primaryContainer,
-                            AppTheme.primary,
-                          ),
-                          const SizedBox(width: 6),
-                          if (trip['budget'] != null)
-                            _buildTripChip(
-                              _formatBudget(
-                                (trip['budget'] is num)
-                                    ? (trip['budget'] as num).toInt()
-                                    : int.tryParse(trip['budget'].toString()) ??
-                                          0,
-                              ),
-                              Icons.payments_rounded,
-                              AppTheme.lightGreen,
-                              AppTheme.green,
-                            ),
-                        ],
                       ),
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTheme.subtitleText,
+              ],
+            ),
+            endActionPane: ActionPane(
+              motion: const ScrollMotion(),
+              extentRatio: 0.25,
+              children: [
+                CustomSlidableAction(
+                  onPressed: (context) => _confirmDeleteItinerary(trip, false),
+                  backgroundColor: const Color(0xFFE53935),
+                  foregroundColor: Colors.white,
+                  borderRadius: const BorderRadius.horizontal(
+                    right: Radius.circular(20),
+                  ),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.delete_outline, color: Colors.white, size: 24),
+                      SizedBox(height: 4),
+                      Text(
+                        'Xóa',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
+            ),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context)
+                    .push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            TripOverviewScreen(itinerary: trip),
+                      ),
+                    )
+                    .then((_) => _loadData());
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: AppTheme.premiumCardDecoration(),
+                child: Row(
+                  children: [
+                    _buildItineraryThumbnail(trip, isGuide: false),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            trip['title'] as String? ?? 'Hành trình',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.darkText,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on_rounded,
+                                size: 12,
+                                color: AppTheme.subtitleText,
+                              ),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(
+                                  trip['destination'] as String? ??
+                                      'Chưa xác định',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.subtitleText,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              _buildTripChip(
+                                '${trip['days'] ?? '?'} ngày',
+                                Icons.calendar_today_rounded,
+                                AppTheme.primaryContainer,
+                                AppTheme.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              if (trip['budget'] != null)
+                                _buildTripChip(
+                                  _formatBudget(
+                                    (trip['budget'] is num)
+                                        ? (trip['budget'] as num).toInt()
+                                        : int.tryParse(
+                                                trip['budget'].toString(),
+                                              ) ??
+                                              0,
+                                  ),
+                                  Icons.payments_rounded,
+                                  AppTheme.lightGreen,
+                                  AppTheme.green,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppTheme.subtitleText,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         );
@@ -1275,7 +1489,9 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     try {
       final List decoded = jsonDecode(notesJson);
       setState(() {
-        _customNotes = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+        _customNotes = decoded
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
       });
     } catch (e) {
       debugPrint('Error loading calendar notes: $e');
@@ -1300,8 +1516,13 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         return StatefulBuilder(
           builder: (context, setModalState) {
             return AlertDialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 24,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               title: Text(
                 'Thêm ghi chú/hoạt động',
                 style: TextStyle(
@@ -1341,7 +1562,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                               children: [
                                 const Text(
                                   'Từ ngày:',
-                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 InkWell(
@@ -1363,18 +1587,30 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                                   },
                                   borderRadius: BorderRadius.circular(8),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey[300]!),
+                                      border: Border.all(
+                                        color: Colors.grey[300]!,
+                                      ),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.calendar_today_rounded, size: 14, color: AppTheme.primary),
+                                        const Icon(
+                                          Icons.calendar_today_rounded,
+                                          size: 14,
+                                          color: AppTheme.primary,
+                                        ),
                                         const SizedBox(width: 6),
                                         Text(
                                           '${startDate.day}/${startDate.month}/${startDate.year}',
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -1390,7 +1626,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                               children: [
                                 const Text(
                                   'Đến ngày:',
-                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 InkWell(
@@ -1409,18 +1648,30 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                                   },
                                   borderRadius: BorderRadius.circular(8),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
-                                      border: Border.all(color: Colors.grey[300]!),
+                                      border: Border.all(
+                                        color: Colors.grey[300]!,
+                                      ),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.calendar_today_rounded, size: 14, color: AppTheme.primary),
+                                        const Icon(
+                                          Icons.calendar_today_rounded,
+                                          size: 14,
+                                          color: AppTheme.primary,
+                                        ),
                                         const SizedBox(width: 6),
                                         Text(
                                           '${endDate.day}/${endDate.month}/${endDate.year}',
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -1437,7 +1688,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                         children: [
                           const Text(
                             'Thời gian:',
-                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
                           ),
                           InkWell(
                             onTap: () async {
@@ -1453,18 +1707,29 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                             },
                             borderRadius: BorderRadius.circular(8),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                               decoration: BoxDecoration(
                                 border: Border.all(color: Colors.grey[300]!),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.access_time_rounded, size: 14, color: AppTheme.primary),
+                                  const Icon(
+                                    Icons.access_time_rounded,
+                                    size: 14,
+                                    color: AppTheme.primary,
+                                  ),
                                   const SizedBox(width: 6),
                                   Text(
                                     selectedTime.format(context),
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.primary,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1479,20 +1744,28 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+                  child: const Text(
+                    'Hủy',
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: () {
                     final title = titleController.text.trim();
                     if (title.isEmpty) return;
 
-                    final timeStr = '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
-                    final startStr = '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
-                    final endStr = '${endDate.year}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}';
+                    final timeStr =
+                        '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}';
+                    final startStr =
+                        '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}';
+                    final endStr =
+                        '${endDate.year}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}';
 
                     setState(() {
                       _customNotes.add({
@@ -1508,7 +1781,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     _saveNotes();
                     Navigator.of(context).pop();
                   },
-                  child: const Text('Lưu', style: TextStyle(color: Colors.white)),
+                  child: const Text(
+                    'Lưu',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
             );
@@ -1554,21 +1830,25 @@ class _ProfileDashboardState extends State<ProfileDashboard>
 
   List<Map<String, dynamic>> _getEventsForDate(DateTime date) {
     final List<Map<String, dynamic>> events = [];
-    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
     for (var trip in _itineraries) {
       if (trip['startDate'] == null) continue;
       try {
-        final DateTime tripStart = DateTime.parse(trip['startDate'] as String).toLocal();
-        
+        final DateTime tripStart = DateTime.parse(
+          trip['startDate'] as String,
+        ).toLocal();
+
         final details = trip['details'] as List?;
         if (details == null) continue;
-        
+
         for (var detail in details) {
           final int day = (detail['day'] as num?)?.toInt() ?? 1;
           final DateTime detailDate = tripStart.add(Duration(days: day - 1));
-          final detailDateStr = '${detailDate.year}-${detailDate.month.toString().padLeft(2, '0')}-${detailDate.day.toString().padLeft(2, '0')}';
-          
+          final detailDateStr =
+              '${detailDate.year}-${detailDate.month.toString().padLeft(2, '0')}-${detailDate.day.toString().padLeft(2, '0')}';
+
           if (detailDateStr == dateStr) {
             events.add({
               'tripTitle': trip['title'] ?? 'Chuyến đi',
@@ -1588,7 +1868,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
       final String? startDateStr = note['startDate'] ?? note['date'];
       final String? endDateStr = note['endDate'] ?? note['date'];
       if (startDateStr != null && endDateStr != null) {
-        if (dateStr.compareTo(startDateStr) >= 0 && dateStr.compareTo(endDateStr) <= 0) {
+        if (dateStr.compareTo(startDateStr) >= 0 &&
+            dateStr.compareTo(endDateStr) <= 0) {
           events.add({
             'isCustomNote': true,
             'id': note['id'],
@@ -1599,31 +1880,44 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         }
       }
     }
-    
+
     events.sort((a, b) {
       final String timeA = a['startTime'] ?? '00:00';
       final String timeB = b['startTime'] ?? '00:00';
       return timeA.compareTo(timeB);
     });
-    
+
     return events;
   }
 
   String _getMonthName(int month) {
     switch (month) {
-      case 1: return 'Tháng Một';
-      case 2: return 'Tháng Hai';
-      case 3: return 'Tháng Ba';
-      case 4: return 'Tháng Tư';
-      case 5: return 'Tháng Năm';
-      case 6: return 'Tháng Sáu';
-      case 7: return 'Tháng Bảy';
-      case 8: return 'Tháng Tám';
-      case 9: return 'Tháng Chín';
-      case 10: return 'Tháng Mười';
-      case 11: return 'Tháng Mười Một';
-      case 12: return 'Tháng Mười Hai';
-      default: return '';
+      case 1:
+        return 'Tháng Một';
+      case 2:
+        return 'Tháng Hai';
+      case 3:
+        return 'Tháng Ba';
+      case 4:
+        return 'Tháng Tư';
+      case 5:
+        return 'Tháng Năm';
+      case 6:
+        return 'Tháng Sáu';
+      case 7:
+        return 'Tháng Bảy';
+      case 8:
+        return 'Tháng Tám';
+      case 9:
+        return 'Tháng Chín';
+      case 10:
+        return 'Tháng Mười';
+      case 11:
+        return 'Tháng Mười Một';
+      case 12:
+        return 'Tháng Mười Hai';
+      default:
+        return '';
     }
   }
 
@@ -1633,7 +1927,15 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     final weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
     String getFullDateHeader(DateTime date) {
-      final daysOfWeek = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+      final daysOfWeek = [
+        'Chủ Nhật',
+        'Thứ Hai',
+        'Thứ Ba',
+        'Thứ Tư',
+        'Thứ Năm',
+        'Thứ Sáu',
+        'Thứ Bảy',
+      ];
       final dayName = daysOfWeek[date.weekday % 7];
       return '$dayName, Ngày ${date.day} tháng ${date.month}, ${date.year}';
     }
@@ -1658,18 +1960,30 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.chevron_left_rounded, color: AppTheme.primary),
+                    icon: const Icon(
+                      Icons.chevron_left_rounded,
+                      color: AppTheme.primary,
+                    ),
                     onPressed: () {
                       setState(() {
-                        _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+                        _currentMonth = DateTime(
+                          _currentMonth.year,
+                          _currentMonth.month - 1,
+                        );
                       });
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.chevron_right_rounded, color: AppTheme.primary),
+                    icon: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppTheme.primary,
+                    ),
                     onPressed: () {
                       setState(() {
-                        _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+                        _currentMonth = DateTime(
+                          _currentMonth.year,
+                          _currentMonth.month + 1,
+                        );
                       });
                     },
                   ),
@@ -1684,18 +1998,22 @@ class _ProfileDashboardState extends State<ProfileDashboard>
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: weekdays.map((day) => Expanded(
-              child: Center(
-                child: Text(
-                  day,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.subtitleText,
+            children: weekdays
+                .map(
+                  (day) => Expanded(
+                    child: Center(
+                      child: Text(
+                        day,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.subtitleText,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            )).toList(),
+                )
+                .toList(),
           ),
         ),
         const SizedBox(height: 4),
@@ -1717,7 +2035,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               final date = calendarDays[index];
               if (date == null) return const SizedBox.shrink();
 
-              final isSelected = DateUtils.isSameDay(date, _selectedCalendarDate);
+              final isSelected = DateUtils.isSameDay(
+                date,
+                _selectedCalendarDate,
+              );
               final isToday = DateUtils.isSameDay(date, DateTime.now());
               final isCurrentMonth = date.month == _currentMonth.month;
               final hasEvents = _getEventsForDate(date).isNotEmpty;
@@ -1736,8 +2057,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                     color: isSelected
                         ? AppTheme.primary
                         : isToday
-                            ? AppTheme.primaryContainer.withOpacity(0.4)
-                            : Colors.transparent,
+                        ? AppTheme.primaryContainer.withOpacity(0.4)
+                        : Colors.transparent,
                     shape: BoxShape.circle,
                   ),
                   child: Stack(
@@ -1747,12 +2068,14 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                         date.day.toString(),
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.w500,
+                          fontWeight: isSelected || isToday
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                           color: isSelected
                               ? Colors.white
                               : isCurrentMonth
-                                  ? AppTheme.darkText
-                                  : Colors.grey[400],
+                              ? AppTheme.darkText
+                              : Colors.grey[400],
                         ),
                       ),
                       if (hasEvents)
@@ -1762,7 +2085,9 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                             width: 4,
                             height: 4,
                             decoration: BoxDecoration(
-                              color: isSelected ? Colors.white : AppTheme.primary,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppTheme.primary,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -1796,14 +2121,21 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               GestureDetector(
                 onTap: () => _showAddNoteDialog(context),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.add_rounded, size: 16, color: AppTheme.primary),
+                      Icon(
+                        Icons.add_rounded,
+                        size: 16,
+                        color: AppTheme.primary,
+                      ),
                       SizedBox(width: 4),
                       Text(
                         'Thêm ghi chú',
@@ -1836,10 +2168,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 const SizedBox(height: 10),
                 Text(
                   'Không có địa điểm hay ghi chú nào cho ngày này.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.subtitleText,
-                  ),
+                  style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
                 ),
               ],
             ),
@@ -1858,7 +2187,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               final noteText = event['noteText'] as String?;
               final isCustomNote = event['isCustomNote'] == true;
 
-              final hasImage = place != null &&
+              final hasImage =
+                  place != null &&
                   place['image'] != null &&
                   place['image'].toString().isNotEmpty &&
                   !place['image'].toString().contains('placeholder');
@@ -1877,20 +2207,19 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: isCustomNote ? Colors.blueGrey : AppTheme.primary,
+                              color: isCustomNote
+                                  ? Colors.blueGrey
+                                  : AppTheme.primary,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Expanded(
-                            child: Container(
-                              width: 2,
-                              color: AppTheme.border,
-                            ),
+                            child: Container(width: 2, color: AppTheme.border),
                           ),
                         ],
                       ),
                     ),
-                    
+
                     // Timeline Node
                     Column(
                       children: [
@@ -1902,7 +2231,9 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                             color: Colors.white,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: isCustomNote ? Colors.blueGrey : AppTheme.primary,
+                              color: isCustomNote
+                                  ? Colors.blueGrey
+                                  : AppTheme.primary,
                               width: 3,
                             ),
                           ),
@@ -1928,9 +2259,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                               context: context,
                               isScrollControlled: true,
                               backgroundColor: Colors.transparent,
-                              builder: (context) => PlaceDetailBottomSheet(
-                                place: place,
-                              ),
+                              builder: (context) =>
+                                  PlaceDetailBottomSheet(place: place),
                             );
                           }
                         },
@@ -1945,17 +2275,27 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                                 child: Container(
                                   width: 50,
                                   height: 50,
-                                  color: isCustomNote ? Colors.blueGrey.withOpacity(0.1) : Colors.grey[200],
+                                  color: isCustomNote
+                                      ? Colors.blueGrey.withOpacity(0.1)
+                                      : Colors.grey[200],
                                   child: isCustomNote
-                                      ? const Icon(Icons.event_note_rounded, color: Colors.blueGrey)
+                                      ? const Icon(
+                                          Icons.event_note_rounded,
+                                          color: Colors.blueGrey,
+                                        )
                                       : hasImage
-                                          ? Image.network(
-                                              place['image'].toString(),
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (c, e, s) =>
-                                                  const Icon(Icons.place_rounded, color: Colors.grey),
-                                            )
-                                          : const Icon(Icons.place_rounded, color: Colors.grey),
+                                      ? Image.network(
+                                          place['image'].toString(),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (c, e, s) => const Icon(
+                                            Icons.place_rounded,
+                                            color: Colors.grey,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.place_rounded,
+                                          color: Colors.grey,
+                                        ),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -1966,7 +2306,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                                     Text(
                                       isCustomNote
                                           ? event['title'] ?? 'Ghi chú'
-                                          : place != null ? place['name']?.toString() ?? 'Ghi chú' : 'Ghi chú',
+                                          : place != null
+                                          ? place['name']?.toString() ??
+                                                'Ghi chú'
+                                          : 'Ghi chú',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
@@ -1988,14 +2331,17 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
-                                    if (noteText != null && noteText.trim().isNotEmpty) ...[
+                                    if (noteText != null &&
+                                        noteText.trim().isNotEmpty) ...[
                                       const SizedBox(height: 4),
                                       Text(
                                         noteText,
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontStyle: FontStyle.italic,
-                                          color: isCustomNote ? Colors.black87 : Colors.black54,
+                                          color: isCustomNote
+                                              ? Colors.black87
+                                              : Colors.black54,
                                         ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
@@ -2112,102 +2458,151 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         final sections = (guide['sections'] as List?)?.length ?? 0;
         final savedPlaces = (guide['savedPlaces'] as List?)?.length ?? 0;
 
-        return GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => TripOverviewScreen(itinerary: guide),
-              ),
-            ).then((_) => _loadData());
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.all(16),
-            decoration: AppTheme.premiumCardDecoration(),
-            child: Row(
+        return Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          child: Slidable(
+            key: ValueKey('guide_${guide['id']}'),
+            startActionPane: ActionPane(
+              motion: const ScrollMotion(),
+              extentRatio: 0.25,
               children: [
-                // Icon thumbnail
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: LinearGradient(
-                      colors: [AppTheme.amber.withAlpha(200), AppTheme.amber],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                CustomSlidableAction(
+                  onPressed: (context) => _confirmDeleteItinerary(guide, true),
+                  backgroundColor: const Color(0xFFE53935),
+                  foregroundColor: Colors.white,
+                  borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(20),
                   ),
-                  child: const Icon(
-                    Icons.menu_book_rounded,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      Icon(Icons.delete_outline, color: Colors.white, size: 24),
+                      SizedBox(height: 4),
                       Text(
-                        guide['title'] as String? ?? 'Hướng dẫn',
+                        'Xóa',
                         style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.darkText,
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_rounded,
-                            size: 12,
-                            color: AppTheme.subtitleText,
-                          ),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              guide['destination'] as String? ??
-                                  'Chưa xác định',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTheme.subtitleText,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _buildTripChip(
-                            '$savedPlaces địa điểm',
-                            Icons.place_rounded,
-                            AppTheme.lightAmber,
-                            AppTheme.amber,
-                          ),
-                          const SizedBox(width: 6),
-                          _buildTripChip(
-                            '$sections mục',
-                            Icons.list_alt_rounded,
-                            AppTheme.primaryContainer,
-                            AppTheme.primary,
-                          ),
-                        ],
                       ),
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTheme.subtitleText,
+              ],
+            ),
+            endActionPane: ActionPane(
+              motion: const ScrollMotion(),
+              extentRatio: 0.25,
+              children: [
+                CustomSlidableAction(
+                  onPressed: (context) => _confirmDeleteItinerary(guide, true),
+                  backgroundColor: const Color(0xFFE53935),
+                  foregroundColor: Colors.white,
+                  borderRadius: const BorderRadius.horizontal(
+                    right: Radius.circular(20),
+                  ),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.delete_outline, color: Colors.white, size: 24),
+                      SizedBox(height: 4),
+                      Text(
+                        'Xóa',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
+            ),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context)
+                    .push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            TripOverviewScreen(itinerary: guide),
+                      ),
+                    )
+                    .then((_) => _loadData());
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: AppTheme.premiumCardDecoration(),
+                child: Row(
+                  children: [
+                    _buildItineraryThumbnail(guide, isGuide: true),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            guide['title'] as String? ?? 'Hướng dẫn',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.darkText,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.location_on_rounded,
+                                size: 12,
+                                color: AppTheme.subtitleText,
+                              ),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(
+                                  guide['destination'] as String? ??
+                                      'Chưa xác định',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.subtitleText,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              _buildTripChip(
+                                '$savedPlaces địa điểm',
+                                Icons.place_rounded,
+                                AppTheme.lightAmber,
+                                AppTheme.amber,
+                              ),
+                              const SizedBox(width: 6),
+                              _buildTripChip(
+                                '$sections mục',
+                                Icons.list_alt_rounded,
+                                AppTheme.primaryContainer,
+                                AppTheme.primary,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppTheme.subtitleText,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         );
@@ -2425,10 +2820,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 ),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTheme.subtitleText,
-                  ),
+                  style: TextStyle(fontSize: 11, color: AppTheme.subtitleText),
                 ),
               ],
             ),
@@ -2553,14 +2945,16 @@ class _SavedPostsTabState extends State<SavedPostsTab> {
     }
 
     try {
-      final response = await ApiClient.get('/forum/saved', query: {
-        'page': _page.toString(),
-        'pageSize': '10',
-      });
+      final response = await ApiClient.get(
+        '/forum/saved',
+        query: {'page': _page.toString(), 'pageSize': '10'},
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        final fetchedPosts = data.map((e) => Map<String, dynamic>.from(e)).toList();
+        final fetchedPosts = data
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
 
         if (mounted) {
           setState(() {
@@ -2624,7 +3018,11 @@ class _SavedPostsTabState extends State<SavedPostsTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bookmark_outline_rounded, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.bookmark_outline_rounded,
+              size: 64,
+              color: Colors.grey[400],
+            ),
             const SizedBox(height: 16),
             Text(
               'Chưa lưu bài viết nào',
@@ -2667,13 +3065,16 @@ class _SavedPostsTabState extends State<SavedPostsTab> {
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             elevation: 1,
             color: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: () async {
                 await Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => PostDetailScreen(postId: post['id'] as int),
+                    builder: (context) =>
+                        PostDetailScreen(postId: post['id'] as int),
                   ),
                 );
                 _fetchSavedPosts();
@@ -2731,11 +3132,18 @@ class _SavedPostsTabState extends State<SavedPostsTab> {
                               if (place != null) ...[
                                 const SizedBox(height: 6),
                                 InkWell(
-                                  onTap: () => PlaceDetailBottomSheet.show(context, place),
+                                  onTap: () => PlaceDetailBottomSheet.show(
+                                    context,
+                                    place,
+                                  ),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: AppTheme.primaryContainer.withOpacity(0.4),
+                                      color: AppTheme.primaryContainer
+                                          .withOpacity(0.4),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Row(
@@ -2776,7 +3184,8 @@ class _SavedPostsTabState extends State<SavedPostsTab> {
                               width: 64,
                               height: 64,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const SizedBox.shrink(),
                             ),
                           ),
                         ],
