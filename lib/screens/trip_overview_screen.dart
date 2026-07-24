@@ -174,8 +174,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         'id': user.id,
         'fullName': user.fullName,
         'avatarUrl': user.avatar,
+        'email': user.email,
+        'role': _itineraryData['role'] ?? 'MEMBER',
       };
+      _activeMembers = [userData];
     }
+
     ItinerarySocketService().connect();
     ItinerarySocketService().joinItinerary(itinId, user: userData);
     ItinerarySocketService().addUpdateListener(_onItinerarySocketUpdated);
@@ -189,9 +193,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final updatedByUserId = data['updatedByUserId']?.toString();
     final currentUserId = AuthService().currentUser.value?.id?.toString();
 
-    if (eventItinId == currentItinId &&
-        updatedByUserId != currentUserId &&
-        mounted) {
+    if (eventItinId == currentItinId && updatedByUserId != currentUserId && mounted) {
       final int noteId = data['noteId'] as int;
       final String text = data['text'] as String;
       final bool isItineraryDetail = data['isItineraryDetail'] == true;
@@ -215,12 +217,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final currentUserId = AuthService().currentUser.value?.id?.toString();
 
     // Chỉ reload khi người gửi là BẠN ĐỒNG HÀNH, không reload khi chính người dùng hiện tại thực hiện
-    if (eventItinId == currentItinId &&
-        updatedByUserId != currentUserId &&
-        mounted) {
-      debugPrint(
-        '⚡ Real-time update từ bạn đồng hành: Đang cập nhật dữ liệu ngầm không quay màn hình...',
-      );
+    if (eventItinId == currentItinId && updatedByUserId != currentUserId && mounted) {
+      debugPrint('⚡ Real-time update từ bạn đồng hành: Đang cập nhật dữ liệu ngầm không quay màn hình...');
       _loadData(silent: true);
     }
   }
@@ -242,9 +240,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ? _itineraryData['id']
         : int.parse(_itineraryData['id'].toString());
     ItinerarySocketService().removeUpdateListener(_onItinerarySocketUpdated);
-    ItinerarySocketService().removeActiveMembersListener(
-      _onActiveMembersUpdated,
-    );
+    ItinerarySocketService().removeActiveMembersListener(_onActiveMembersUpdated);
     ItinerarySocketService().leaveItinerary(itinId);
 
     _currentNotification?.remove();
@@ -638,19 +634,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           int scoreA = 0;
           int scoreB = 0;
 
-          final catA = (a['category']?['name'] ?? a['category'] ?? '')
-              .toString();
-          final catB = (b['category']?['name'] ?? b['category'] ?? '')
-              .toString();
+          final catA = (a['category']?['name'] ?? a['category'] ?? '').toString();
+          final catB = (b['category']?['name'] ?? b['category'] ?? '').toString();
 
           for (var userCat in selectedCats) {
             final uCatStr = userCat.toString().toLowerCase();
-            if (catA.toLowerCase().contains(uCatStr) ||
-                uCatStr.contains(catA.toLowerCase()))
-              scoreA += 5;
-            if (catB.toLowerCase().contains(uCatStr) ||
-                uCatStr.contains(catB.toLowerCase()))
-              scoreB += 5;
+            if (catA.toLowerCase().contains(uCatStr) || uCatStr.contains(catA.toLowerCase())) scoreA += 5;
+            if (catB.toLowerCase().contains(uCatStr) || uCatStr.contains(catB.toLowerCase())) scoreB += 5;
           }
 
           final subCatA = (a['subCategories'] ?? []).toString().toLowerCase();
@@ -670,13 +660,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
         // Mark top matched places with dynamic preference tag
         for (var p in places) {
-          final catP = (p['category']?['name'] ?? p['category'] ?? '')
-              .toString();
-          bool matchesCat = selectedCats.any(
-            (c) =>
-                catP.toLowerCase().contains(c.toString().toLowerCase()) ||
-                c.toString().toLowerCase().contains(catP.toLowerCase()),
-          );
+          final catP = (p['category']?['name'] ?? p['category'] ?? '').toString();
+          bool matchesCat = selectedCats.any((c) =>
+              catP.toLowerCase().contains(c.toString().toLowerCase()) ||
+              c.toString().toLowerCase().contains(catP.toLowerCase()));
           if (matchesCat) {
             p['isRecommendedForYou'] = true;
           }
@@ -1058,13 +1045,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     Icons.share_outlined,
                     color: Color(0xFF2563EB),
                   ),
-                  title: const Text(
-                    'Chia sẻ chuyến đi',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2563EB),
-                    ),
-                  ),
+                  title: const Text('Chia sẻ chuyến đi', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
                   subtitle: const Text('Mời bạn bè qua Email hoặc Copy Link'),
                   onTap: () {
                     Navigator.pop(context);
@@ -1086,13 +1067,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     Icons.people_alt_outlined,
                     color: Color(0xFF059669),
                   ),
-                  title: const Text(
-                    'Quản lý thành viên',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF059669),
-                    ),
-                  ),
+                  title: const Text('Quản lý thành viên', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF059669))),
                   subtitle: const Text('Xem danh sách & quyền hạn thành viên'),
                   onTap: () {
                     Navigator.pop(context);
@@ -1294,15 +1269,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       'placeId': placeId,
       'place': place,
       'section': sectionOrDay,
-      'day': sectionOrDay.startsWith('Ngày')
-          ? (int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1)
-          : null,
+      'day': sectionOrDay.startsWith('Ngày') ? (int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1) : null,
       'sortOrder': 9999,
     };
 
     setState(() {
-      if (sectionOrDay.startsWith('Ngày') &&
-          _itineraryData['isGuide'] != true) {
+      if (sectionOrDay.startsWith('Ngày') && _itineraryData['isGuide'] != true) {
         _details.add(tempItem);
       } else {
         _savedPlaces.add(tempItem);
@@ -1335,14 +1307,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     // Cập nhật id thật từ Server trả về mà không cần reload xóa mục tạm
     if (result != null && result['id'] != null) {
       setState(() {
-        if (sectionOrDay.startsWith('Ngày') &&
-            _itineraryData['isGuide'] != true) {
+        if (sectionOrDay.startsWith('Ngày') && _itineraryData['isGuide'] != true) {
           final idx = _details.indexWhere((d) => d['id'] == tempItem['id']);
           if (idx != -1) _details[idx] = result;
         } else {
-          final idx = _savedPlaces.indexWhere(
-            (sp) => sp['id'] == tempItem['id'],
-          );
+          final idx = _savedPlaces.indexWhere((sp) => sp['id'] == tempItem['id']);
           if (idx != -1) _savedPlaces[idx] = result;
         }
       });
@@ -1829,28 +1798,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     const Text(
                       'Mời bạn đồng hành',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 20),
                     Row(
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () =>
-                                setModalState(() => selectedRole = 'EDITOR'),
+                            onTap: () => setModalState(() => selectedRole = 'EDITOR'),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: selectedRole == 'EDITOR'
-                                    ? Colors.blue.shade50
-                                    : Colors.grey.shade100,
+                                color: selectedRole == 'EDITOR' ? Colors.blue.shade50 : Colors.grey.shade100,
                                 border: Border.all(
-                                  color: selectedRole == 'EDITOR'
-                                      ? AppTheme.primary
-                                      : Colors.transparent,
+                                  color: selectedRole == 'EDITOR' ? AppTheme.primary : Colors.transparent,
                                   width: 1.5,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
@@ -1859,12 +1820,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               child: Text(
                                 'Có thể chỉnh sửa',
                                 style: TextStyle(
-                                  color: selectedRole == 'EDITOR'
-                                      ? AppTheme.primary
-                                      : AppTheme.subtitleText,
-                                  fontWeight: selectedRole == 'EDITOR'
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
+                                  color: selectedRole == 'EDITOR' ? AppTheme.primary : AppTheme.subtitleText,
+                                  fontWeight: selectedRole == 'EDITOR' ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
                             ),
@@ -1873,18 +1830,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         const SizedBox(width: 12),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () =>
-                                setModalState(() => selectedRole = 'VIEWER'),
+                            onTap: () => setModalState(() => selectedRole = 'VIEWER'),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: selectedRole == 'VIEWER'
-                                    ? Colors.blue.shade50
-                                    : Colors.grey.shade100,
+                                color: selectedRole == 'VIEWER' ? Colors.blue.shade50 : Colors.grey.shade100,
                                 border: Border.all(
-                                  color: selectedRole == 'VIEWER'
-                                      ? AppTheme.primary
-                                      : Colors.transparent,
+                                  color: selectedRole == 'VIEWER' ? AppTheme.primary : Colors.transparent,
                                   width: 1.5,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
@@ -1893,12 +1845,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               child: Text(
                                 'Chỉ xem',
                                 style: TextStyle(
-                                  color: selectedRole == 'VIEWER'
-                                      ? AppTheme.primary
-                                      : AppTheme.subtitleText,
-                                  fontWeight: selectedRole == 'VIEWER'
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
+                                  color: selectedRole == 'VIEWER' ? AppTheme.primary : AppTheme.subtitleText,
+                                  fontWeight: selectedRole == 'VIEWER' ? FontWeight.bold : FontWeight.normal,
                                 ),
                               ),
                             ),
@@ -1914,12 +1862,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             controller: emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
-                              hintText: selectedRole == 'EDITOR'
-                                  ? 'Nhập email để mời chỉnh sửa...'
-                                  : 'Chỉ chia sẻ qua Link cho người xem',
-                              prefixIcon: const Icon(
-                                Icons.person_add_alt_1_rounded,
-                              ),
+                              hintText: selectedRole == 'EDITOR' ? 'Nhập email để mời chỉnh sửa...' : 'Chỉ chia sẻ qua Link cho người xem',
+                              prefixIcon: const Icon(Icons.person_add_alt_1_rounded),
                               filled: true,
                               fillColor: Colors.grey.shade100,
                               enabled: selectedRole == 'EDITOR',
@@ -1938,48 +1882,30 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 : () async {
                                     final email = emailController.text.trim();
                                     if (email.isEmpty || !email.contains('@')) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Vui lòng nhập email hợp lệ',
-                                          ),
-                                        ),
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Vui lòng nhập email hợp lệ')),
                                       );
                                       return;
                                     }
                                     setModalState(() => isSending = true);
                                     final itinId = _itineraryData['id'] is int
                                         ? _itineraryData['id']
-                                        : int.parse(
-                                            _itineraryData['id'].toString(),
-                                          );
-                                    final res = await DatabaseService()
-                                        .inviteByEmail(itinId, email);
+                                        : int.parse(_itineraryData['id'].toString());
+                                    final res = await DatabaseService().inviteByEmail(itinId, email);
                                     setModalState(() => isSending = false);
 
                                     if (res != null && res['success'] == true) {
                                       emailController.clear();
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          content: Text(
-                                            res['message'] ??
-                                                'Đã gửi lời mời thành công!',
-                                          ),
+                                          content: Text(res['message'] ?? 'Đã gửi lời mời thành công!'),
                                           backgroundColor: Colors.green,
                                         ),
                                       );
                                     } else {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          content: Text(
-                                            res?['message'] ?? 'Gửi thất bại',
-                                          ),
+                                          content: Text(res?['message'] ?? 'Gửi thất bại'),
                                           backgroundColor: Colors.red,
                                         ),
                                       );
@@ -1988,29 +1914,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.primary,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
                             child: isSending
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Gửi',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : const Text('Gửi', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ],
                       ],
@@ -2026,22 +1935,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   setModalState(() => isGenerating = true);
                                   final itinId = _itineraryData['id'] is int
                                       ? _itineraryData['id']
-                                      : int.parse(
-                                          _itineraryData['id'].toString(),
-                                        );
-                                  final res = await DatabaseService()
-                                      .getShareLink(itinId);
+                                      : int.parse(_itineraryData['id'].toString());
+                                  final res = await DatabaseService().getShareLink(itinId);
                                   setModalState(() => isGenerating = false);
 
                                   if (res != null && res['shareUrl'] != null) {
-                                    Clipboard.setData(
-                                      ClipboardData(text: res['shareUrl']),
-                                    );
+                                    Clipboard.setData(ClipboardData(text: res['shareUrl']));
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text(
-                                          'Đã sao chép liên kết chia sẻ (Chỉ xem)!',
-                                        ),
+                                        content: Text('Đã sao chép liên kết chia sẻ (Chỉ xem)!'),
                                         backgroundColor: Colors.green,
                                       ),
                                     );
@@ -2058,27 +1960,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             final itinId = _itineraryData['id'] is int
                                 ? _itineraryData['id']
                                 : int.parse(_itineraryData['id'].toString());
-                            final res = await DatabaseService().getShareLink(
-                              itinId,
-                            );
+                            final res = await DatabaseService().getShareLink(itinId);
                             if (res != null && res['shareUrl'] != null) {
-                              Clipboard.setData(
-                                ClipboardData(text: res['shareUrl']),
-                              );
+                              Clipboard.setData(ClipboardData(text: res['shareUrl']));
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Đã chép liên kết để chia sẻ qua các ứng dụng khác!',
-                                  ),
-                                ),
+                                const SnackBar(content: Text('Đã chép liên kết để chia sẻ qua các ứng dụng khác!')),
                               );
                             }
                           },
                           borderRadius: BorderRadius.circular(30),
-                          child: _buildShareIconOption(
-                            Icons.ios_share_rounded,
-                            'Khác',
-                          ),
+                          child: _buildShareIconOption(Icons.ios_share_rounded, 'Khác'),
                         ),
                       ],
                     ),
@@ -2101,8 +1992,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             itineraryId: _itineraryData['id'] is int
                                 ? _itineraryData['id']
                                 : int.parse(_itineraryData['id'].toString()),
-                            itineraryTitle:
-                                _itineraryData['title'] ?? 'Chuyến đi',
+                            itineraryTitle: _itineraryData['title'] ?? 'Chuyến đi',
                           ),
                         );
                       },
@@ -4505,6 +4395,159 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
+                                    // Active online members avatars stacked
+                                    if (_activeMembers.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 6),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SizedBox(
+                                              height: 28,
+                                              width: (_activeMembers.take(3).length * 18.0) + 10.0,
+                                              child: Stack(
+                                                clipBehavior: Clip.none,
+                                                children: _activeMembers.take(3).toList().asMap().entries.map((entry) {
+                                                  final idx = entry.key;
+                                                  final member = entry.value;
+                                                  final name = member['fullName'] ?? 'Thành viên';
+                                                  final String? rawAvatar = member['avatarUrl'] ?? member['avatar'];
+                                                  String? avatarUrl;
+                                                  if (rawAvatar != null && rawAvatar.trim().isNotEmpty && !rawAvatar.contains('default-avatar')) {
+                                                    final trimmed = rawAvatar.trim();
+                                                    if (trimmed.startsWith('http')) {
+                                                      avatarUrl = trimmed;
+                                                    } else if (trimmed.startsWith('/')) {
+                                                      avatarUrl = 'http://localhost:3000$trimmed';
+                                                    } else {
+                                                      avatarUrl = 'http://localhost:3000/$trimmed';
+                                                    }
+                                                  }
+                                                  final Color avatarBgColor = Colors.primaries[name.hashCode.abs() % Colors.primaries.length];
+                                                  final roleStr = member['role'] == 'OWNER' ? 'Chủ sở hữu' : 'Có thể chỉnh sửa';
+
+                                                  return Positioned(
+                                                    left: idx * 18.0,
+                                                    child: Tooltip(
+                                                      richMessage: WidgetSpan(
+                                                        child: Container(
+                                                          padding: const EdgeInsets.all(12),
+                                                          width: 210,
+                                                          child: Row(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              CircleAvatar(
+                                                                radius: 18,
+                                                                backgroundColor: avatarBgColor,
+                                                                foregroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                                                                child: Text(
+                                                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                                                  style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.bold),
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 10),
+                                                              Expanded(
+                                                                child: Column(
+                                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    Text(
+                                                                      name,
+                                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                                                                      maxLines: 1,
+                                                                      overflow: TextOverflow.ellipsis,
+                                                                    ),
+                                                                    const SizedBox(height: 2),
+                                                                    Text(
+                                                                      roleStr,
+                                                                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white,
+                                                        borderRadius: BorderRadius.circular(16),
+                                                        boxShadow: const [
+                                                          BoxShadow(
+                                                            color: Colors.black12,
+                                                            blurRadius: 10,
+                                                            offset: Offset(0, 4),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      verticalOffset: 20,
+                                                      child: InkWell(
+                                                        onTap: () {
+                                                          showModalBottomSheet(
+                                                            context: context,
+                                                            isScrollControlled: true,
+                                                            backgroundColor: Colors.transparent,
+                                                            builder: (ctx) => ManageMembersModal(
+                                                              itineraryId: _itineraryData['id'] is int
+                                                                  ? _itineraryData['id']
+                                                                  : int.parse(_itineraryData['id'].toString()),
+                                                              itineraryTitle: _itineraryData['title'] ?? 'Chuyến đi',
+                                                            ),
+                                                          );
+                                                        },
+                                                        borderRadius: BorderRadius.circular(14),
+                                                        child: Container(
+                                                          decoration: BoxDecoration(
+                                                            shape: BoxShape.circle,
+                                                            border: Border.all(color: Colors.white, width: 1.5),
+                                                          ),
+                                                          child: CircleAvatar(
+                                                            radius: 12,
+                                                            backgroundColor: avatarBgColor,
+                                                            foregroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                                                            child: Text(
+                                                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                                              style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                              ),
+                                            ),
+                                            if (_activeMembers.length > 3)
+                                              InkWell(
+                                                onTap: () {
+                                                  showModalBottomSheet(
+                                                    context: context,
+                                                    isScrollControlled: true,
+                                                    backgroundColor: Colors.transparent,
+                                                    builder: (ctx) => ManageMembersModal(
+                                                      itineraryId: _itineraryData['id'] is int
+                                                          ? _itineraryData['id']
+                                                          : int.parse(_itineraryData['id'].toString()),
+                                                      itineraryTitle: _itineraryData['title'] ?? 'Chuyến đi',
+                                                    ),
+                                                  );
+                                                },
+                                                child: Container(
+                                                  margin: const EdgeInsets.only(left: 2),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey.shade200,
+                                                    borderRadius: BorderRadius.circular(10),
+                                                  ),
+                                                  child: Text(
+                                                    '+${_activeMembers.length - 3}',
+                                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
                                     if (_itineraryData['isGuide'] == true)
                                       GestureDetector(
                                         onTap: _previewGuide,
@@ -4761,7 +4804,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       ],
                               ),
                             ),
-
                           // The Tab Views
                           SizedBox(
                             height: contentHeight,
@@ -4780,89 +4822,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           }
                                           return TabBarView(
                                             controller: _tabController,
-                                            children:
-                                                _itineraryData['isGuide'] ==
-                                                    true
+                                            children: _itineraryData['isGuide'] == true
                                                 ? [
                                                     _buildOverviewTab(),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        // Active online members avatars on header
-                                                        if (_activeMembers
-                                                            .isNotEmpty)
-                                                          Padding(
-                                                            padding:
-                                                                const EdgeInsets.only(
-                                                                  right: 6,
-                                                                ),
-                                                            child: Row(
-                                                              mainAxisSize:
-                                                                  MainAxisSize
-                                                                      .min,
-                                                              children: _activeMembers.take(3).map((
-                                                                m,
-                                                              ) {
-                                                                final name =
-                                                                    m['fullName'] ??
-                                                                    'U';
-                                                                final avatar =
-                                                                    m['avatarUrl'];
-                                                                return Container(
-                                                                  margin:
-                                                                      const EdgeInsets.only(
-                                                                        right:
-                                                                            2,
-                                                                      ),
-                                                                  decoration: BoxDecoration(
-                                                                    shape: BoxShape
-                                                                        .circle,
-                                                                    border: Border.all(
-                                                                      color: Colors
-                                                                          .greenAccent,
-                                                                      width:
-                                                                          1.5,
-                                                                    ),
-                                                                  ),
-                                                                  child: CircleAvatar(
-                                                                    radius: 11,
-                                                                    backgroundColor:
-                                                                        AppTheme
-                                                                            .primary,
-                                                                    backgroundImage:
-                                                                        (avatar !=
-                                                                                null &&
-                                                                            avatar.toString().startsWith(
-                                                                              'http',
-                                                                            ))
-                                                                        ? NetworkImage(
-                                                                            avatar,
-                                                                          )
-                                                                        : null,
-                                                                    child:
-                                                                        (avatar ==
-                                                                                null ||
-                                                                            !avatar.toString().startsWith(
-                                                                              'http',
-                                                                            ))
-                                                                        ? Text(
-                                                                            name[0].toUpperCase(),
-                                                                            style: const TextStyle(
-                                                                              fontSize: 10,
-                                                                              color: Colors.white,
-                                                                              fontWeight: FontWeight.bold,
-                                                                            ),
-                                                                          )
-                                                                        : null,
-                                                                  ),
-                                                                );
-                                                              }).toList(),
-                                                            ),
-                                                          ),
-                                                        _buildExploreTab(),
-                                                      ],
-                                                    ),
+                                                    _buildExploreTab(),
                                                   ]
                                                 : [
                                                     _buildOverviewTab(),
@@ -5063,11 +5026,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   Future<void> _addNoteInline(String section) async {
     final itineraryId = _itineraryData['id'] as int;
-    final isDay =
-        section.startsWith('Ngày') && _itineraryData['isGuide'] != true;
-    final int? day = isDay
-        ? (int.tryParse(section.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1)
-        : null;
+    final isDay = section.startsWith('Ngày') && _itineraryData['isGuide'] != true;
+    final int? day = isDay ? (int.tryParse(section.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1) : null;
 
     final tempItem = {
       'id': DateTime.now().millisecondsSinceEpoch,
@@ -5126,9 +5086,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           final idx = _details.indexWhere((d) => d['id'] == tempItem['id']);
           if (idx != -1) _details[idx] = result;
         } else {
-          final idx = _savedPlaces.indexWhere(
-            (sp) => sp['id'] == tempItem['id'],
-          );
+          final idx = _savedPlaces.indexWhere((sp) => sp['id'] == tempItem['id']);
           if (idx != -1) _savedPlaces[idx] = result;
         }
       });
@@ -5865,8 +5823,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     child: isEditing
                         ? Builder(
                             builder: (context) {
-                              if (editController != null &&
-                                  editController.text.isNotEmpty) {
+                              if (editController != null && editController.text.isNotEmpty) {
                                 editController.selection = TextSelection(
                                   baseOffset: 0,
                                   extentOffset: editController.text.length,
@@ -5882,11 +5839,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                                 onChanged: (val) {
                                   final itinId = _itineraryData['id'] as int;
-                                  final userId = AuthService()
-                                      .currentUser
-                                      .value
-                                      ?.id
-                                      ?.toString();
+                                  final userId = AuthService().currentUser.value?.id?.toString();
                                   ItinerarySocketService().sendTypingNote(
                                     itineraryId: itinId,
                                     noteId: id,
@@ -5895,56 +5848,48 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     userId: userId,
                                   );
                                 },
-                                decoration: InputDecoration(
-                                  hintText: isTodo
-                                      ? 'Tên danh sách...'
-                                      : 'Nhập ghi chú...',
-                                  hintStyle: const TextStyle(
-                                    color: Colors.black26,
-                                    fontSize: 13,
-                                  ),
-                                  border: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  errorBorder: InputBorder.none,
-                                  disabledBorder: InputBorder.none,
-                                  filled: false,
-                                  fillColor: Colors.transparent,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                                onSubmitted: (val) async {
-                                  final cleanVal = val.trim();
-                                  String finalVal = cleanVal.isEmpty
-                                      ? (isTodo
-                                            ? 'Danh sách công việc'
-                                            : 'Ghi chú mới')
-                                      : cleanVal;
-                                  if (isTodo) finalVal = '[TODO] $finalVal';
-                                  setState(() {
-                                    if (isItineraryDetail) {
-                                      final idx = _details.indexWhere(
-                                        (d) => d['id'] == id,
-                                      );
-                                      if (idx != -1)
-                                        _details[idx]['noteText'] = finalVal;
-                                    } else {
-                                      final idx = _savedPlaces.indexWhere(
-                                        (sp) => sp['id'] == id,
-                                      );
-                                      if (idx != -1)
-                                        _savedPlaces[idx]['noteText'] =
-                                            finalVal;
-                                    }
-                                    _editingNoteId = null;
-                                  });
-                                  DatabaseService().updateNoteOrDetail(id, {
-                                    'noteText': finalVal,
-                                  }, isItineraryDetail);
-                                },
-                              );
+                            decoration: InputDecoration(
+                              hintText: isTodo
+                                  ? 'Tên danh sách...'
+                                  : 'Nhập ghi chú...',
+                              hintStyle: const TextStyle(
+                                color: Colors.black26,
+                                fontSize: 13,
+                              ),
+                              border: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              errorBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              filled: false,
+                              fillColor: Colors.transparent,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            onSubmitted: (val) async {
+                              final cleanVal = val.trim();
+                              String finalVal = cleanVal.isEmpty
+                                  ? (isTodo
+                                        ? 'Danh sách công việc'
+                                        : 'Ghi chú mới')
+                                  : cleanVal;
+                              if (isTodo) finalVal = '[TODO] $finalVal';
+                              setState(() {
+                                if (isItineraryDetail) {
+                                  final idx = _details.indexWhere((d) => d['id'] == id);
+                                  if (idx != -1) _details[idx]['noteText'] = finalVal;
+                                } else {
+                                  final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
+                                  if (idx != -1) _savedPlaces[idx]['noteText'] = finalVal;
+                                }
+                                _editingNoteId = null;
+                              });
+                              DatabaseService().updateNoteOrDetail(id, {
+                                'noteText': finalVal,
+                              }, isItineraryDetail);
                             },
-                          )
+                          );
+                        })
                         : GestureDetector(
                             onTap: () => setState(() => _editingNoteId = id),
                             child: Text(
@@ -5979,11 +5924,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           final idx = _details.indexWhere((d) => d['id'] == id);
                           if (idx != -1) _details[idx]['noteText'] = finalVal;
                         } else {
-                          final idx = _savedPlaces.indexWhere(
-                            (sp) => sp['id'] == id,
-                          );
-                          if (idx != -1)
-                            _savedPlaces[idx]['noteText'] = finalVal;
+                          final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
+                          if (idx != -1) _savedPlaces[idx]['noteText'] = finalVal;
                         }
                         _editingNoteId = null;
                       });
@@ -6004,21 +5946,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       setState(() {
                         if (isItineraryDetail) {
                           final idx = _details.indexWhere((d) => d['id'] == id);
-                          if (idx != -1)
-                            _details[idx]['isCollapsed'] = newCollapsed;
+                          if (idx != -1) _details[idx]['isCollapsed'] = newCollapsed;
                         } else {
-                          final idx = _savedPlaces.indexWhere(
-                            (sp) => sp['id'] == id,
-                          );
-                          if (idx != -1)
-                            _savedPlaces[idx]['isCollapsed'] = newCollapsed;
+                          final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
+                          if (idx != -1) _savedPlaces[idx]['isCollapsed'] = newCollapsed;
                         }
                       });
-                      DatabaseService()
-                          .updateNoteOrDetail(id, {
-                            'isCollapsed': newCollapsed,
-                          }, isItineraryDetail)
-                          .then((_) => _loadData(silent: true));
+                      DatabaseService().updateNoteOrDetail(id, {
+                        'isCollapsed': newCollapsed,
+                      }, isItineraryDetail);
                     },
                     child: Padding(
                       padding: const EdgeInsets.only(left: 4),
@@ -6059,11 +5995,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     final updated = List.from(todoList);
                     final item = updated.removeAt(oldIndex);
                     updated.insert(newIndex, item);
-                    DatabaseService()
-                        .updateNoteOrDetail(id, {
-                          'todoItems': updated,
-                        }, isItineraryDetail)
-                        .then((_) => _loadData(silent: true));
+                    setState(() {
+                      if (isItineraryDetail) {
+                        final idx = _details.indexWhere((d) => d['id'] == id);
+                        if (idx != -1) _details[idx]['todoItems'] = updated;
+                      } else {
+                        final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
+                        if (idx != -1) _savedPlaces[idx]['todoItems'] = updated;
+                      }
+                    });
+                    DatabaseService().updateNoteOrDetail(id, {
+                      'todoItems': updated,
+                    }, isItineraryDetail);
                   },
                   children: todoList.asMap().entries.map((entry) {
                     final itemIdx = entry.key;
@@ -6086,11 +6029,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 }
                                 return it;
                               }).toList();
-                              DatabaseService()
-                                  .updateNoteOrDetail(id, {
-                                    'todoItems': updated,
-                                  }, isItineraryDetail)
-                                  .then((_) => _loadData(silent: true));
+                              setState(() {
+                                if (isItineraryDetail) {
+                                  final idx = _details.indexWhere((d) => d['id'] == id);
+                                  if (idx != -1) _details[idx]['todoItems'] = updated;
+                                } else {
+                                  final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
+                                  if (idx != -1) _savedPlaces[idx]['todoItems'] = updated;
+                                }
+                              });
+                              DatabaseService().updateNoteOrDetail(id, {
+                                'todoItems': updated,
+                              }, isItineraryDetail);
                             },
                             child: Icon(
                               done
@@ -6136,11 +6086,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               onTap: () {
                                 final updated = List.from(todoList)
                                   ..removeWhere((it) => it['text'] == itemText);
-                                DatabaseService()
-                                    .updateNoteOrDetail(id, {
-                                      'todoItems': updated,
-                                    }, isItineraryDetail)
-                                    .then((_) => _loadData(silent: true));
+                                setState(() {
+                                  if (isItineraryDetail) {
+                                    final idx = _details.indexWhere((d) => d['id'] == id);
+                                    if (idx != -1) _details[idx]['todoItems'] = updated;
+                                  } else {
+                                    final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
+                                    if (idx != -1) _savedPlaces[idx]['todoItems'] = updated;
+                                  }
+                                  _focusedTodoItemKey = null;
+                                });
+                                DatabaseService().updateNoteOrDetail(id, {
+                                  'todoItems': updated,
+                                }, isItineraryDetail);
                               },
                               child: const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 4),
@@ -6208,11 +6166,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               !todoList.any((it) => it['text'] == cleanVal)) {
                             final updated = List.from(todoList)
                               ..add({'text': cleanVal, 'done': false});
-                            DatabaseService()
-                                .updateNoteOrDetail(id, {
-                                  'todoItems': updated,
-                                }, isItineraryDetail)
-                                .then((_) => _loadData(silent: true));
+                            setState(() {
+                              if (isItineraryDetail) {
+                                final idx = _details.indexWhere((d) => d['id'] == id);
+                                if (idx != -1) _details[idx]['todoItems'] = updated;
+                              } else {
+                                final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
+                                if (idx != -1) _savedPlaces[idx]['todoItems'] = updated;
+                              }
+                            });
+                            DatabaseService().updateNoteOrDetail(id, {
+                              'todoItems': updated,
+                            }, isItineraryDetail);
                           }
                         },
                       ),

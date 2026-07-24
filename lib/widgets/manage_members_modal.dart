@@ -161,16 +161,35 @@ class _ManageMembersModalState extends State<ManageMembersModal> {
                     contentPadding: EdgeInsets.zero,
                     leading: Stack(
                       children: [
-                        CircleAvatar(
-                          backgroundImage: (member['avatar'] != null &&
-                                  member['avatar'].toString().startsWith('http'))
-                              ? NetworkImage(member['avatar'])
-                              : null,
-                          child: (member['avatar'] == null ||
-                                  !member['avatar'].toString().startsWith('http'))
-                              ? Text((member['fullName'] ?? 'U')[0].toUpperCase())
-                              : null,
-                        ),
+                         Builder(
+                           builder: (ctx) {
+                             final String name = member['fullName'] ?? 'Người dùng';
+                             final String? rawAvatar = member['avatarUrl'] ?? member['avatar'];
+                             String? avatarUrl;
+                             if (rawAvatar != null &&
+                                 rawAvatar.trim().isNotEmpty &&
+                                 !rawAvatar.contains('default-avatar')) {
+                               final trimmed = rawAvatar.trim();
+                               if (trimmed.startsWith('http')) {
+                                 avatarUrl = trimmed;
+                               } else if (trimmed.startsWith('/')) {
+                                 avatarUrl = 'http://localhost:3000$trimmed';
+                               } else {
+                                 avatarUrl = 'http://localhost:3000/$trimmed';
+                               }
+                             }
+                             final Color avatarBgColor = Colors.primaries[name.hashCode.abs() % Colors.primaries.length];
+
+                             return CircleAvatar(
+                               backgroundColor: avatarBgColor,
+                               foregroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                               child: Text(
+                                 name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                               ),
+                             );
+                           },
+                         ),
                         Positioned(
                           right: 0,
                           bottom: 0,
