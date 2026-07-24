@@ -1323,6 +1323,22 @@ class _ProfileDashboardState extends State<ProfileDashboard>
       itemCount: _itineraries.length,
       itemBuilder: (context, index) {
         final trip = _itineraries[index];
+        final members = (trip['members'] as List?) ?? [];
+        final ownerMember = members.firstWhere(
+          (m) => m['role'] == 'OWNER',
+          orElse: () => null,
+        );
+        final String? ownerName = ownerMember != null
+            ? (ownerMember['user']?['fullName'] ?? ownerMember['fullName'])
+            : null;
+        final int tripUserId = (trip['userId'] is num)
+            ? (trip['userId'] as num).toInt()
+            : int.tryParse(trip['userId']?.toString() ?? '') ?? 0;
+        final bool isOwner = tripUserId == widget.user.id ||
+            (ownerMember != null &&
+                (ownerMember['userId'] == widget.user.id ||
+                    ownerMember['user']?['id'] == widget.user.id));
+
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
           child: Slidable(
@@ -1450,19 +1466,21 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                                 AppTheme.primary,
                               ),
                               const SizedBox(width: 6),
-                              if (trip['budget'] != null)
+                              if (isOwner)
                                 _buildTripChip(
-                                  _formatBudget(
-                                    (trip['budget'] is num)
-                                        ? (trip['budget'] as num).toInt()
-                                        : int.tryParse(
-                                                trip['budget'].toString(),
-                                              ) ??
-                                              0,
-                                  ),
-                                  Icons.payments_rounded,
-                                  AppTheme.lightGreen,
-                                  AppTheme.green,
+                                  'Chủ sở hữu',
+                                  Icons.person_rounded,
+                                  const Color(0xFFEFF6FF),
+                                  const Color(0xFF2563EB),
+                                )
+                              else
+                                _buildTripChip(
+                                  ownerName != null
+                                      ? 'Chủ: $ownerName'
+                                      : 'Được chia sẻ',
+                                  Icons.group_rounded,
+                                  const Color(0xFFF3E8FF),
+                                  const Color(0xFF7C3AED),
                                 ),
                             ],
                           ),
@@ -2457,6 +2475,21 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         final guide = _guides[index];
         final sections = (guide['sections'] as List?)?.length ?? 0;
         final savedPlaces = (guide['savedPlaces'] as List?)?.length ?? 0;
+        final members = (guide['members'] as List?) ?? [];
+        final ownerMember = members.firstWhere(
+          (m) => m['role'] == 'OWNER',
+          orElse: () => null,
+        );
+        final String? ownerName = ownerMember != null
+            ? (ownerMember['user']?['fullName'] ?? ownerMember['fullName'])
+            : null;
+        final int guideUserId = (guide['userId'] is num)
+            ? (guide['userId'] as num).toInt()
+            : int.tryParse(guide['userId']?.toString() ?? '') ?? 0;
+        final bool isOwner = guideUserId == widget.user.id ||
+            (ownerMember != null &&
+                (ownerMember['userId'] == widget.user.id ||
+                    ownerMember['user']?['id'] == widget.user.id));
 
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
@@ -2576,22 +2609,42 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              _buildTripChip(
-                                '$savedPlaces địa điểm',
-                                Icons.place_rounded,
-                                AppTheme.lightAmber,
-                                AppTheme.amber,
-                              ),
-                              const SizedBox(width: 6),
-                              _buildTripChip(
-                                '$sections mục',
-                                Icons.list_alt_rounded,
-                                AppTheme.primaryContainer,
-                                AppTheme.primary,
-                              ),
-                            ],
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _buildTripChip(
+                                  '$savedPlaces địa điểm',
+                                  Icons.place_rounded,
+                                  AppTheme.lightAmber,
+                                  AppTheme.amber,
+                                ),
+                                const SizedBox(width: 6),
+                                _buildTripChip(
+                                  '$sections mục',
+                                  Icons.list_alt_rounded,
+                                  AppTheme.primaryContainer,
+                                  AppTheme.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                if (isOwner)
+                                  _buildTripChip(
+                                    'Chủ sở hữu',
+                                    Icons.person_rounded,
+                                    const Color(0xFFEFF6FF),
+                                    const Color(0xFF2563EB),
+                                  )
+                                else
+                                  _buildTripChip(
+                                    ownerName != null
+                                        ? 'Chủ: $ownerName'
+                                        : 'Được chia sẻ',
+                                    Icons.group_rounded,
+                                    const Color(0xFFF3E8FF),
+                                    const Color(0xFF7C3AED),
+                                  ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

@@ -22,6 +22,7 @@ class InlinePlaceWhiteCardExtension extends StatefulWidget {
   final bool isItineraryDetail;
   final VoidCallback onUpdate;
   final VoidCallback? onShowEmojiPicker;
+  final bool isReadOnly;
 
   const InlinePlaceWhiteCardExtension({
     super.key,
@@ -29,6 +30,7 @@ class InlinePlaceWhiteCardExtension extends StatefulWidget {
     required this.isItineraryDetail,
     required this.onUpdate,
     this.onShowEmojiPicker,
+    this.isReadOnly = false,
   });
 
   @override
@@ -134,7 +136,24 @@ class _InlinePlaceWhiteCardExtensionState
     }
   }
 
+  bool _checkCanEdit() {
+    if (widget.isReadOnly) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bạn chỉ có quyền Xem (VIEWER), không thể chỉnh sửa chuyến đi này.'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
   void _showEmojiPicker() {
+    if (!_checkCanEdit()) return;
     if (widget.onShowEmojiPicker != null) {
       widget.onShowEmojiPicker!();
       return;
@@ -171,6 +190,7 @@ class _InlinePlaceWhiteCardExtensionState
   }
 
   void _onNoteChanged(String val) {
+    if (!_checkCanEdit()) return;
     final itinId = widget.detail['itineraryId'] as int?;
     final detailId = widget.detail['id'] as int?;
     if (itinId != null && detailId != null) {
@@ -189,6 +209,7 @@ class _InlinePlaceWhiteCardExtensionState
   }
 
   void _onCostChanged(String val) {
+    if (!_checkCanEdit()) return;
     if (_costDebounce?.isActive ?? false) _costDebounce!.cancel();
     _costDebounce = Timer(const Duration(milliseconds: 1000), () {
       final parsed = double.tryParse(val) ?? 0.0;
@@ -200,6 +221,7 @@ class _InlinePlaceWhiteCardExtensionState
   }
 
   Future<void> _pickTime() async {
+    if (!_checkCanEdit()) return;
     final TimeOfDay? start = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -227,6 +249,7 @@ class _InlinePlaceWhiteCardExtensionState
   }
 
   Future<void> _pickFile() async {
+    if (!_checkCanEdit()) return;
     FilePickerResult? result = await FilePicker.platform.pickFiles();
     if (result != null && result.files.isNotEmpty) {
       setState(() {
@@ -237,6 +260,7 @@ class _InlinePlaceWhiteCardExtensionState
   }
 
   Future<void> _updateField(Map<String, dynamic> data) async {
+    if (widget.isReadOnly) return;
     final id = widget.detail['id'] as int;
     await DatabaseService().updateNoteOrDetail(
       id,
@@ -260,6 +284,8 @@ class _InlinePlaceWhiteCardExtensionState
           controller: _noteController,
           focusNode: _noteFocus,
           onChanged: _onNoteChanged,
+          readOnly: widget.isReadOnly,
+          enabled: !widget.isReadOnly,
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: AppTheme.darkText),
@@ -288,6 +314,7 @@ class _InlinePlaceWhiteCardExtensionState
           children: [
             GestureDetector(
               onTap: () {
+                if (!_checkCanEdit()) return;
                 setState(() {
                   isVisited = !isVisited;
                 });
@@ -382,6 +409,8 @@ class _InlinePlaceWhiteCardExtensionState
                     controller: _costController,
                     focusNode: _costFocus,
                     onChanged: _onCostChanged,
+                    readOnly: widget.isReadOnly,
+                    enabled: !widget.isReadOnly,
                     keyboardType: TextInputType.number,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,

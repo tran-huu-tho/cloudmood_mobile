@@ -67,6 +67,26 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   String _privacySetting = 'friends';
 
+  String _currentRole = 'OWNER';
+  bool get _isViewer => _currentRole == 'VIEWER';
+  bool get _canEdit => _currentRole == 'OWNER' || _currentRole == 'EDITOR';
+
+  bool _checkCanEdit({bool showToast = true}) {
+    if (_isViewer) {
+      if (showToast && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bạn chỉ có quyền Xem (VIEWER), không thể chỉnh sửa chuyến đi này.'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
   // Overview Tab section names
   final List<String> _sectionNames = [];
   final Map<String, TextEditingController> _searchControllers = {};
@@ -256,6 +276,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _saveSectionTitle(String oldTitle, String newTitle) {
+    if (!_checkCanEdit()) {
+      setState(() => _editingSection = null);
+      return;
+    }
     if (newTitle.trim().isEmpty || newTitle == oldTitle) {
       setState(() {
         _editingSection = null;
@@ -316,6 +340,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     String sectionName, {
     int initialTabIndex = 0,
   }) {
+    if (!_checkCanEdit()) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -350,6 +375,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     int initialTabIndex = 0,
     int initialDayIndex = 0,
   }) {
+    if (!_checkCanEdit()) return;
     final int totalDays = (_itineraryData['days'] as num?)?.toInt() ?? 1;
 
     showModalBottomSheet(
@@ -578,7 +604,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     if (_mapCenter == null) {
       _fetchMapData();
     }
-    final itineraryId = _itineraryData['id'] as int;
+    final itineraryId = _itineraryData['id'] is int
+        ? _itineraryData['id'] as int
+        : int.parse(_itineraryData['id'].toString());
+
+    // Fetch member roles to get exact currentRole of user
+    DatabaseService().getItineraryMembers(itineraryId).then((membersData) {
+      if (membersData != null && membersData['currentRole'] != null && mounted) {
+        setState(() {
+          _currentRole = membersData['currentRole'].toString().toUpperCase();
+        });
+      }
+    });
 
     // Fetch refreshed itinerary details
     final refreshed = await DatabaseService().fetchItineraryById(itineraryId);
@@ -1258,6 +1295,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     Map<String, dynamic> place,
     String sectionOrDay,
   ) async {
+    if (!_checkCanEdit()) return;
     final itineraryId = _itineraryData['id'] as int;
     final placeId = place['id'] as int;
     dynamic result;
@@ -1323,6 +1361,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     String placeName, {
     bool isSavedPlace = false,
   }) async {
+    if (!_checkCanEdit()) return;
     // OPTIMISTIC DELETE: Xóa khỏi giao diện ngay lập tức
     setState(() {
       if (isSavedPlace) {
@@ -1369,6 +1408,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   // Dialog to prompt user where to add a place
   void _showAddPlaceDialog(Map<String, dynamic> place) {
+    if (!_checkCanEdit()) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1490,6 +1530,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   // Create new section
   void _deleteSelectedItems() async {
+    if (!_checkCanEdit()) return;
     if (_selectedItemIds.isEmpty) return;
 
     final idsToDelete = _selectedItemIds.toList();
@@ -1507,6 +1548,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showSelectSectionBottomSheet({required bool isCopy}) {
+    if (!_checkCanEdit()) return;
     if (_selectedItemIds.isEmpty) return;
 
     showModalBottomSheet(
@@ -1585,6 +1627,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _createNewSection() {
+    if (!_checkCanEdit()) return;
     int counter = 1;
     String baseName = 'Danh sách mới';
     String newName = baseName;
@@ -1632,6 +1675,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   // Custom Expense Adder Dialog
   void _showAddExpenseDialog() {
+    if (!_checkCanEdit()) return;
     final titleController = TextEditingController();
     final amountController = TextEditingController();
     showDialog(
@@ -4882,29 +4926,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             size: 20,
                                           ),
                                         ),
-                                        const SizedBox(height: 8),
-                                        FloatingActionButton(
-                                          heroTag: 'add_btn',
-                                          onPressed: () async {
-                                            if (_tabController.index == 1) {
-                                              _showPremiumNotification(
-                                                title: 'Hướng dẫn',
-                                                message:
-                                                    'Vui lòng chọn địa điểm bên dưới để thêm!',
-                                                icon:
-                                                    Icons.info_outline_rounded,
-                                                color: AppTheme.primary,
-                                              );
-                                            } else {
-                                              _createNewSection();
-                                            }
-                                          },
-                                          backgroundColor: AppTheme.darkText,
-                                          child: const Icon(
-                                            Icons.add,
-                                            color: Colors.white,
-                                          ),
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -5025,6 +5046,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   Future<void> _addNoteInline(String section) async {
+    if (!_checkCanEdit()) return;
     final itineraryId = _itineraryData['id'] as int;
     final isDay = section.startsWith('Ngày') && _itineraryData['isGuide'] != true;
     final int? day = isDay ? (int.tryParse(section.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1) : null;
@@ -5094,6 +5116,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   Future<void> _addChecklistInline(String section) async {
+    if (!_checkCanEdit()) return;
     final itineraryId = _itineraryData['id'] as int;
 
     dynamic result;
@@ -5142,6 +5165,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     List<dynamic> currentItems,
     bool isItineraryDetail,
   ) {
+    if (!_checkCanEdit()) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -5891,7 +5915,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           );
                         })
                         : GestureDetector(
-                            onTap: () => setState(() => _editingNoteId = id),
+                            onTap: () {
+                              if (!_checkCanEdit()) return;
+                              setState(() => _editingNoteId = id);
+                            },
                             child: Text(
                               isTodo
                                   ? (displayTitle.isEmpty
@@ -6357,6 +6384,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     List<dynamic> currentReactions,
     bool isItineraryDetail,
   ) {
+    if (!_checkCanEdit()) return;
     // Full emoji list organized by categories
     const Map<String, List<String>> emojiCategories = {
       'Mặt cười & cảm xúc': [
@@ -7513,6 +7541,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         InlinePlaceWhiteCardExtension(
                           detail: detail,
                           isItineraryDetail: false,
+                          isReadOnly: _isViewer,
                           onUpdate: () => _loadData(silent: true),
                           onShowEmojiPicker: () {
                             // Pass the current local state of reactions if needed, or get from detail
@@ -7608,6 +7637,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             itemCount: _sectionNames.length + 1,
             itemBuilder: (context, index) {
               if (index == _sectionNames.length) {
+                if (_isViewer) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
@@ -7889,6 +7919,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 );
                                 _syncSectionsToDatabase();
                               } else if (value == 'select_all') {
+                                if (!_checkCanEdit()) return;
                                 setState(() {
                                   _isSelectionMode = true;
                                   _selectedSections.add(section);
@@ -8079,6 +8110,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           )
                         : GestureDetector(
                             onTap: () {
+                              if (!_checkCanEdit()) return;
                               setState(() {
                                 _editingSection = section;
                                 _sectionTitleController.text = section;
@@ -8223,40 +8255,42 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: () => _addNoteInline(section),
-                                  child: Container(
-                                    height: 48,
-                                    width: 48,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.surfaceVariant,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      Icons.description_outlined,
-                                      color: AppTheme.darkText,
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: () => _addChecklistInline(section),
-                                  child: Container(
-                                    height: 48,
-                                    width: 48,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.surfaceVariant,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      Icons.checklist_rounded,
-                                      color: AppTheme.darkText,
-                                      size: 20,
+                                if (!_isViewer) ...[
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () => _addNoteInline(section),
+                                    child: Container(
+                                      height: 48,
+                                      width: 48,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.surfaceVariant,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(
+                                        Icons.description_outlined,
+                                        color: AppTheme.darkText,
+                                        size: 20,
+                                      ),
                                     ),
                                   ),
-                                ),
+                                  const SizedBox(width: 8),
+                                  GestureDetector(
+                                    onTap: () => _addChecklistInline(section),
+                                    child: Container(
+                                      height: 48,
+                                      width: 48,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.surfaceVariant,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(
+                                        Icons.checklist_rounded,
+                                        color: AppTheme.darkText,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
 
@@ -8374,7 +8408,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
                                   final place = availableRecommendations[rIdx];
                                   return GestureDetector(
-                                    onTap: () => _addPlace(place, section),
+                                    onTap: () {
+                                      if (!_checkCanEdit()) return;
+                                      _addPlace(place, section);
+                                    },
                                     child: Container(
                                       width: 160,
                                       margin: const EdgeInsets.only(right: 8),
@@ -8425,18 +8462,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                               ],
                                             ),
                                           ),
-                                          Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: AppTheme.primaryPeach,
-                                              shape: BoxShape.circle,
+                                          if (!_isViewer)
+                                            Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.primaryPeach,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Icon(
+                                                Icons.add,
+                                                size: 12,
+                                                color: AppTheme.primary,
+                                              ),
                                             ),
-                                            child: Icon(
-                                              Icons.add,
-                                              size: 12,
-                                              color: AppTheme.primary,
-                                            ),
-                                          ),
                                         ],
                                       ),
                                     ),
@@ -8545,6 +8583,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     String dayLabel,
     List<Map<String, dynamic>> savedPlaces,
   ) {
+    if (!_checkCanEdit()) return;
     String searchQuery = '';
 
     showModalBottomSheet(
@@ -8829,6 +8868,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showTransportModeSheet() {
+    if (!_checkCanEdit()) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -8922,6 +8962,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showDefaultTransportModeSheet() {
+    if (!_checkCanEdit()) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -9372,6 +9413,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               InlinePlaceWhiteCardExtension(
                                 detail: detail,
                                 isItineraryDetail: true,
+                                isReadOnly: _isViewer,
                                 onUpdate: () => _loadData(silent: true),
                                 onShowEmojiPicker: () {
                                   _showEmojiPickerSheet(
@@ -9952,7 +9994,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  // ================= TAB 3: KHÁM PHÁ =================
   // ================= TAB 3: KHÁM PHÁ =================
   Widget _buildExploreTab() {
     if (_isLoadingExplore) {

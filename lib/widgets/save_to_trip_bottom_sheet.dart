@@ -276,20 +276,50 @@ class _SaveToTripBottomSheetState extends State<SaveToTripBottomSheet> {
                 itemCount: _itineraries.length,
                 itemBuilder: (context, index) {
                   final itin = _itineraries[index];
+                  final isViewerRole = itin['role'] == 'VIEWER' || itin['currentRole'] == 'VIEWER';
                   return ListTile(
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 24,
                       vertical: 4,
                     ),
-                    title: Text(
-                      itin['title'] ?? 'Chuyến đi chưa đặt tên',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppTheme.bodyText,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            itin['title'] ?? 'Chuyến đi chưa đặt tên',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isViewerRole ? Colors.grey : AppTheme.bodyText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        if (isViewerRole)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Chỉ xem',
+                              style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
                     ),
-                    onTap: () => _selectItinerary(itin),
+                    onTap: () {
+                      if (isViewerRole) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Bạn chỉ có quyền Xem (VIEWER), không thể chỉnh sửa chuyến đi này.'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        return;
+                      }
+                      _selectItinerary(itin);
+                    },
                   );
                 },
               ),
