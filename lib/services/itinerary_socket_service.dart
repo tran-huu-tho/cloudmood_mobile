@@ -33,7 +33,10 @@ class ItinerarySocketService {
       debugPrint('Đã kết nối thành công WebSocket Itinerary!');
       _isConnected = true;
       if (_currentJoinedItineraryId != null) {
-        _socket!.emit('join_itinerary', {'itineraryId': _currentJoinedItineraryId.toString()});
+        _socket!.emit('join_itinerary', {
+          'itineraryId': _currentJoinedItineraryId.toString(),
+          'user': _currentUser,
+        });
       }
     });
 

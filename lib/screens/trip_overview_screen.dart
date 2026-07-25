@@ -74,10 +74,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   bool _checkCanEdit({bool showToast = true}) {
     if (_isViewer) {
       if (showToast && mounted) {
+        final String label = _itineraryData['isGuide'] == true ? 'hướng dẫn' : 'chuyến đi';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Bạn chỉ có quyền Xem (VIEWER), không thể chỉnh sửa chuyến đi này.'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text('Bạn chỉ có quyền Xem (VIEWER), không thể chỉnh sửa $label này.'),
+            duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -169,6 +170,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   void initState() {
     super.initState();
     _itineraryData = widget.itinerary;
+    final currentUser = AuthService().currentUser.value;
+    final ownerId = (_itineraryData['userId'] ?? _itineraryData['user']?['id'])?.toString();
+    if (currentUser != null && ownerId != null && currentUser.id.toString() != ownerId) {
+      _currentRole = (_itineraryData['role'] ?? 'VIEWER').toString().toUpperCase();
+    } else {
+      _currentRole = 'OWNER';
+    }
     _privacySetting = 'friends';
     SharedPreferences.getInstance().then((prefs) {
       final saved = prefs.getString('privacy_${_itineraryData['id']}');
@@ -248,8 +256,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final currentItinId = _itineraryData['id']?.toString();
     if (eventItinId == currentItinId && mounted) {
       final List<dynamic> list = data['activeMembers'] ?? [];
+      final Map<String, Map<String, dynamic>> uniqueMap = {};
+      for (var item in list) {
+        if (item is Map) {
+          final m = Map<String, dynamic>.from(item);
+          final uid = (m['userId'] ?? m['id'])?.toString();
+          if (uid != null) {
+            uniqueMap[uid] = m;
+          }
+        }
+      }
       setState(() {
-        _activeMembers = list.cast<Map<String, dynamic>>();
+        _activeMembers = uniqueMap.values.toList();
       });
     }
   }
@@ -915,6 +933,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   Future<void> _insertDayAfter(int dayIndex) async {
+    if (!_checkCanEdit()) return;
     final itineraryId = _itineraryData['id'] as int;
     final int targetDay = dayIndex + 1; // Insert after this day
 
@@ -934,6 +953,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   Future<void> _deleteDay(int dayIndex) async {
+    if (!_checkCanEdit()) return;
     final itineraryId = _itineraryData['id'] as int;
     final int targetDay = dayIndex + 1;
 
@@ -1004,6 +1024,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showDayOptionsSheet(int dayIndex) {
+    if (!_checkCanEdit()) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1166,6 +1187,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _editDaySubtitle(int dayIndex) {
+    if (!_checkCanEdit()) return;
     final controller = TextEditingController(
       text: _daySubtitles[dayIndex] ?? '',
     );
@@ -2165,6 +2187,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showPrivacySettingsSheet() {
+    if (_currentRole != 'OWNER') {
+      if (mounted) {
+        final String label = _itineraryData['isGuide'] == true ? 'hướng dẫn' : 'chuyến đi';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Chỉ chủ sở hữu (OWNER) mới có quyền cài đặt quyền riêng tư cho $label này.'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -2222,8 +2257,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
                     if (mounted) {
                       _fetchExplorePosts();
+                      Navigator.pop(context);
                     }
-                    Navigator.pop(context);
                   },
                 );
               }
@@ -2303,6 +2338,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showEditTitleDialog() {
+    if (!_checkCanEdit()) return;
     final TextEditingController titleController = TextEditingController(
       text: _itineraryData['title'] as String? ?? '',
     );
@@ -3100,6 +3136,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showChangeImageSheet() {
+    if (!_checkCanEdit()) return;
     final destination = _itineraryData['destination'] ?? 'Cần Thơ';
     List<Map<String, dynamic>> placeImages = [];
     List<Map<String, dynamic>> filteredPlaceImages = [];
@@ -6033,6 +6070,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   physics: const NeverScrollableScrollPhysics(),
                   buildDefaultDragHandles: false,
                   onReorder: (oldIndex, newIndex) {
+                    if (!_checkCanEdit()) return;
                     if (oldIndex < newIndex) newIndex -= 1;
                     final updated = List.from(todoList);
                     final item = updated.removeAt(oldIndex);
@@ -6065,6 +6103,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         children: [
                           GestureDetector(
                             onTap: () {
+                              if (!_checkCanEdit()) return;
                               final updated = todoList.map((it) {
                                 if (it['text'] == itemText) {
                                   return {...it as Map, 'done': !done};
@@ -6126,6 +6165,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           if (isFocused) ...[
                             GestureDetector(
                               onTap: () {
+                                if (!_checkCanEdit()) return;
                                 final updated = List.from(todoList)
                                   ..removeWhere((it) => it['text'] == itemText);
                                 setState(() {
@@ -6151,17 +6191,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                               ),
                             ),
-                            ReorderableDragStartListener(
-                              index: itemIdx,
-                              child: Padding(
-                                padding: EdgeInsets.only(left: 4),
-                                child: Icon(
-                                  Icons.drag_indicator_rounded,
-                                  size: 16,
-                                  color: AppTheme.subtitleText,
+                            if (!_isViewer)
+                              ReorderableDragStartListener(
+                                index: itemIdx,
+                                child: Padding(
+                                  padding: EdgeInsets.only(left: 4),
+                                  child: Icon(
+                                    Icons.drag_indicator_rounded,
+                                    size: 16,
+                                    color: AppTheme.subtitleText,
+                                  ),
                                 ),
                               ),
-                            ),
                           ],
                         ],
                       ),
@@ -6172,7 +6213,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             ],
 
             // ── Add todo item input
-            if (isTodo && !isCollapsed) ...[
+            if (isTodo && !isCollapsed && !_isViewer) ...[
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.only(left: 36),
@@ -6348,17 +6389,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       ),
                     ),
                   ),
-                  ReorderableDragStartListener(
-                    index: listIdx,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(
-                        Icons.drag_indicator_rounded,
-                        color: AppTheme.subtitleText,
-                        size: 18,
+                  if (!_isViewer)
+                    ReorderableDragStartListener(
+                      index: listIdx,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(
+                          Icons.drag_indicator_rounded,
+                          color: AppTheme.subtitleText,
+                          size: 18,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ],
@@ -7765,25 +7807,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               color: AppTheme.surfaceVariant,
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: Theme(
-                              data: Theme.of(context).copyWith(
-                                splashColor: Colors.transparent,
-                                highlightColor: Colors.transparent,
-                              ),
-                              child: PopupMenuButton<String>(
-                                offset: const Offset(0, 40),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                color: Colors.white,
-                                elevation: 4,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Text(
+                            child: _isViewer
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    child: Center(
+                                      child: Text(
                                         _sectionTypes[section] == 'ITINERARY'
                                             ? 'Hành trình'
                                             : 'Danh sách',
@@ -7793,21 +7823,52 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
-                                      const SizedBox(width: 4),
-                                      Icon(
-                                        Icons.arrow_drop_down_rounded,
-                                        size: 20,
-                                        color: AppTheme.darkText,
+                                    ),
+                                  )
+                                : Theme(
+                                    data: Theme.of(context).copyWith(
+                                      splashColor: Colors.transparent,
+                                      highlightColor: Colors.transparent,
+                                    ),
+                                    child: PopupMenuButton<String>(
+                                      offset: const Offset(0, 40),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                    ],
-                                  ),
-                                ),
-                                onSelected: (value) {
-                                  setState(() {
-                                    _sectionTypes[section] = value;
-                                  });
-                                  _syncSectionsToDatabase();
-                                },
+                                      color: Colors.white,
+                                      elevation: 4,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              _sectionTypes[section] == 'ITINERARY'
+                                                  ? 'Hành trình'
+                                                  : 'Danh sách',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: AppTheme.darkText,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Icon(
+                                              Icons.arrow_drop_down_rounded,
+                                              size: 20,
+                                              color: AppTheme.darkText,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      onSelected: (value) {
+                                        if (!_checkCanEdit()) return;
+                                        setState(() {
+                                          _sectionTypes[section] = value;
+                                        });
+                                        _syncSectionsToDatabase();
+                                      },
                                 itemBuilder: (context) => [
                                   PopupMenuItem(
                                     value: 'LIST',
@@ -7892,6 +7953,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             color: Colors.white,
                             elevation: 4,
                             onSelected: (value) {
+                              if (value == 'collapse') {
+                                for (var controller
+                                    in _expansionControllers.values) {
+                                  if (controller.isExpanded) {
+                                    controller.collapse();
+                                  }
+                                }
+                                return;
+                              }
+                              if (!_checkCanEdit()) return;
+
                               if (value == 'edit') {
                                 setState(() {
                                   _editingSection = section;
@@ -7906,13 +7978,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   section,
                                   initialTabIndex: 1,
                                 );
-                              } else if (value == 'collapse') {
-                                for (var controller
-                                    in _expansionControllers.values) {
-                                  if (controller.isExpanded) {
-                                    controller.collapse();
-                                  }
-                                }
                               } else if (value == 'delete') {
                                 setState(() {
                                   _sectionNames.remove(section);
@@ -8165,6 +8230,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 itemCount: sectionDetails.length,
                                 buildDefaultDragHandles: false,
                                 onReorder: (oldIndex, newIndex) async {
+                                  if (!_checkCanEdit()) return;
                                   if (newIndex > oldIndex) {
                                     newIndex -= 1;
                                   }
@@ -8232,45 +8298,45 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               ),
                               const SizedBox(height: 12),
                             ],
-                            // Search field & custom icon buttons
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Container(
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.surfaceVariant,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: TextField(
-                                      readOnly: true,
-                                      onTap: () {
-                                        _tabController.animateTo(
-                                          _itineraryData['isGuide'] == true
-                                              ? 1
-                                              : 3,
-                                        );
-                                      },
-                                      decoration: InputDecoration(
-                                        hintText: 'Thêm địa điểm',
-                                        hintStyle: TextStyle(
-                                          color: AppTheme.hintText,
-                                          fontSize: 13,
-                                        ),
-                                        prefixIcon: Icon(
-                                          Icons.location_on_outlined,
-                                          color: AppTheme.subtitleText,
-                                          size: 20,
-                                        ),
-                                        border: InputBorder.none,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          vertical: 12,
+                            // Search field & custom icon buttons & recommendations (hidden for read-only VIEWER)
+                            if (!_isViewer) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.surfaceVariant,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: TextField(
+                                        readOnly: true,
+                                        onTap: () {
+                                          _tabController.animateTo(
+                                            _itineraryData['isGuide'] == true
+                                                ? 1
+                                                : 3,
+                                          );
+                                        },
+                                        decoration: InputDecoration(
+                                          hintText: 'Thêm địa điểm',
+                                          hintStyle: TextStyle(
+                                            color: AppTheme.hintText,
+                                            fontSize: 13,
+                                          ),
+                                          prefixIcon: Icon(
+                                            Icons.location_on_outlined,
+                                            color: AppTheme.subtitleText,
+                                            size: 20,
+                                          ),
+                                          border: InputBorder.none,
+                                          contentPadding: EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                if (!_isViewer) ...[
                                   const SizedBox(width: 8),
                                   GestureDetector(
                                     onTap: () => _addNoteInline(section),
@@ -8306,178 +8372,176 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     ),
                                   ),
                                 ],
-                              ],
-                            ),
+                              ),
 
-                            // Display Local Search results inline
-                            if (searchResultsList.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              Container(
-                                constraints: const BoxConstraints(
-                                  maxHeight: 150,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppTheme.border),
-                                ),
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  itemCount: searchResultsList.length,
-                                  separatorBuilder: (_, _) =>
-                                      const Divider(height: 1),
-                                  itemBuilder: (context, sIdx) {
-                                    final p = searchResultsList[sIdx];
-                                    return ListTile(
-                                      leading: Icon(
-                                        Icons.location_on,
-                                        color: AppTheme.primary,
-                                      ),
-                                      title: Text(
-                                        p['name'] ?? '',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
+                              // Display Local Search results inline
+                              if (searchResultsList.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 150,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppTheme.border),
+                                  ),
+                                  child: ListView.separated(
+                                    shrinkWrap: true,
+                                    itemCount: searchResultsList.length,
+                                    separatorBuilder: (_, _) =>
+                                        const Divider(height: 1),
+                                    itemBuilder: (context, sIdx) {
+                                      final p = searchResultsList[sIdx];
+                                      return ListTile(
+                                        leading: Icon(
+                                          Icons.location_on,
+                                          color: AppTheme.primary,
                                         ),
-                                      ),
-                                      subtitle: Text(
-                                        p['address'] ?? '',
-                                        style: const TextStyle(fontSize: 11),
-                                        maxLines: 1,
-                                      ),
-                                      onTap: () {
-                                        searchController.clear();
-                                        setState(() {
-                                          _searchResults[section] = [];
-                                        });
-                                        _addPlace(p, section);
-                                      },
-                                    );
-                                  },
+                                        title: Text(
+                                          p['name'] ?? '',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          p['address'] ?? '',
+                                          style: const TextStyle(fontSize: 11),
+                                          maxLines: 1,
+                                        ),
+                                        onTap: () {
+                                          searchController.clear();
+                                          setState(() {
+                                            _searchResults[section] = [];
+                                          });
+                                          _addPlace(p, section);
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+
+                              const SizedBox(height: 12),
+                              Text(
+                                'Địa điểm được đề xuất',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.subtitleText,
                                 ),
                               ),
-                            ],
+                              const SizedBox(height: 8),
 
-                            const SizedBox(height: 12),
-                            Text(
-                              'Địa điểm được đề xuất',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.subtitleText,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
+                              // Recommendations Horizontal List
+                              SizedBox(
+                                height: 70,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: availableRecommendations.length + 1,
+                                  itemBuilder: (context, rIdx) {
+                                    if (rIdx == availableRecommendations.length) {
+                                      // "Khám phá" card at the end
+                                      return GestureDetector(
+                                        onTap: () => _tabController.animateTo(
+                                          _itineraryData['isGuide'] == true
+                                              ? 1
+                                              : 3,
+                                        ),
+                                        child: Container(
+                                          width: 120,
+                                          margin: const EdgeInsets.only(right: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            border: Border.all(
+                                              color: AppTheme.border,
+                                              style: BorderStyle.solid,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.location_on,
+                                                color: Colors.redAccent,
+                                                size: 16,
+                                              ),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                'Khám phá',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 11,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }
 
-                            // Recommendations Horizontal List
-                            SizedBox(
-                              height: 70,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: availableRecommendations.length + 1,
-                                itemBuilder: (context, rIdx) {
-                                  if (rIdx == availableRecommendations.length) {
-                                    // "Khám phá" card at the end
+                                    final place = availableRecommendations[rIdx];
                                     return GestureDetector(
-                                      onTap: () => _tabController.animateTo(
-                                        _itineraryData['isGuide'] == true
-                                            ? 1
-                                            : 3,
-                                      ),
+                                      onTap: () {
+                                        if (!_checkCanEdit()) return;
+                                        _addPlace(place, section);
+                                      },
                                       child: Container(
-                                        width: 120,
+                                        width: 160,
                                         margin: const EdgeInsets.only(right: 8),
+                                        padding: const EdgeInsets.all(6),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
+                                          borderRadius: BorderRadius.circular(12),
                                           border: Border.all(
                                             color: AppTheme.border,
-                                            style: BorderStyle.solid,
                                           ),
                                         ),
                                         child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
                                           children: [
-                                            Icon(
-                                              Icons.location_on,
-                                              color: Colors.redAccent,
-                                              size: 16,
-                                            ),
-                                            SizedBox(width: 4),
-                                            Text(
-                                              'Khám phá',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 11,
-                                                color: AppTheme.darkText,
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(
+                                                8,
+                                              ),
+                                              child: Image.network(
+                                                place['image'] ?? '',
+                                                width: 42,
+                                                height: 42,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, _, _) =>
+                                                    const Icon(
+                                                      Icons.image,
+                                                      size: 42,
+                                                    ),
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  }
-
-                                  final place = availableRecommendations[rIdx];
-                                  return GestureDetector(
-                                    onTap: () {
-                                      if (!_checkCanEdit()) return;
-                                      _addPlace(place, section);
-                                    },
-                                    child: Container(
-                                      width: 160,
-                                      margin: const EdgeInsets.only(right: 8),
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: AppTheme.border,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                            child: Image.network(
-                                              place['image'] ?? '',
-                                              width: 42,
-                                              height: 42,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, _, _) =>
-                                                  const Icon(
-                                                    Icons.image,
-                                                    size: 42,
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Text(
+                                                    place['name'] ?? '',
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 10,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Text(
-                                                  place['name'] ?? '',
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 10,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          if (!_isViewer)
                                             Container(
                                               padding: const EdgeInsets.all(4),
                                               decoration: BoxDecoration(
@@ -8490,13 +8554,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                 color: AppTheme.primary,
                                               ),
                                             ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
+                            ],
 
                             // Saved places list moved to the top of accordion content
                           ],
@@ -8515,6 +8580,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   // ================= TAB 2: HÀNH TRÌNH =================
   Widget _buildPopupMenuAddPlaceButton(String dayLabel, Color customColor) {
+    if (_isViewer) return const SizedBox.shrink();
     final overviewDetails = _savedPlaces;
 
     if (overviewDetails.isEmpty) {
@@ -9107,6 +9173,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       physics: const NeverScrollableScrollPhysics(),
       buildDefaultDragHandles: false,
       onReorder: (oldIndex, newIndex) {
+        if (!_checkCanEdit()) return;
         if (oldIndex < newIndex) newIndex -= 1;
         final updated = List.from(dayDetails);
         final item = updated.removeAt(oldIndex);

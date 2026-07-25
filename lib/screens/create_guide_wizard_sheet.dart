@@ -51,7 +51,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
   // Companions & Privacy
   final List<InvitedGuideCompanion> _invitedCompanionsList = [];
   final TextEditingController _companionInputController = TextEditingController();
-  String _dialogSelectedRole = 'EDITOR';
+  String _dialogSelectedRole = 'VIEWER';
   String _privacyLevel = 'Công khai';
 
   // Categories
@@ -374,7 +374,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
   }
 
   void _showAddCompanionDialog() {
-    _dialogSelectedRole = 'EDITOR';
+    _dialogSelectedRole = 'VIEWER';
     List<Map<String, dynamic>> suggestions = [];
     bool isSearching = false;
     String? emailErrorMessage;
