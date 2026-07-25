@@ -207,7 +207,7 @@ class DatabaseService {
       };
 
       final response = await ApiClient.post('/itineraries', body: data);
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         refreshTrigger.value++;
         return jsonDecode(response.body);
       }
@@ -746,14 +746,31 @@ class DatabaseService {
     }
   }
 
+  /// Search registered users by email query
+  Future<List<Map<String, dynamic>>> searchUsersByEmail(String email) async {
+    try {
+      final response = await ApiClient.get('/auth/search-users?email=${Uri.encodeComponent(email)}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['users'] is List) {
+          return List<Map<String, dynamic>>.from(data['users']);
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error searchUsersByEmail: $e');
+      return [];
+    }
+  }
+
   // --- API CHIA SẺ & QUẢN LÝ THÀNH VIÊN ---
 
-  /// Mời chỉnh sửa qua Email (EDITOR)
-  Future<Map<String, dynamic>?> inviteByEmail(int itineraryId, String email) async {
+  /// Mời qua Email (EDITOR / VIEWER)
+  Future<Map<String, dynamic>?> inviteByEmail(int itineraryId, String email, {String role = 'EDITOR'}) async {
     try {
       final response = await ApiClient.post(
         '/itineraries/$itineraryId/invite-email',
-        body: {'email': email},
+        body: {'email': email, 'role': role},
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body);

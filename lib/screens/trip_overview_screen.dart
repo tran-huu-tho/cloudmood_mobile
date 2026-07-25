@@ -608,6 +608,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ? _itineraryData['id'] as int
         : int.parse(_itineraryData['id'].toString());
 
+    // Load privacy setting for this itinerary
+    final prefs = await SharedPreferences.getInstance();
+    final cachedPrivacy = prefs.getString('privacy_$itineraryId');
+    if (cachedPrivacy != null) {
+      if (mounted) setState(() => _privacySetting = cachedPrivacy);
+    } else {
+      final comp = (_itineraryData['companion'] ?? '').toString().toLowerCase();
+      if (comp.contains('công khai') || comp == 'public') {
+        if (mounted) setState(() => _privacySetting = 'public');
+      } else if (comp.contains('riêng tư') || comp == 'private') {
+        if (mounted) setState(() => _privacySetting = 'private');
+      } else {
+        if (mounted) setState(() => _privacySetting = 'friends');
+      }
+    }
+
     // Fetch member roles to get exact currentRole of user
     DatabaseService().getItineraryMembers(itineraryId).then((membersData) {
       if (membersData != null && membersData['currentRole'] != null && mounted) {
@@ -758,7 +774,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     _checkedSections ??= Set.from(_sectionNames);
 
     // Restore custom expenses
-    final prefs = await SharedPreferences.getInstance();
     final savedExpenses = prefs.getString('expenses_$itineraryId');
     if (savedExpenses != null) {
       try {

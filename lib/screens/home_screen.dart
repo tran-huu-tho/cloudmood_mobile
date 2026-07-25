@@ -1137,12 +1137,16 @@ class CreateMenuOverlay extends StatelessWidget {
                               _buildOverlayCard(
                                 context: context,
                                 icon: Icons.explore_rounded,
-                                gradient: AppTheme.accentGradient,
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF92400E), Color(0xFFD97706)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
                                 title: 'Viết hướng dẫn du lịch',
                                 subtitle:
                                     'Chia sẻ địa điểm ẩn mình, cẩm nang chi tiết và mẹo hay cho các lữ khách khác.',
                                 actionText: 'Viết cẩm nang →',
-                                actionColor: AppTheme.accent,
+                                actionColor: const Color(0xFFD97706),
                                 onTap: () {
                                   Navigator.of(context).pop('create_guide');
                                 },
