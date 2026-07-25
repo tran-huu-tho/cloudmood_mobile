@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'guide_overview_screen.dart';
 import 'package:image_picker/image_picker.dart';
@@ -2769,7 +2770,18 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 iconBg: AppTheme.lightAmber,
                 iconColor: AppTheme.amber,
                 title: 'Trợ giúp & Hỗ trợ',
-                onTap: () {},
+                onTap: () async {
+                  final url = Uri.parse('https://www.facebook.com/dungnguyen060904');
+                  try {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } catch (e) {
+                    try {
+                      await launchUrl(url, mode: LaunchMode.platformDefault);
+                    } catch (ex) {
+                      debugPrint('Error launching URL: $ex');
+                    }
+                  }
+                },
               ),
               Divider(color: AppTheme.divider),
               _buildActionTile(

@@ -20,6 +20,8 @@ class TimeUtils {
     }
     
     if (data is Map) {
+      if (data.isEmpty) return 'Đang cập nhật';
+      
       if (data.containsKey('weekday_text') && 
           data['weekday_text'] is List && 
           (data['weekday_text'] as List).isNotEmpty) {
@@ -65,6 +67,19 @@ class TimeUtils {
     }
     
     if (data is Map) {
+      if (data.isEmpty) {
+        final now = DateTime.now();
+        final todayIndex = now.weekday - 1;
+        final dayNamesVi = ['Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy', 'Chủ nhật'];
+        final shortNamesVi = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+        return List.generate(7, (i) => {
+          'dayName': dayNamesVi[i],
+          'shortName': shortNamesVi[i],
+          'time': 'Đang cập nhật',
+          'isToday': i == todayIndex,
+        });
+      }
+      
       final now = DateTime.now();
       final todayIndex = now.weekday - 1; 
 

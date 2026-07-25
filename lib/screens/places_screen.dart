@@ -8,6 +8,8 @@ import '../services/database_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/place_detail_bottom_sheet.dart';
 import '../utils/string_utils.dart';
+import 'package:latlong2/latlong.dart';
+import 'map_picker_screen.dart';
 
 class CloudmoodPlacesScreen extends StatefulWidget {
   const CloudmoodPlacesScreen({super.key});
@@ -322,6 +324,7 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
       selectedCategoryId = int.tryParse(_categories.first['id'].toString());
     }
     XFile? selectedImage;
+    LatLng? selectedLatLng;
 
     showModalBottomSheet(
       context: context,
@@ -340,7 +343,7 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
               ),
               child: SafeArea(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.only(top: 62, left: 24, right: 24, bottom: 24),
                   child: Form(
                     key: formKey,
                     child: Column(
@@ -511,6 +514,71 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                         ),
                         const SizedBox(height: 16),
 
+                        // Map Picker Button
+                        Text(
+                          'Vị trí trên bản đồ *',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: () async {
+                            final LatLng? result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => MapPickerScreen(
+                                  initialPosition: selectedLatLng,
+                                ),
+                              ),
+                            );
+                            if (result != null) {
+                              setSheetState(() {
+                                selectedLatLng = result;
+                              });
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surfaceVariant,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.border,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.map_rounded,
+                                  color: AppTheme.primary,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    selectedLatLng != null
+                                        ? '${selectedLatLng!.latitude.toStringAsFixed(6)}, ${selectedLatLng!.longitude.toStringAsFixed(6)}'
+                                        : 'Chọn vị trí trên bản đồ *',
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: selectedLatLng != null ? AppTheme.darkText : AppTheme.subtitleText,
+                                      fontWeight: selectedLatLng != null ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: AppTheme.subtitleText,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         // Image Picker instead of URL input field
                         Text(
                           'Ảnh địa điểm',
@@ -634,6 +702,15 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                                 ),
                                 onPressed: () async {
                                   if (formKey.currentState!.validate()) {
+                                    if (selectedLatLng == null) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Vui lòng chọn vị trí trên bản đồ!'),
+                                          backgroundColor: AppTheme.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
                                     final name = nameController.text.trim();
                                     final address = addressController.text.trim();
                                     final desc = descController.text.trim();
@@ -656,6 +733,8 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                                       description: desc,
                                       price: price,
                                       image: imgBase64,
+                                      latitude: selectedLatLng?.latitude,
+                                      longitude: selectedLatLng?.longitude,
                                     );
 
                                     if (context.mounted) {
