@@ -22,6 +22,7 @@ class InlinePlaceWhiteCardExtension extends StatefulWidget {
   final bool isItineraryDetail;
   final VoidCallback onUpdate;
   final VoidCallback? onShowEmojiPicker;
+  final VoidCallback? onOpenExpenseSheet;
   final bool isReadOnly;
 
   const InlinePlaceWhiteCardExtension({
@@ -30,6 +31,7 @@ class InlinePlaceWhiteCardExtension extends StatefulWidget {
     required this.isItineraryDetail,
     required this.onUpdate,
     this.onShowEmojiPicker,
+    this.onOpenExpenseSheet,
     this.isReadOnly = false,
   });
 
@@ -70,11 +72,7 @@ class _InlinePlaceWhiteCardExtensionState
 
     _costFocus.addListener(() {
       if (!_costFocus.hasFocus) {
-        final parsed = double.tryParse(_costController.text) ?? 0.0;
-        if (parsed != cost) {
-          cost = parsed;
-          _updateField({'cost': parsed});
-        }
+        // Cost is managed via expense sheet, no direct update needed
       }
     });
   }
@@ -82,23 +80,25 @@ class _InlinePlaceWhiteCardExtensionState
   @override
   void didUpdateWidget(InlinePlaceWhiteCardExtension oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.detail != widget.detail) {
-      _initData();
-    }
+    _initData();
   }
 
   void _initData() {
     isVisited =
         widget.detail['isVisited'] == true ||
         widget.detail['is_visited'] == true;
-    final costVal = widget.detail['cost'];
-    if (costVal is num) {
-      cost = costVal.toDouble();
-    } else if (costVal is String) {
-      cost = double.tryParse(costVal) ?? 0.0;
-    } else {
-      cost = 0.0;
+    // Read cost from linked expense (FK relationship)
+    final expenseObj = widget.detail['expense'];
+    double expenseCost = 0.0;
+    if (expenseObj is Map<String, dynamic>) {
+      final amt = expenseObj['amount'];
+      if (amt is num) {
+        expenseCost = amt.toDouble();
+      } else if (amt is String) {
+        expenseCost = double.tryParse(amt) ?? 0.0;
+      }
     }
+    cost = expenseCost;
 
     final String text =
         widget.detail['noteText'] ?? widget.detail['notetext'] ?? '';
@@ -208,17 +208,7 @@ class _InlinePlaceWhiteCardExtensionState
     });
   }
 
-  void _onCostChanged(String val) {
-    if (!_checkCanEdit()) return;
-    if (_costDebounce?.isActive ?? false) _costDebounce!.cancel();
-    _costDebounce = Timer(const Duration(milliseconds: 1000), () {
-      final parsed = double.tryParse(val) ?? 0.0;
-      if (parsed != cost) {
-        cost = parsed;
-        _updateField({'cost': parsed});
-      }
-    });
-  }
+
 
   Future<void> _pickTime() async {
     if (!_checkCanEdit()) return;
@@ -391,52 +381,52 @@ class _InlinePlaceWhiteCardExtensionState
                 ],
               ),
             ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '\$',
-                  style: TextStyle(
-                    color: AppTheme.subtitleText,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+            if (cost > 0)
+              GestureDetector(
+                onTap: widget.onOpenExpenseSheet ?? () {},
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                ),
-                const SizedBox(width: 4),
-                SizedBox(
-                  width: 100,
-                  child: TextField(
-                    controller: _costController,
-                    focusNode: _costFocus,
-                    onChanged: _onCostChanged,
-                    readOnly: widget.isReadOnly,
-                    enabled: !widget.isReadOnly,
-                    keyboardType: TextInputType.number,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  child: Text(
+                    '${cost.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
+                    style: const TextStyle(
+                      color: Color(0xFF4F46E5),
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.darkText,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Thêm chi phí',
-                      hintStyle: Theme.of(context).textTheme.bodyMedium
-                          ?.copyWith(
-                            color: AppTheme.subtitleText,
-                            fontWeight: FontWeight.bold,
-                          ),
-                      border: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      errorBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      filled: false,
-                      fillColor: Colors.transparent,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
+                      fontSize: 13,
                     ),
                   ),
                 ),
-              ],
-            ),
+              )
+            else if (!widget.isReadOnly)
+              GestureDetector(
+                onTap: widget.onOpenExpenseSheet ?? () {},
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '\$',
+                      style: TextStyle(
+                        color: AppTheme.subtitleText,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Thêm chi phí',
+                      style: TextStyle(
+                        color: AppTheme.subtitleText,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
           ],
         ),
 

@@ -139,6 +139,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   List<Map<String, dynamic>> _customExpenses = [];
+  List<Map<String, dynamic>> _itineraryMembers = [];
+  String _sortExpensesOption = 'NEWEST';
+  int _tripBudget = 0;
 
   // Itinerary Tab custom items
   final Map<int, String> _daySubtitles = {};
@@ -644,9 +647,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     // Fetch member roles to get exact currentRole of user
     DatabaseService().getItineraryMembers(itineraryId).then((membersData) {
-      if (membersData != null && membersData['currentRole'] != null && mounted) {
+      if (membersData != null && mounted) {
         setState(() {
-          _currentRole = membersData['currentRole'].toString().toUpperCase();
+          if (membersData['currentRole'] != null) {
+            _currentRole = membersData['currentRole'].toString().toUpperCase();
+          }
+          if (membersData['members'] is List) {
+            _itineraryMembers = List<Map<String, dynamic>>.from(membersData['members']);
+          }
         });
       }
     });
@@ -791,7 +799,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     _checkedSections ??= Set.from(_sectionNames);
 
-    // Restore custom expenses
+    // Restore custom expenses and budget
+    _tripBudget = prefs.getInt('budget_$itineraryId') ?? (_itineraryData['budget'] as num?)?.toInt() ?? 0;
     final savedExpenses = prefs.getString('expenses_$itineraryId');
     if (savedExpenses != null) {
       try {
@@ -801,6 +810,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       } catch (e) {
         debugPrint('Error loading expenses: $e');
       }
+    }
+
+    final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+    if (currentItineraryId > 0) {
+      DatabaseService().getExpenses(currentItineraryId).then((serverExp) {
+        if (mounted) {
+          setState(() {
+            _customExpenses = serverExp;
+          });
+          _saveExpensesToPrefs();
+        }
+      });
     }
 
     final daySubtitlesStr = prefs.getString('day_subtitles_$itineraryId');
@@ -1712,81 +1733,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   // Custom Expense Adder Dialog
   void _showAddExpenseDialog() {
-    if (!_checkCanEdit()) return;
-    final titleController = TextEditingController();
-    final amountController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Text(
-            'Thêm chi tiêu mới',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: AppTheme.inputDecoration(
-                  hintText: 'Tên khoản chi (vd: Vé máy bay)',
-                  prefixIcon: Icons.shopping_bag_outlined,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: AppTheme.inputDecoration(
-                  hintText: 'Số tiền (VNĐ)',
-                  prefixIcon: Icons.attach_money_rounded,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Hủy',
-                style: TextStyle(color: AppTheme.subtitleText),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () {
-                final title = titleController.text.trim();
-                final amt = int.tryParse(amountController.text.trim()) ?? 0;
-                if (title.isNotEmpty && amt > 0) {
-                  setState(() {
-                    _customExpenses.add({
-                      'title': title,
-                      'amount': amt,
-                      'date': DateTime.now().toIso8601String().substring(0, 10),
-                    });
-                  });
-                  _saveExpensesToPrefs();
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text(
-                'Thêm',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+    _showAddExpenseBottomSheet();
   }
 
   // AI Itinerary Planner Generator simulating API
@@ -7613,6 +7560,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               false,
                             );
                           },
+                          onOpenExpenseSheet: () {
+                            _openPlaceExpenseSheet(detail, isItineraryDetail: false);
+                          },
                         ),
                       if (!isCollapsed)
                         Padding(
@@ -9511,6 +9461,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     true,
                                   );
                                 },
+                                onOpenExpenseSheet: () {
+                                  _openPlaceExpenseSheet(detail, isItineraryDetail: true, dayIndex: (detail['day'] as int? ?? 1) - 1);
+                                },
                               ),
                           ],
                         ),
@@ -10272,322 +10225,2777 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   // ================= TAB 4: CHI PHÍ ($) =================
-  Widget _buildExpensesTab() {
-    // Determine target budget
-    final budgetLimit = (_itineraryData['budget'] as num?)?.toInt() ?? 3000000;
-
-    // Calculate sum of place costs if they have prices (mocked/parsed)
-    int placeCosts = 0;
-    for (var detail in _details) {
-      final p = detail['place'] ?? {};
-      final priceStr = p['price']?.toString() ?? '';
-      if (priceStr.contains('Miễn phí') || priceStr.isEmpty) {
-        placeCosts += 0;
-      } else {
-        placeCosts += 50000; // Mock admission fee if not free
+  IconData _getCategoryIconData(String catName, {int? iconCode}) {
+    if (iconCode != null && iconCode > 0) {
+      return IconData(iconCode, fontFamily: 'MaterialIcons');
+    }
+    if (_searchCategories.isNotEmpty) {
+      final String trimmedName = catName.trim().toLowerCase();
+      for (var c in _searchCategories) {
+        final cName = c['name']?.toString().trim().toLowerCase();
+        if (cName == trimmedName) {
+          final code = int.tryParse(c['iconCode']?.toString() ?? '');
+          if (code != null && code > 0) {
+            return IconData(code, fontFamily: 'MaterialIcons');
+          }
+        }
       }
     }
-
-    int customSpent = 0;
-    for (var exp in _customExpenses) {
-      customSpent += (exp['amount'] as num).toInt();
+    switch (catName) {
+      case 'Chuyến bay':
+        return Icons.flight_takeoff_rounded;
+      case 'Chỗ ở':
+        return Icons.hotel_rounded;
+      case 'Xe thuê':
+        return Icons.directions_car_rounded;
+      case 'Phương tiện công cộng':
+        return Icons.directions_bus_rounded;
+      case 'Ẩm thực':
+        return Icons.restaurant_rounded;
+      case 'Đồ uống':
+        return Icons.local_bar_rounded;
+      case 'Tham quan':
+        return Icons.account_balance_rounded;
+      case 'Hoạt động':
+        return Icons.local_activity_rounded;
+      case 'Mua sắm':
+        return Icons.shopping_bag_rounded;
+      case 'Xăng':
+        return Icons.local_gas_station_rounded;
+      case 'Hàng tạp hóa':
+        return Icons.shopping_cart_rounded;
+      default:
+        return Icons.receipt_long_rounded;
     }
+  }
 
-    final totalSpent = placeCosts + customSpent;
-    final progress = totalSpent / budgetLimit;
-    final percent = (progress * 100).clamp(0.0, 100.0).toStringAsFixed(0);
+  Color _getCategoryColor(String catName) {
+    final name = catName.toLowerCase().trim();
+    if (name.contains('bay') || name.contains('flight')) {
+      return const Color(0xFF0284C7); // Sky Blue
+    } else if (name.contains('ở') || name.contains('khách') || name.contains('chỗ') || name.contains('hotel')) {
+      return const Color(0xFF7C3AED); // Purple
+    } else if (name.contains('xe') || name.contains('tiện') || name.contains('transit') || name.contains('car')) {
+      return const Color(0xFF2563EB); // Royal Blue
+    } else if (name.contains('thực') || name.contains('ăn') || name.contains('food') || name.contains('restaurant')) {
+      return const Color(0xFFF59E0B); // Amber / Warm Orange
+    } else if (name.contains('uống') || name.contains('bar') || name.contains('cafe') || name.contains('đồ uống')) {
+      return const Color(0xFFD97706); // Dark Amber
+    } else if (name.contains('quan') || name.contains('tham') || name.contains('sights')) {
+      return const Color(0xFFEC4899); // Pink
+    } else if (name.contains('động') || name.contains('hoạt') || name.contains('activity')) {
+      return const Color(0xFF10B981); // Emerald
+    } else if (name.contains('sắm') || name.contains('mua') || name.contains('shop')) {
+      return const Color(0xFF8B5CF6); // Violet
+    } else if (name.contains('xăng') || name.contains('gas')) {
+      return const Color(0xFFEF4444); // Red
+    } else if (name.contains('hóa') || name.contains('tạp')) {
+      return const Color(0xFF059669); // Green
+    }
+    return const Color(0xFF6366F1); // Indigo default
+  }
 
-    String formatDong(int amount) {
-      if (amount >= 1000000) {
-        double m = amount / 1000000.0;
-        return '${m.toStringAsFixed(m % 1 == 0 ? 0 : 1)} Tr';
+
+  String? _getPayerAvatarUrl(String payer) {
+    if (_itineraryMembers.isNotEmpty) {
+      final firstPayer = payer.split(',').first.trim();
+      for (var m in _itineraryMembers) {
+        final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
+        final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? '').toString().trim();
+        final bool isOwner = m['role'] == 'OWNER' ||
+            (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
+        final String displayName = isOwner ? 'Bạn ($nameCandidate)' : nameCandidate;
+
+        if (firstPayer == displayName || firstPayer == nameCandidate || (nameCandidate.isNotEmpty && firstPayer.contains(nameCandidate))) {
+          final String? rawAvatar = userObj['avatarUrl'] ?? userObj['avatar'];
+          if (rawAvatar != null && rawAvatar.trim().isNotEmpty && !rawAvatar.contains('default-avatar')) {
+            final trimmed = rawAvatar.trim();
+            if (trimmed.startsWith('http')) return trimmed;
+            if (trimmed.startsWith('/')) return 'http://localhost:3000$trimmed';
+            return 'http://localhost:3000/$trimmed';
+          }
+        }
       }
-      return '${amount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} đ';
     }
+    final currentUser = AuthService().currentUser.value;
+    if (currentUser != null && currentUser.avatar != null && currentUser.avatar!.isNotEmpty) {
+      final raw = currentUser.avatar!.trim();
+      if (raw.startsWith('http')) return raw;
+      if (raw.startsWith('/')) return 'http://localhost:3000$raw';
+      return 'http://localhost:3000/$raw';
+    }
+    return null;
+  }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Budget Summary Card
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+  String _getSortOptionLabel(String opt) {
+    switch (opt) {
+      case 'OLDEST':
+        return 'Ngày (cũ nhất trước)';
+      case 'PRICE_HIGH':
+        return 'Giá (cao đến thấp)';
+      case 'PRICE_LOW':
+        return 'Giá (thấp đến cao)';
+      default:
+        return 'Ngày (mới nhất trước)';
+    }
+  }
+
+  String _formatExpenseAmount(num amount) {
+    final intVal = amount.toInt();
+    if (intVal == 0) return 'đ0';
+    final formatted = intVal.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return 'đ$formatted';
+  }
+
+  void _showSetBudgetSheet() {
+    String currentBudgetStr = _tripBudget > 0 ? _tripBudget.toString() : '0';
+    final budgetController = TextEditingController(
+      text: _tripBudget > 0 ? _tripBudget.toString() : '',
+    );
+    String selectedCurrencySymbol = 'đ';
+    String selectedCurrencyCode = 'VND';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Tổng chi tiêu',
-                      style: TextStyle(color: Colors.white60, fontSize: 13),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(30),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Ngân sách: ${formatDong(budgetLimit)}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+              child: SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: const Text(
+                              'Hủy',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            'Đặt ngân sách',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.darkText,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () async {
+                              final b = int.tryParse(currentBudgetStr) ?? 0;
+                              setState(() {
+                                _tripBudget = b;
+                              });
+                              final prefs = await SharedPreferences.getInstance();
+                              final itinId = _itineraryData['id'] as int;
+                              await prefs.setInt('budget_$itinId', b);
+                              Navigator.pop(context);
+                            },
+                            child: Text(
+                              'Lưu',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              _showCurrencyPickerSheet(selectedCurrencyCode, (symbol, code) {
+                                setModalState(() {
+                                  selectedCurrencySymbol = symbol;
+                                  selectedCurrencyCode = code;
+                                });
+                              });
+                            },
+                            child: Row(
+                              children: [
+                                Text(
+                                  selectedCurrencySymbol,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkText,
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: 200,
+                            child: TextField(
+                              controller: budgetController,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.darkText,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: '0',
+                                border: InputBorder.none,
+                                isDense: true,
+                              ),
+                              onChanged: (val) {
+                                setModalState(() {
+                                  currentBudgetStr = val.trim();
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  formatDong(totalSpent),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showGroupBalanceSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        int totalSpent = 0;
+        for (var exp in _customExpenses) {
+          totalSpent += (exp['amount'] as num?)?.toInt() ?? 0;
+        }
+
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Progress Bar
-                Stack(
-                  children: [
-                    Container(
-                      height: 8,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    FractionallySizedBox(
-                      widthFactor: progress.clamp(0.0, 1.0),
-                      child: Container(
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: progress > 1.0
-                              ? Colors.redAccent
-                              : AppTheme.primary,
-                          borderRadius: BorderRadius.circular(4),
+                const Text(
+                  'Số dư nhóm',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: AppTheme.primary,
+                    child: Icon(Icons.person, color: Colors.white),
+                  ),
+                  title: const Text('Bạn (Dừng Nguyễn)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Đã chi trả toàn bộ'),
+                  trailing: Text(
+                    _formatExpenseAmount(totalSpent),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: AppTheme.subtitleText, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Mọi chi phí hiện tại được ghi nhận thanh toán bởi bạn.',
+                          style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      progress > 1.0
-                          ? 'Vượt quá ngân sách!'
-                          : 'Đã sử dụng $percent% ngân sách',
-                      style: TextStyle(
-                        color: progress > 1.0
-                            ? Colors.redAccent
-                            : Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Text(
-                      'Còn lại: ${formatDong((budgetLimit - totalSpent).clamp(0, 999999999))}',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
+        );
+      },
+    );
+  }
 
-          // Details List
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Chi tiết chi tiêu', style: AppTheme.sectionTitleStyle),
-              TextButton.icon(
-                icon: Icon(Icons.add, size: 16, color: AppTheme.primary),
-                label: Text(
-                  'Thêm chi phí',
-                  style: TextStyle(
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.bold,
+  void _showExpenseAnalyticsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        Map<String, int> categoryTotals = {};
+        int totalSpent = 0;
+        for (var exp in _customExpenses) {
+          final cat = exp['category']?.toString() ?? 'Khác';
+          final amt = (exp['amount'] as num?)?.toInt() ?? 0;
+          categoryTotals[cat] = (categoryTotals[cat] ?? 0) + amt;
+          totalSpent += amt;
+        }
+
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-                onPressed: _showAddExpenseDialog,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Places cost section
-          if (placeCosts > 0) ...[
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-              child: Text(
-                'VÉ THAM QUAN / DỊCH VỤ ĐỊA ĐIỂM',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                  color: AppTheme.subtitleText,
+                const SizedBox(height: 16),
+                const Text(
+                  'Xem phân tích chi tiêu',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-              ),
-            ),
-            ..._details
-                .where((d) {
-                  final p = d['place'] ?? {};
-                  final priceStr = p['price']?.toString() ?? '';
-                  return !priceStr.contains('Miễn phí') && priceStr.isNotEmpty;
-                })
-                .map((d) {
-                  final p = d['place'] ?? {};
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
+                const SizedBox(height: 20),
+                if (totalSpent == 0)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(
+                      child: Text('Chưa có chi tiêu nào để phân tích.'),
                     ),
-                    decoration: AppTheme.premiumCardDecoration(radius: 12),
-                    child: Row(
+                  )
+                else
+                  ...categoryTotals.entries.map((e) {
+                    final catName = e.key;
+                    final amt = e.value;
+                    final double pct = totalSpent > 0 ? (amt / totalSpent) : 0.0;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(catName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text('${_formatExpenseAmount(amt)} (${(pct * 100).toStringAsFixed(0)}%)'),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          LinearProgressIndicator(
+                            value: pct,
+                            backgroundColor: Colors.grey[200],
+                            color: AppTheme.primary,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSharingOptionSheet(
+    String currentShare,
+    Function(String selectedShare) onSelect, {
+    int amount = 0,
+  }) {
+    String activeShare = currentShare;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final options = ['Cá nhân', 'Mọi người', 'Không chia sẻ'];
+        final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+        final currentUser = AuthService().currentUser.value;
+        final currentUserIdStr = currentUser?.id.toString();
+        final currentUserName = currentUser?.fullName.trim();
+
+        List<Map<String, dynamic>> membersList = [];
+        bool fetchedMembers = false;
+        Set<String> selectedUserIds = {};
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            if (!fetchedMembers && currentItineraryId > 0) {
+              fetchedMembers = true;
+              DatabaseService().getItineraryMembers(currentItineraryId).then((data) {
+                if (context.mounted && data != null && data['members'] is List) {
+                  final list = List<Map<String, dynamic>>.from(data['members']);
+                  setModalState(() {
+                    membersList = list;
+                    selectedUserIds = list
+                        .map((m) => ((m['user'] as Map<String, dynamic>?)?['id'] ?? m['userId'] ?? m['id'] ?? '').toString())
+                        .toSet();
+                  });
+                }
+              });
+            }
+
+            final showMembersList = activeShare == 'Cá nhân' || activeShare == 'Mọi người';
+
+            return SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          color: AppTheme.primary,
-                          size: 20,
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Icon(Icons.arrow_back, color: AppTheme.darkText),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: Text(
-                            p['name'] ?? 'Vé tham quan',
-                            style: const TextStyle(
+                            'Chia sẻ chi phí cho nhóm',
+                            style: TextStyle(
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                              color: AppTheme.darkText,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Text(
-                          formatDong(50000),
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showShareDialog();
+                          },
+                          child: Icon(
+                            Icons.person_add_outlined,
                             color: AppTheme.darkText,
-                            fontSize: 13,
+                            size: 22,
                           ),
                         ),
                       ],
                     ),
-                  );
-                }),
-            const SizedBox(height: 16),
-          ],
+                    const SizedBox(height: 16),
 
-          // Custom Expenses Section
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-            child: Text(
-              'CHI PHÍ TỰ THÊM',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 11,
-                color: AppTheme.subtitleText,
-              ),
-            ),
-          ),
-          if (_customExpenses.isEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 30),
-              alignment: Alignment.center,
-              child: Text(
-                'Chưa có chi tiêu tự thêm nào. Hãy nhấn "+ Thêm chi phí"!',
-                style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
-              ),
-            )
-          else
-            ...List.generate(_customExpenses.length, (idx) {
-              final item = _customExpenses[idx];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: AppTheme.premiumCardDecoration(radius: 12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.credit_card_rounded,
-                      color: AppTheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item['title'] ?? '',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                    ...options.map((opt) {
+                      final isSelected = opt == activeShare;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          opt,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check, color: AppTheme.primary)
+                            : null,
+                        onTap: () {
+                          setModalState(() {
+                            activeShare = opt;
+                          });
+                          onSelect(opt);
+                        },
+                      );
+                    }),
+
+                    if (showMembersList) ...[
+                      const Divider(height: 20),
+
+                      if (membersList.isEmpty) ...[
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: AppTheme.primary,
+                            child: const Icon(Icons.person, color: Colors.white, size: 20),
+                          ),
+                          title: Text(
+                            'Bạn (${currentUserName ?? "Dừng"})',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.darkText,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            item['date'] ?? '',
+                          trailing: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Icon(Icons.check, color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ] else ...[
+                        ...membersList.map((m) {
+                          final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
+                          final String uId = (userObj['id'] ?? m['userId'] ?? '').toString();
+                          final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? (userObj['email'] is String ? userObj['email'].split('@')[0] : null) ?? 'Thành viên').toString().trim();
+                          final String rawName = nameCandidate.isNotEmpty ? nameCandidate : 'Thành viên';
+
+                          final bool isOwner = m['role'] == 'OWNER' ||
+                              (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
+
+                          final String displayName = isOwner ? 'Bạn ($rawName)' : rawName;
+
+                          final String? rawAvatar = userObj['avatarUrl'] ?? userObj['avatar'];
+                          String? avatarUrl;
+                          if (rawAvatar != null && rawAvatar.trim().isNotEmpty && !rawAvatar.contains('default-avatar')) {
+                            final trimmed = rawAvatar.trim();
+                            if (trimmed.startsWith('http')) {
+                              avatarUrl = trimmed;
+                            } else if (trimmed.startsWith('/')) {
+                              avatarUrl = 'http://localhost:3000$trimmed';
+                            } else {
+                              avatarUrl = 'http://localhost:3000/$trimmed';
+                            }
+                          }
+                          final Color avatarBgColor = Colors.primaries[rawName.hashCode.abs() % Colors.primaries.length];
+                          final isChecked = activeShare == 'Mọi người' || selectedUserIds.contains(uId);
+
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: avatarBgColor,
+                              foregroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                              child: Text(
+                                rawName.isNotEmpty ? rawName[0].toUpperCase() : '?',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            title: Text(
+                              displayName,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.darkText,
+                              ),
+                            ),
+                            trailing: GestureDetector(
+                              onTap: () {
+                                setModalState(() {
+                                  if (isChecked) {
+                                    selectedUserIds.remove(uId);
+                                  } else {
+                                    selectedUserIds.add(uId);
+                                  }
+                                });
+                              },
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: isChecked ? AppTheme.primary : Colors.transparent,
+                                  border: Border.all(
+                                    color: isChecked ? AppTheme.primary : Colors.grey.shade400,
+                                    width: 1.5,
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: isChecked
+                                    ? const Icon(Icons.check, color: Colors.white, size: 16)
+                                    : null,
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+
+                    if (activeShare == 'Mọi người' || activeShare == 'Cá nhân') ...[
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Builder(builder: (ctx) {
+                              final int personCount = activeShare == 'Mọi người'
+                                  ? (membersList.isEmpty ? 1 : membersList.length)
+                                  : (selectedUserIds.isEmpty ? 1 : selectedUserIds.length);
+                              final int perPerson = personCount > 0 ? (amount ~/ personCount) : amount;
+                              return Text(
+                                '${_formatExpenseAmount(perPerson)} đ/người',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.darkText,
+                                ),
+                              );
+                            }),
+                            Builder(builder: (ctx) {
+                              final int personCount = activeShare == 'Mọi người'
+                                  ? (membersList.isEmpty ? 1 : membersList.length)
+                                  : (selectedUserIds.isEmpty ? 1 : selectedUserIds.length);
+                              return Text(
+                                '$personCount người',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.darkText,
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showPayerPickerSheet(
+    String currentPayer,
+    Function(String selectedPayer) onSelect,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+        final currentUser = AuthService().currentUser.value;
+        final currentUserName = currentUser?.fullName.trim();
+
+        List<Map<String, dynamic>> membersList = [];
+        bool fetchedMembers = false;
+        Set<String> selectedUserIds = {};
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            if (!fetchedMembers && currentItineraryId > 0) {
+              fetchedMembers = true;
+              DatabaseService().getItineraryMembers(currentItineraryId).then((data) {
+                if (context.mounted && data != null && data['members'] is List) {
+                  final list = List<Map<String, dynamic>>.from(data['members']);
+                  setModalState(() {
+                    membersList = list;
+
+                    // Match currentPayer string to member IDs strictly
+                    final Set<String> matchedIds = {};
+                    final currentPayerList = currentPayer.split(',').map((s) => s.trim()).toList();
+
+                    // Pass 1: Match exact displayName (e.g. "Bạn (Dửng)" vs "Dửng")
+                    for (var m in list) {
+                      final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
+                      final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
+                      final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? 'Thành viên').toString().trim();
+                      final String rawName = nameCandidate.isNotEmpty ? nameCandidate : 'Thành viên';
+                      final bool isOwner = m['role'] == 'OWNER' ||
+                          (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
+                      final String displayName = isOwner ? 'Bạn ($rawName)' : rawName;
+
+                      if (currentPayerList.contains(displayName)) {
+                        matchedIds.add(uId);
+                      }
+                    }
+
+                    // Pass 2: If no exact displayName match, match rawName (stop at first match)
+                    if (matchedIds.isEmpty) {
+                      for (var m in list) {
+                        final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
+                        final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
+                        final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? 'Thành viên').toString().trim();
+                        final String rawName = nameCandidate.isNotEmpty ? nameCandidate : 'Thành viên';
+
+                        if (currentPayerList.contains(rawName)) {
+                          matchedIds.add(uId);
+                          break;
+                        }
+                      }
+                    }
+
+                    // Pass 3: Default to OWNER only if matchedIds is empty AND currentPayer is empty or "Bạn"
+                    if (matchedIds.isEmpty && (currentPayer.trim().isEmpty || currentPayer.trim() == 'Bạn')) {
+                      final ownerMember = list.firstWhere(
+                        (m) => m['role'] == 'OWNER' || (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString()),
+                        orElse: () => list.first,
+                      );
+                      final ownerUserObj = (ownerMember['user'] as Map<String, dynamic>?) ?? ownerMember;
+                      final String ownerId = (ownerUserObj['id'] ?? ownerMember['userId'] ?? ownerMember['id'] ?? '').toString();
+                      matchedIds.add(ownerId);
+                    }
+
+                    selectedUserIds = matchedIds;
+                  });
+                }
+              });
+            }
+
+            return SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Icon(Icons.arrow_back, color: AppTheme.darkText),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            'Người trả chi phí',
                             style: TextStyle(
-                              color: AppTheme.subtitleText,
-                              fontSize: 10,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.darkText,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showShareDialog();
+                          },
+                          child: Icon(
+                            Icons.person_add_outlined,
+                            color: AppTheme.darkText,
+                            size: 22,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (membersList.isEmpty) ...[
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: AppTheme.primary,
+                          child: const Icon(Icons.person, color: Colors.white, size: 20),
+                        ),
+                        title: Text(
+                          'Bạn (${currentUserName ?? "Dừng Nguyễn"})',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                        trailing: Icon(Icons.check, color: AppTheme.primary),
+                        onTap: () {
+                          onSelect('Bạn (${currentUserName ?? "Dừng Nguyễn"})');
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ] else ...[
+                      ...membersList.map((m) {
+                        final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
+                        final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
+                        final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? (userObj['email'] is String ? userObj['email'].split('@')[0] : null) ?? 'Thành viên').toString().trim();
+                        final String rawName = nameCandidate.isNotEmpty ? nameCandidate : 'Thành viên';
+
+                        final bool isOwner = m['role'] == 'OWNER' ||
+                            (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
+
+                        final String displayName = isOwner ? 'Bạn ($rawName)' : rawName;
+
+                        final String? rawAvatar = userObj['avatarUrl'] ?? userObj['avatar'];
+                        String? avatarUrl;
+                        if (rawAvatar != null && rawAvatar.trim().isNotEmpty && !rawAvatar.contains('default-avatar')) {
+                          final trimmed = rawAvatar.trim();
+                          if (trimmed.startsWith('http')) {
+                            avatarUrl = trimmed;
+                          } else if (trimmed.startsWith('/')) {
+                            avatarUrl = 'http://localhost:3000$trimmed';
+                          } else {
+                            avatarUrl = 'http://localhost:3000/$trimmed';
+                          }
+                        }
+                        final Color avatarBgColor = Colors.primaries[rawName.hashCode.abs() % Colors.primaries.length];
+                        final isSelected = selectedUserIds.contains(uId);
+
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: avatarBgColor,
+                            foregroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                            child: Text(
+                              rawName.isNotEmpty ? rawName[0].toUpperCase() : '?',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          title: Text(
+                            displayName,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                              color: AppTheme.darkText,
+                            ),
+                          ),
+                          trailing: isSelected
+                              ? Icon(Icons.check, color: AppTheme.primary)
+                              : null,
+                          onTap: () {
+                            setModalState(() {
+                              selectedUserIds = {uId};
+                            });
+                            onSelect(displayName);
+                          },
+                        );
+                      }),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showCurrencyPickerSheet(
+    String currentCode,
+    Function(String symbol, String code) onSelect,
+  ) {
+    final List<Map<String, String>> currencies = [
+      {'flag': '🇻🇳', 'name': 'Vietnamese Dong', 'code': 'VND', 'symbol': 'đ'},
+      {'flag': '🇺🇸', 'name': 'United States Dollar', 'code': 'USD', 'symbol': r'$'},
+      {'flag': '🇪🇺', 'name': 'Euro', 'code': 'EUR', 'symbol': '€'},
+      {'flag': '🇯🇵', 'name': 'Japanese Yen', 'code': 'JPY', 'symbol': '¥'},
+      {'flag': '🇰🇷', 'name': 'South Korean Won', 'code': 'KRW', 'symbol': '₩'},
+      {'flag': '🇨🇳', 'name': 'Chinese Yuan', 'code': 'CNY', 'symbol': '¥'},
+      {'flag': '🇬🇧', 'name': 'British Pound', 'code': 'GBP', 'symbol': '£'},
+      {'flag': '🇸🇬', 'name': 'Singapore Dollar', 'code': 'SGD', 'symbol': r'S$'},
+      {'flag': '🇹🇭', 'name': 'Thai Baht', 'code': 'THB', 'symbol': '฿'},
+      {'flag': '🇦🇺', 'name': 'Australian Dollar', 'code': 'AUD', 'symbol': r'A$'},
+      {'flag': '🇨🇦', 'name': 'Canadian Dollar', 'code': 'CAD', 'symbol': r'CA$'},
+      {'flag': '🇹🇼', 'name': 'New Taiwan Dollar', 'code': 'TWD', 'symbol': r'NT$'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        String searchQuery = '';
+        final searchController = TextEditingController();
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final filtered = currencies.where((c) {
+              final q = searchQuery.toLowerCase().trim();
+              if (q.isEmpty) return true;
+              return c['name']!.toLowerCase().contains(q) ||
+                  c['code']!.toLowerCase().contains(q) ||
+                  c['symbol']!.toLowerCase().contains(q);
+            }).toList();
+
+            return SafeArea(
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.75,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Icon(Icons.arrow_back, color: AppTheme.darkText),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            'Thay đổi tiền tệ',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.darkText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.search, color: Colors.grey[500], size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: searchController,
+                              onChanged: (val) {
+                                setModalState(() {
+                                  searchQuery = val;
+                                });
+                              },
+                              decoration: InputDecoration(
+                                hintText: 'Tìm kiếm',
+                                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                          if (searchQuery.isNotEmpty)
+                            GestureDetector(
+                              onTap: () {
+                                setModalState(() {
+                                  searchController.clear();
+                                  searchQuery = '';
+                                });
+                              },
+                              child: Icon(Icons.cancel, color: Colors.grey[400], size: 18),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 4),
+                        itemBuilder: (context, index) {
+                          final curr = filtered[index];
+                          final isSelected = curr['code'] == currentCode;
+
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Text(
+                              curr['flag']!,
+                              style: const TextStyle(fontSize: 26),
+                            ),
+                            title: Text(
+                              curr['name']!,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                color: AppTheme.darkText,
+                              ),
+                            ),
+                            subtitle: Text(
+                              curr['code']!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? Icon(Icons.check, color: AppTheme.primary)
+                                : null,
+                            onTap: () {
+                              onSelect(curr['symbol']!, curr['code']!);
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAllTripItemsSheet(
+    Function({required String categoryName, required IconData categoryIcon, String? placeName}) onSelect,
+  ) {
+    String searchQuery = '';
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final List<Map<String, dynamic>> validPlaces = [];
+        for (var item in [..._savedPlaces, ..._details]) {
+          final placeObj = (item['place'] as Map<String, dynamic>?) ?? (item['itemType'] == 'PLACE' ? item : null);
+          final realName = placeObj?['name'] ?? item['place_name'] ?? item['name'];
+          if (realName != null && realName.toString().trim().isNotEmpty && realName != 'Địa điểm') {
+            if (!validPlaces.any((existing) {
+              final eObj = (existing['place'] as Map<String, dynamic>?) ?? existing;
+              final eName = eObj['name'] ?? existing['name'];
+              return eName == realName;
+            })) {
+              validPlaces.add(item);
+            }
+          }
+        }
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final allItems = validPlaces.where((p) {
+              final placeObj = (p['place'] as Map<String, dynamic>?) ?? p;
+              final name = (placeObj['name'] ?? p['name'] ?? p['title'] ?? '').toString().toLowerCase();
+              return name.contains(searchQuery.toLowerCase());
+            }).toList();
+
+            return SafeArea(
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.85,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Icon(Icons.arrow_back, color: AppTheme.darkText),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            'Tất cả các mục chuyến đi',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.darkText,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TextField(
+                        onChanged: (val) {
+                          setModalState(() {
+                            searchQuery = val;
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          hintText: 'Tìm kiếm',
+                          prefixIcon: Icon(Icons.search, color: Colors.grey),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    Text(
+                      'Chọn nhanh từ các danh sách của bạn',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Expanded(
+                      child: allItems.isEmpty
+                          ? Center(
+                              child: Text(
+                                'Không tìm thấy mục nào',
+                                style: TextStyle(color: Colors.grey[500]),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: allItems.length,
+                              separatorBuilder: (_, _) => const Divider(height: 1),
+                              itemBuilder: (context, idx) {
+                                final p = allItems[idx];
+                                final placeObj = (p['place'] as Map<String, dynamic>?) ?? p;
+                                final name = placeObj['name'] ?? p['name'] ?? p['title'] ?? 'Mục chuyến đi';
+
+                                IconData itemIcon = Icons.location_on_outlined;
+                                final catObj = (placeObj['category'] as Map<String, dynamic>?) ?? (p['category'] as Map<String, dynamic>?);
+                                if (catObj != null) {
+                                  final code = int.tryParse(catObj['iconCode']?.toString() ?? '');
+                                  if (code != null) {
+                                    itemIcon = IconData(code, fontFamily: 'MaterialIcons');
+                                  } else if (catObj['name'] != null) {
+                                    itemIcon = _getCategoryIconData(catObj['name'].toString());
+                                  }
+                                }
+
+                                final catName = catObj?['name']?.toString() ?? 'Tham quan';
+                                final section = p['section_name'] ?? catName;
+
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.surfaceVariant,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(itemIcon, size: 20, color: AppTheme.darkText),
+                                  ),
+                                  title: Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  trailing: Text(
+                                    section,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[500],
+                                    ),
+                                  ),
+                                  onTap: () {
+                                    onSelect(categoryName: catName, categoryIcon: itemIcon, placeName: name);
+                                    Navigator.pop(context);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showCategoryPickerSheet(
+    Function({required String categoryName, required IconData categoryIcon, String? placeName}) onSelect,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final List<Map<String, dynamic>> validPlaces = [];
+        for (var item in [..._savedPlaces, ..._details]) {
+          final placeObj = (item['place'] as Map<String, dynamic>?) ?? (item['itemType'] == 'PLACE' ? item : null);
+          final realName = placeObj?['name'] ?? item['place_name'] ?? item['name'];
+          if (realName != null && realName.toString().trim().isNotEmpty && realName != 'Địa điểm') {
+            if (!validPlaces.any((existing) {
+              final eObj = (existing['place'] as Map<String, dynamic>?) ?? existing;
+              final eName = eObj['name'] ?? existing['name'];
+              return eName == realName;
+            })) {
+              validPlaces.add(item);
+            }
+          }
+        }
+        final itineraryPlaces = validPlaces.take(3).toList();
+
+        List<Map<String, dynamic>> categoriesGrid = [];
+        if (_searchCategories.isNotEmpty) {
+          categoriesGrid = _searchCategories.map((c) {
+            IconData iconData = Icons.receipt_long_rounded;
+            final code = int.tryParse(c['iconCode']?.toString() ?? '');
+            if (code != null) {
+              iconData = IconData(code, fontFamily: 'MaterialIcons');
+            } else if (c['name'] != null) {
+              iconData = _getCategoryIconData(c['name'].toString());
+            }
+            return {
+              'name': c['name']?.toString() ?? 'Khác',
+              'icon': iconData,
+            };
+          }).toList();
+        }
+
+        if (categoriesGrid.isEmpty) {
+          categoriesGrid = [
+            {'name': 'Chuyến bay', 'icon': Icons.flight_takeoff_rounded},
+            {'name': 'Chỗ ở', 'icon': Icons.hotel_rounded},
+            {'name': 'Xe thuê', 'icon': Icons.directions_car_rounded},
+            {'name': 'Phương tiện công cộng', 'icon': Icons.directions_bus_rounded},
+            {'name': 'Ẩm thực', 'icon': Icons.restaurant_rounded},
+            {'name': 'Đồ uống', 'icon': Icons.local_bar_rounded},
+            {'name': 'Tham quan', 'icon': Icons.account_balance_rounded},
+            {'name': 'Hoạt động', 'icon': Icons.local_activity_rounded},
+            {'name': 'Mua sắm', 'icon': Icons.shopping_bag_rounded},
+            {'name': 'Xăng', 'icon': Icons.local_gas_station_rounded},
+            {'name': 'Hàng tạp hóa', 'icon': Icons.shopping_cart_rounded},
+            {'name': 'Khác', 'icon': Icons.receipt_long_rounded},
+          ];
+        }
+
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.arrow_back, color: AppTheme.darkText),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        'Danh mục chi phí',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                Text(
+                  'Chọn từ kế hoạch chuyến đi',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ...itineraryPlaces.map((p) {
+                  final placeObj = (p['place'] as Map<String, dynamic>?) ?? p;
+                  final placeName = placeObj['name'] ?? p['name'] ?? p['title'] ?? 'Địa điểm';
+
+                  IconData placeIcon = Icons.location_on_outlined;
+                  final catObj = (placeObj['category'] as Map<String, dynamic>?) ?? (p['category'] as Map<String, dynamic>?);
+                  if (catObj != null) {
+                    final code = int.tryParse(catObj['iconCode']?.toString() ?? '');
+                    if (code != null) {
+                      placeIcon = IconData(code, fontFamily: 'MaterialIcons');
+                    } else if (catObj['name'] != null) {
+                      placeIcon = _getCategoryIconData(catObj['name'].toString());
+                    }
+                  }
+                  final catName = catObj?['name']?.toString() ?? 'Tham quan';
+
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: const VisualDensity(vertical: -2),
+                    leading: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceVariant,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(placeIcon, size: 18, color: AppTheme.darkText),
+                    ),
+                    title: Text(
+                      placeName,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () {
+                      onSelect(categoryName: catName, categoryIcon: placeIcon, placeName: placeName);
+                      Navigator.pop(context);
+                    },
+                  );
+                }),
+
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  visualDensity: const VisualDensity(vertical: -2),
+                  leading: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceVariant,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.more_horiz_rounded, size: 18),
+                  ),
+                  title: Text(
+                    'Xem tất cả',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAllTripItemsSheet(onSelect);
+                  },
+                ),
+
+                const Divider(height: 16),
+
+                Text(
+                  'Hoặc chọn từ một danh mục',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 2.7,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: categoriesGrid.length,
+                  itemBuilder: (context, idx) {
+                    final cat = categoriesGrid[idx];
+                    final catName = cat['name'] as String;
+                    final catIcon = cat['icon'] as IconData;
+                    final catColor = _getCategoryColor(catName);
+
+                    return GestureDetector(
+                      onTap: () {
+                        onSelect(categoryName: catName, categoryIcon: catIcon, placeName: null);
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: catColor.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: catColor.withValues(alpha: 0.2)),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: catColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(catIcon, color: catColor, size: 18),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                catName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.darkText,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _detectCategoryFromPlace(Map<String, dynamic> detail) {
+    final placeMap = detail['place'] is Map<String, dynamic> ? (detail['place'] as Map<String, dynamic>) : <String, dynamic>{};
+    final name = (placeMap['name'] ?? placeMap['title'] ?? detail['name'] ?? detail['title'] ?? '').toString().toLowerCase();
+    final cat = (placeMap['category'] ?? placeMap['type'] ?? detail['category'] ?? detail['type'] ?? '').toString().toLowerCase();
+
+    final combined = '$name $cat';
+    if (combined.contains('ăn') || combined.contains('uống') || combined.contains('quán') || combined.contains('nhà hàng') || combined.contains('cà phê') || combined.contains('bún') || combined.contains('phở') || combined.contains('cơm')) {
+      return 'Ẩm thực';
+    }
+    if (combined.contains('khách sạn') || combined.contains('hotel') || combined.contains('chỗ ở') || combined.contains('homestay') || combined.contains('resort')) {
+      return 'Chỗ ở';
+    }
+    if (combined.contains('xe') || combined.contains('bay') || combined.contains('tàu') || combined.contains('di chuyển') || combined.contains('taxi') || combined.contains('grab')) {
+      return 'Di chuyển';
+    }
+    if (combined.contains('chợ') || combined.contains('mua sắm') || combined.contains('siêu thị') || combined.contains('mall')) {
+      return 'Mua sắm';
+    }
+    if (combined.contains('chùa') || combined.contains('viện') || combined.contains('bảo tàng') || combined.contains('hoạt động') || combined.contains('chơi') || combined.contains('park') || combined.contains('công viên')) {
+      return 'Hoạt động';
+    }
+    return 'Tham quan';
+  }
+
+  DateTime? _getDateForDay(int dayIndex) {
+    final startStr = _itineraryData['startDate'] as String?;
+    if (startStr == null) return null;
+    final startDate = DateTime.tryParse(startStr);
+    if (startDate == null) return null;
+    return startDate.add(Duration(days: dayIndex));
+  }
+
+  /// Cập nhật trường expense.amount trong _savedPlaces/_details local state
+  void _syncExpenseAmountToPlace(dynamic spId, dynamic dId, num amount) {
+    if (spId != null) {
+      final idx = _savedPlaces.indexWhere((sp) => sp['id']?.toString() == spId.toString());
+      if (idx != -1) {
+        _savedPlaces[idx]['expense'] = {
+          ...(_savedPlaces[idx]['expense'] as Map<String, dynamic>? ?? {}),
+          'amount': amount,
+          'savedPlaceId': spId.toString(),
+        };
+      }
+    }
+    if (dId != null) {
+      final idx = _details.indexWhere((d) => d['id']?.toString() == dId.toString());
+      if (idx != -1) {
+        _details[idx]['expense'] = {
+          ...(_details[idx]['expense'] as Map<String, dynamic>? ?? {}),
+          'amount': amount,
+          'detailId': dId.toString(),
+        };
+      }
+    }
+  }
+
+  void _openPlaceExpenseSheet(Map<String, dynamic> detail, {required bool isItineraryDetail, int dayIndex = 0}) {
+    if (!_checkCanEdit()) return;
+
+    final placeId = detail['id'];
+    final placeMap = detail['place'] is Map<String, dynamic> ? (detail['place'] as Map<String, dynamic>) : <String, dynamic>{};
+    final placeName = (placeMap['name'] ?? placeMap['title'] ?? detail['name'] ?? detail['title'] ?? detail['customName'] ?? detail['placeName'] ?? 'Địa điểm').toString().trim();
+    final detectedCategory = _detectCategoryFromPlace(detail);
+
+    // First check if the place already has an expense linked via expense relation (from server)
+    Map<String, dynamic>? existingExp;
+    final placeExpense = detail['expense'];
+    if (placeExpense is Map<String, dynamic>) {
+      // Find matching expense in _customExpenses list
+      final expId = placeExpense['id']?.toString();
+      if (expId != null) {
+        for (var e in _customExpenses) {
+          if (e['id']?.toString() == expId) {
+            existingExp = e;
+            break;
+          }
+        }
+        // If not in list yet, use the embedded expense
+        existingExp ??= Map<String, dynamic>.from(placeExpense);
+      }
+    }
+    // Fallback: match by savedPlaceId or detailId in _customExpenses
+    if (existingExp == null && placeId != null) {
+      final placeIdStr = placeId.toString();
+      for (var e in _customExpenses) {
+        if (isItineraryDetail) {
+          if (e['detailId']?.toString() == placeIdStr) {
+            existingExp = e;
+            break;
+          }
+        } else {
+          if (e['savedPlaceId']?.toString() == placeIdStr) {
+            existingExp = e;
+            break;
+          }
+        }
+      }
+    }
+
+    DateTime? defaultDate;
+    if (isItineraryDetail) {
+      defaultDate = _getDateForDay(dayIndex);
+    }
+
+    _showAddExpenseBottomSheet(
+      expenseToEdit: existingExp,
+      defaultTitle: placeName != 'Địa điểm' ? placeName : '',
+      defaultCategory: detectedCategory,
+      defaultDate: defaultDate,
+      savedPlaceId: isItineraryDetail ? null : placeId,
+      detailId: isItineraryDetail ? placeId : null,
+    );
+  }
+
+  void _showAddExpenseBottomSheet({
+    Map<String, dynamic>? expenseToEdit,
+    String? defaultTitle,
+    String? defaultCategory,
+    DateTime? defaultDate,
+    dynamic savedPlaceId,
+    dynamic detailId,
+  }) {
+    if (!_checkCanEdit()) return;
+
+    String currentAmountStr = expenseToEdit != null
+        ? ((expenseToEdit['amount'] as num?)?.toInt().toString() ?? '0')
+        : '0';
+    final amountController = TextEditingController(
+      text: currentAmountStr != '0' ? currentAmountStr : '',
+    );
+    String? selectedCategory = expenseToEdit != null
+        ? expenseToEdit['category']?.toString()
+        : defaultCategory;
+    IconData selectedIcon = selectedCategory != null
+        ? _getCategoryIconData(selectedCategory, iconCode: (expenseToEdit?['iconCode'] as num?)?.toInt())
+        : Icons.receipt_long_rounded;
+
+    final ownerObj = (_itineraryData['user'] as Map<String, dynamic>?);
+    final String ownerRawName = (ownerObj?['fullName'] ?? ownerObj?['name'] ?? _itineraryData['userName'] ?? AuthService().currentUser.value?.fullName ?? 'Dừng Nguyễn').toString().trim();
+    String currentPayer = expenseToEdit != null
+        ? (expenseToEdit['payer']?.toString() ?? 'Bạn ($ownerRawName)')
+        : 'Bạn ($ownerRawName)';
+    String currentShare = expenseToEdit != null
+        ? (expenseToEdit['share']?.toString() ?? 'Không chia sẻ')
+        : 'Không chia sẻ';
+    String selectedCurrencySymbol = expenseToEdit != null
+        ? (expenseToEdit['currencySymbol']?.toString() ?? 'đ')
+        : 'đ';
+    String selectedCurrencyCode = expenseToEdit != null
+        ? (expenseToEdit['currencyCode']?.toString() ?? 'VND')
+        : 'VND';
+
+    final String? defaultNoteText = expenseToEdit != null
+        ? (expenseToEdit['title'] != expenseToEdit['category'] ? (expenseToEdit['title']?.toString() ?? '') : '')
+        : (defaultTitle ?? '');
+    final noteController = TextEditingController(text: defaultNoteText);
+
+    DateTime? selectedDate = expenseToEdit != null
+        ? (expenseToEdit['date'] != null ? DateTime.tryParse(expenseToEdit['date']) : null)
+        : defaultDate;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final int parsedAmount = int.tryParse(amountController.text.trim()) ?? 0;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const SizedBox(width: 80),
+                            Text(
+                              expenseToEdit != null ? 'Chỉnh sửa chi phí' : 'Thêm chi phí',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.darkText,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                final int parsedAmt = int.tryParse(amountController.text.trim()) ?? 0;
+                                final DateTime activeDate = selectedDate ?? DateTime.now();
+                                if (parsedAmt <= 0) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Vui lòng nhập số tiền chi phí'),
+                                      backgroundColor: Colors.redAccent,
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (selectedCategory == null || selectedCategory!.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Vui lòng chọn mục chi phí'),
+                                      backgroundColor: Colors.redAccent,
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (selectedDate == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Vui lòng chọn ngày cho chi phí'),
+                                      backgroundColor: Colors.redAccent,
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                final dynamic effSavedPlaceId = savedPlaceId ?? expenseToEdit?['savedPlaceId'];
+                                final dynamic effDetailId = detailId ?? expenseToEdit?['detailId'];
+
+                                if (expenseToEdit != null) {
+                                  final expId = expenseToEdit['id'];
+                                  final updatedExp = {
+                                    ...expenseToEdit,
+                                    'title': noteController.text.trim().isNotEmpty
+                                        ? noteController.text.trim()
+                                        : selectedCategory!,
+                                    'amount': parsedAmt,
+                                    'category': selectedCategory!,
+                                    'payer': currentPayer,
+                                    'share': currentShare,
+                                    'date': selectedDate!.toIso8601String().substring(0, 10),
+                                    'currencySymbol': selectedCurrencySymbol,
+                                    'currencyCode': selectedCurrencyCode,
+                                    if (effSavedPlaceId != null) 'savedPlaceId': effSavedPlaceId.toString(),
+                                    if (effDetailId != null) 'detailId': effDetailId.toString(),
+                                  };
+                                  setState(() {
+                                    _syncExpenseAmountToPlace(effSavedPlaceId, effDetailId, parsedAmt);
+                                    final idx = _customExpenses.indexOf(expenseToEdit);
+                                    if (idx >= 0) {
+                                      _customExpenses[idx] = updatedExp;
+                                    }
+                                  });
+                                  _saveExpensesToPrefs();
+                                  Navigator.pop(context);
+                                  if (expId != null) {
+                                    DatabaseService().updateExpense(expId, updatedExp).then((savedExp) {
+                                      if (savedExp != null && mounted) {
+                                        setState(() {
+                                          final idx2 = _customExpenses.indexWhere((e) => e['id'] == expId);
+                                          if (idx2 >= 0) _customExpenses[idx2] = savedExp;
+                                        });
+                                        _saveExpensesToPrefs();
+                                        _loadData(silent: true);
+                                      }
+                                    });
+                                  }
+                                } else {
+                                  final newExp = {
+                                    'title': noteController.text.trim().isNotEmpty
+                                        ? noteController.text.trim()
+                                        : selectedCategory!,
+                                    'amount': parsedAmt,
+                                    'category': selectedCategory!,
+                                    'payer': currentPayer,
+                                    'share': currentShare,
+                                    'date': (selectedDate ?? DateTime.now()).toIso8601String().substring(0, 10),
+                                    'currencySymbol': selectedCurrencySymbol,
+                                    'currencyCode': selectedCurrencyCode,
+                                    if (effSavedPlaceId != null) 'savedPlaceId': effSavedPlaceId.toString(),
+                                    if (effDetailId != null) 'detailId': effDetailId.toString(),
+                                  };
+                                  setState(() {
+                                    _syncExpenseAmountToPlace(effSavedPlaceId, effDetailId, parsedAmt);
+                                    _customExpenses.insert(0, newExp);
+                                  });
+                                  _saveExpensesToPrefs();
+                                  Navigator.pop(context);
+                                  final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+                                  if (currentItineraryId > 0) {
+                                    DatabaseService().addExpense(currentItineraryId, newExp).then((savedExp) {
+                                      if (savedExp != null && mounted) {
+                                        setState(() {
+                                          final idx = _customExpenses.indexWhere((e) => e['title'] == newExp['title'] && e['amount'] == newExp['amount'] && e['id'] == null);
+                                          if (idx >= 0) {
+                                            _customExpenses[idx] = savedExp;
+                                          } else {
+                                            _customExpenses.insert(0, savedExp);
+                                          }
+                                        });
+                                        _saveExpensesToPrefs();
+                                        _loadData(silent: true);
+                                      }
+                                    });
+                                  }
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: (parsedAmount > 0 && selectedCategory != null)
+                                      ? AppTheme.primary
+                                      : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  'Hoàn thành',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: (parsedAmount > 0 && selectedCategory != null)
+                                        ? Colors.white
+                                        : Colors.grey[500],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Compact Sleek Amount Display Box
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  _showCurrencyPickerSheet(selectedCurrencyCode, (symbol, code) {
+                                    setModalState(() {
+                                      selectedCurrencySymbol = symbol;
+                                      selectedCurrencyCode = code;
+                                    });
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '$selectedCurrencySymbol $selectedCurrencyCode',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.darkText,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey, size: 16),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: TextField(
+                                  controller: amountController,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.end,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkText,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: '0',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
+                                    filled: false,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onChanged: (val) {
+                                    setModalState(() {
+                                      currentAmountStr = val.trim();
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Detail Options Group Box
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              // Category Tile
+                              InkWell(
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                                onTap: () {
+                                  _showCategoryPickerSheet(({required categoryName, required categoryIcon, placeName}) {
+                                    setModalState(() {
+                                      selectedCategory = categoryName;
+                                      selectedIcon = categoryIcon;
+                                      noteController.text = placeName ?? '';
+                                    });
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      Builder(builder: (ctx) {
+                                        final catColor = _getCategoryColor(selectedCategory ?? '');
+                                        return Container(
+                                          width: 38,
+                                          height: 38,
+                                          decoration: BoxDecoration(
+                                            color: catColor.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Icon(selectedIcon, color: catColor, size: 20),
+                                        );
+                                      }),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Danh mục',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[500],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              selectedCategory ?? 'Chọn danh mục',
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: selectedCategory != null ? FontWeight.bold : FontWeight.w500,
+                                                color: selectedCategory != null ? AppTheme.darkText : Colors.grey[400],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const Divider(height: 1, indent: 68, endIndent: 16),
+
+                              // Description Tile
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 38,
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(Icons.edit_note_rounded, color: Colors.grey[700], size: 22),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: noteController,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.darkText,
+                                        ),
+                                        decoration: InputDecoration(
+                                          hintText: 'Thêm mô tả (tùy chọn)',
+                                          hintStyle: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.normal,
+                                            color: Colors.grey[400],
+                                          ),
+                                          border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          disabledBorder: InputBorder.none,
+                                          filled: false,
+                                          fillColor: Colors.transparent,
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Divider(height: 1, indent: 68, endIndent: 16),
+
+
+                              // Payer Tile
+                              InkWell(
+                                onTap: () {
+                                  _showPayerPickerSheet(currentPayer, (newPayer) {
+                                    setModalState(() {
+                                      currentPayer = newPayer;
+                                    });
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Icon(Icons.account_balance_wallet_outlined, color: Colors.grey[700], size: 20),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Người trả',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[500],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              currentPayer,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.darkText,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const Divider(height: 1, indent: 68, endIndent: 16),
+
+                              // Sharing Option Tile
+                              InkWell(
+                                onTap: () {
+                                  _showSharingOptionSheet(currentShare, (newShare) {
+                                    setModalState(() {
+                                      currentShare = newShare;
+                                    });
+                                  }, amount: parsedAmount);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Icon(Icons.group_outlined, color: Colors.grey[700], size: 20),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Chia sẻ nhóm',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[500],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              currentShare,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.darkText,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const Divider(height: 1, indent: 68, endIndent: 16),
+
+                              // Date Picker Tile
+                              InkWell(
+                                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDate ?? DateTime.now(),
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2030),
+                                  );
+                                  if (picked != null) {
+                                    setModalState(() {
+                                      selectedDate = picked;
+                                    });
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Icon(Icons.calendar_today_rounded, color: Colors.grey[700], size: 18),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Ngày thanh toán',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[500],
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              selectedDate != null
+                                                  ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
+                                                  : 'Chọn ngày',
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.darkText,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        if (expenseToEdit != null) ...[
+                          const SizedBox(height: 24),
+                          Center(
+                            child: GestureDetector(
+                              onTap: () async {
+                                final expId = expenseToEdit['id'];
+                                final effSavedPlaceId = expenseToEdit['savedPlaceId'];
+                                final effDetailId = expenseToEdit['detailId'];
+
+                                // Update local state immediately
+                                setState(() {
+                                  // Clear expense from place in local state
+                                  _syncExpenseAmountToPlace(effSavedPlaceId, effDetailId, 0);
+                                  // Also clear the expense object
+                                  if (effSavedPlaceId != null) {
+                                    final idx = _savedPlaces.indexWhere((sp) => sp['id']?.toString() == effSavedPlaceId.toString());
+                                    if (idx != -1) _savedPlaces[idx]['expense'] = null;
+                                  }
+                                  if (effDetailId != null) {
+                                    final idx = _details.indexWhere((d) => d['id']?.toString() == effDetailId.toString());
+                                    if (idx != -1) _details[idx]['expense'] = null;
+                                  }
+                                  _customExpenses.removeWhere((e) => e['id'] == expId || e == expenseToEdit);
+                                });
+                                _saveExpensesToPrefs();
+                                Navigator.pop(context);
+
+                                // Delete from server
+                                if (expId != null) {
+                                  await DatabaseService().deleteExpense(expId);
+                                }
+                                if (mounted) {
+                                  _loadData(); // reload full để tổng quan + hành trình cập nhật
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.delete_outline, color: Colors.grey[700], size: 18),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Xóa',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[800],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildExpensesTab() {
+    int totalSpent = 0;
+    for (var exp in _customExpenses) {
+      totalSpent += (exp['amount'] as num?)?.toInt() ?? 0;
+    }
+
+    List<Map<String, dynamic>> sortedExpenses = List.from(_customExpenses);
+    if (_sortExpensesOption == 'NEWEST') {
+      sortedExpenses = sortedExpenses.reversed.toList();
+    } else if (_sortExpensesOption == 'OLDEST') {
+      // original order
+    } else if (_sortExpensesOption == 'PRICE_HIGH') {
+      sortedExpenses.sort((a, b) => ((b['amount'] as num?) ?? 0).compareTo((a['amount'] as num?) ?? 0));
+    } else if (_sortExpensesOption == 'PRICE_LOW') {
+      sortedExpenses.sort((a, b) => ((a['amount'] as num?) ?? 0).compareTo((b['amount'] as num?) ?? 0));
+    }
+
+    return Container(
+      color: AppTheme.background,
+      child: Stack(
+        children: [
+          ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+            itemCount: sortedExpenses.isEmpty ? 2 : sortedExpenses.length + 1,
+            itemBuilder: (context, idx) {
+              if (idx == 0) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Sleek Light Brand Hero Card
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFEFF6FF), Color(0xFFE0F2FE)],
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFBAE6FD)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primary.withValues(alpha: 0.06),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primary.withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.account_balance_wallet_rounded, color: AppTheme.primary, size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                _formatExpenseAmount(totalSpent),
+                                style: TextStyle(
+                                  color: AppTheme.darkText,
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (_tripBudget <= 0) ...[
+                            GestureDetector(
+                              onTap: _showSetBudgetSheet,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add_circle_outline_rounded, color: AppTheme.primary, size: 15),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Đặt ngân sách',
+                                      style: TextStyle(
+                                        color: AppTheme.primary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            Container(
+                              width: 200,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFCBD5E1),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: (totalSpent / _tripBudget).clamp(0.0, 1.0),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: _showSetBudgetSheet,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Ngân sách: ${_formatExpenseAmount(_tripBudget)}',
+                                    style: TextStyle(
+                                      color: AppTheme.subtitleText,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.edit_rounded,
+                                    color: AppTheme.subtitleText,
+                                    size: 14,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 18),
+
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                GestureDetector(
+                                  onTap: _showShareDialog,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(9),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white,
+                                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Icon(
+                                      Icons.person_add_outlined,
+                                      color: AppTheme.primary,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: _showGroupBalanceSheet,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.monetization_on_outlined,
+                                          color: AppTheme.primary,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Số dư nhóm',
+                                          style: TextStyle(
+                                            color: AppTheme.darkText,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: _showExpenseAnalyticsSheet,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.equalizer_rounded,
+                                          color: AppTheme.primary,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Xem phân tích chi tiêu',
+                                          style: TextStyle(
+                                            color: AppTheme.darkText,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Text(
-                      formatDong(item['amount']),
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.darkText,
-                        fontSize: 13,
+
+                    // Title & Sort Row
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Chi phí',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.darkText,
+                            ),
+                          ),
+                          PopupMenuButton<String>(
+                            onSelected: (val) {
+                              setState(() {
+                                _sortExpensesOption = val;
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'Sắp xếp: ${_getSortOptionLabel(_sortExpensesOption)}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.darkText,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_drop_down_rounded,
+                                    color: AppTheme.darkText,
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'NEWEST',
+                                child: Text('Ngày (mới nhất trước)'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'OLDEST',
+                                child: Text('Ngày (cũ nhất trước)'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'PRICE_HIGH',
+                                child: Text('Giá (cao đến thấp)'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'PRICE_LOW',
+                                child: Text('Giá (thấp đến cao)'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
+                  ],
+                );
+              }
+
+              if (sortedExpenses.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                  child: Text(
+                    'Bạn chưa thêm chi phí nào. Theo dõi chi phí của bạn và chia sẻ chi phí bằng cách thêm một chi phí.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                      height: 1.5,
+                    ),
+                  ),
+                );
+              }
+
+              final itemIndex = idx - 1;
+              final item = sortedExpenses[itemIndex];
+              final title = item['title'] ?? 'Chi phí';
+              final amt = (item['amount'] as num?)?.toInt() ?? 0;
+              final payer = (item['payer'] ?? 'Bạn').toString();
+              final date = item['date'] ?? '';
+              final categoryName = item['category'] ?? 'Khác';
+
+              final firstPayer = payer.split(',').first.trim();
+              final payerInitial = firstPayer.isNotEmpty ? firstPayer[0].toUpperCase() : '?';
+              final Color payerColor = Colors.primaries[firstPayer.hashCode.abs() % Colors.primaries.length];
+              final String? payerAvatarUrl = _getPayerAvatarUrl(payer);
+              final Color catColor = _getCategoryColor(categoryName);
+
+              final tileWidget = Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  onTap: () {
+                    if (!_isViewer) {
+                      _showAddExpenseBottomSheet(expenseToEdit: item);
+                    }
+                  },
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: catColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      _getCategoryIconData(categoryName, iconCode: (item['iconCode'] as num?)?.toInt()),
+                      color: catColor,
+                      size: 22,
+                    ),
+                  ),
+                  title: Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    '$date • $categoryName',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        _formatExpenseAmount(amt),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      CircleAvatar(
+                        radius: 11,
+                        backgroundColor: payerColor,
+                        foregroundImage: payerAvatarUrl != null ? NetworkImage(payerAvatarUrl) : null,
+                        child: Text(
+                          payerInitial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+
+              if (_isViewer) return tileWidget;
+
+              return Slidable(
+                key: ValueKey('expense_${item['id'] ?? itemIndex}'),
+                endActionPane: ActionPane(
+                  motion: const ScrollMotion(),
+                  extentRatio: 0.22,
+                  children: [
+                    CustomSlidableAction(
+                      onPressed: (context) async {
+                        final expId = item['id'];
+                        final effSavedPlaceId = item['savedPlaceId'];
+                        final effDetailId = item['detailId'];
+
                         setState(() {
-                          _customExpenses.removeAt(idx);
+                          _syncExpenseAmountToPlace(effSavedPlaceId, effDetailId, 0);
+                          if (effSavedPlaceId != null) {
+                            final idx = _savedPlaces.indexWhere((sp) => sp['id']?.toString() == effSavedPlaceId.toString());
+                            if (idx != -1) _savedPlaces[idx]['expense'] = null;
+                          }
+                          if (effDetailId != null) {
+                            final idx = _details.indexWhere((d) => d['id']?.toString() == effDetailId.toString());
+                            if (idx != -1) _details[idx]['expense'] = null;
+                          }
+                          _customExpenses.remove(item);
                         });
                         _saveExpensesToPrefs();
+
+                        if (expId != null) {
+                          await DatabaseService().deleteExpense(expId);
+                        }
+                        if (mounted) {
+                          _loadData();
+                        }
                       },
-                      child: const Icon(
-                        Icons.close_rounded,
-                        size: 16,
-                        color: Colors.grey,
+                      backgroundColor: const Color(0xFFFF5252),
+                      foregroundColor: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.delete, color: Colors.white, size: 22),
+                          SizedBox(height: 4),
+                          Text(
+                            'Xóa',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
+                child: tileWidget,
               );
-            }),
+            },
+          ),
+          if (!_isViewer)
+            Positioned(
+              bottom: 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 4,
+                  ),
+                  icon: const Icon(Icons.add, size: 20),
+                  label: const Text(
+                    'Thêm chi phí',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onPressed: _showAddExpenseBottomSheet,
+                ),
+              ),
+            ),
         ],
       ),
     );
+
   }
 }
 

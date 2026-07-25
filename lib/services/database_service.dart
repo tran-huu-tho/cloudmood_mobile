@@ -864,5 +864,64 @@ class DatabaseService {
       return null;
     }
   }
+
+  /// Lấy danh sách chi phí của chuyến đi từ Server
+  Future<List<Map<String, dynamic>>> getExpenses(int itineraryId) async {
+    try {
+      final response = await ApiClient.get('/itineraries/$itineraryId/expenses');
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getExpenses: $e');
+      return [];
+    }
+  }
+
+  /// Thêm chi phí mới vào Server
+  Future<Map<String, dynamic>?> addExpense(int itineraryId, Map<String, dynamic> expenseData) async {
+    try {
+      final response = await ApiClient.post(
+        '/itineraries/$itineraryId/expenses',
+        body: expenseData,
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error addExpense: $e');
+      return null;
+    }
+  }
+
+  /// Xóa chi phí trên Server
+  Future<bool> deleteExpense(dynamic expenseId) async {
+    try {
+      final response = await ApiClient.delete('/itineraries/expenses/$expenseId');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error deleteExpense: $e');
+      return false;
+    }
+  }
+
+  /// Cập nhật chi phí trên Server
+  Future<Map<String, dynamic>?> updateExpense(dynamic expenseId, Map<String, dynamic> expenseData) async {
+    try {
+      final response = await ApiClient.put(
+        '/itineraries/expenses/$expenseId',
+        body: expenseData,
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error updateExpense: $e');
+      return null;
+    }
+  }
 }
 
