@@ -923,5 +923,47 @@ class DatabaseService {
       return null;
     }
   }
+
+  /// Lấy danh sách giao dịch thanh toán của chuyến đi từ Server
+  Future<List<Map<String, dynamic>>> getSettlements(int itineraryId) async {
+    try {
+      final response = await ApiClient.get('/itineraries/$itineraryId/settlements');
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getSettlements: $e');
+      return [];
+    }
+  }
+
+  /// Thêm giao dịch thanh toán mới vào Server
+  Future<Map<String, dynamic>?> addSettlement(int itineraryId, Map<String, dynamic> settlementData) async {
+    try {
+      final response = await ApiClient.post(
+        '/itineraries/$itineraryId/settlements',
+        body: settlementData,
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error addSettlement: $e');
+      return null;
+    }
+  }
+
+  /// Xóa giao dịch thanh toán trên Server
+  Future<bool> deleteSettlement(dynamic settlementId) async {
+    try {
+      final response = await ApiClient.delete('/itineraries/settlements/$settlementId');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Error deleteSettlement: $e');
+      return false;
+    }
+  }
 }
 

@@ -139,6 +139,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   List<Map<String, dynamic>> _customExpenses = [];
+  List<Map<String, dynamic>> _settlements = [];
   List<Map<String, dynamic>> _itineraryMembers = [];
   String _sortExpensesOption = 'NEWEST';
   int _tripBudget = 0;
@@ -812,6 +813,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
 
+    final savedSettlements = prefs.getString('settlements_$itineraryId');
+    if (savedSettlements != null) {
+      try {
+        _settlements = List<Map<String, dynamic>>.from(
+          json.decode(savedSettlements),
+        );
+      } catch (e) {
+        debugPrint('Error loading settlements: $e');
+      }
+    }
+
     final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
     if (currentItineraryId > 0) {
       DatabaseService().getExpenses(currentItineraryId).then((serverExp) {
@@ -820,6 +832,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             _customExpenses = serverExp;
           });
           _saveExpensesToPrefs();
+        }
+      });
+
+      DatabaseService().getSettlements(currentItineraryId).then((serverSt) {
+        if (mounted && serverSt.isNotEmpty) {
+          setState(() {
+            _settlements = serverSt;
+          });
+          _saveSettlementsToPrefs();
         }
       });
     }
@@ -1345,6 +1366,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     await prefs.setString(
       'expenses_$itineraryId',
       json.encode(_customExpenses),
+    );
+  }
+
+  Future<void> _saveSettlementsToPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final itineraryId = _itineraryData['id'] as int;
+    await prefs.setString(
+      'settlements_$itineraryId',
+      json.encode(_settlements),
     );
   }
 
@@ -10497,158 +10527,1859 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  void _showGroupBalanceSheet() {
+  Map<String, dynamic> _calculateGroupDebtBalances(List<Map<String, dynamic>> membersList) {
+    final currentUser = AuthService().currentUser.value;
+    final String currentUserIdStr = (currentUser?.id ?? '').toString();
+    final String currentUserName = currentUser?.fullName.trim() ?? 'Bạn';
+
+    List<Map<String, dynamic>> allMembers = [];
+    if (membersList.isNotEmpty) {
+      allMembers = membersList;
+    } else {
+      final ownerObj = _itineraryData['user'] as Map<String, dynamic>?;
+      final ownerName = (ownerObj?['fullName'] ?? ownerObj?['name'] ?? currentUserName).toString().trim();
+      final ownerAvatar = ownerObj?['avatarUrl'] ?? ownerObj?['avatar'] ?? currentUser?.avatar;
+      allMembers = [
+        {
+          'id': currentUserIdStr.isNotEmpty ? currentUserIdStr : '1',
+          'userId': currentUserIdStr.isNotEmpty ? currentUserIdStr : '1',
+          'name': ownerName,
+          'fullName': ownerName,
+          'avatarUrl': ownerAvatar,
+          'role': 'OWNER',
+        }
+      ];
+    }
+
+    Map<String, Map<String, dynamic>> memberMap = {};
+    for (var m in allMembers) {
+      final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
+      final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
+      final String rawName = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? 'Thành viên').toString().trim();
+      final bool isOwner = m['role'] == 'OWNER' ||
+          (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
+      final String displayName = isOwner ? 'Bạn ($rawName)' : rawName;
+
+      final String? rawAvatar = userObj['avatarUrl'] ?? userObj['avatar'] ?? m['avatarUrl'] ?? m['avatar'] ?? (isOwner ? currentUser?.avatar : null);
+      String? avatarUrl;
+      if (rawAvatar != null && rawAvatar.toString().trim().isNotEmpty && !rawAvatar.toString().contains('default-avatar')) {
+        final str = rawAvatar.toString().trim();
+        if (str.startsWith('http')) {
+          avatarUrl = str;
+        } else if (str.startsWith('/')) {
+          avatarUrl = '${ApiClient.baseUrl}$str';
+        } else {
+          avatarUrl = '${ApiClient.baseUrl}/$str';
+        }
+      }
+
+      final entry = {
+        'id': uId,
+        'name': rawName,
+        'displayName': displayName,
+        'isOwner': isOwner,
+        'avatarUrl': avatarUrl,
+        'totalPaid': 0,
+        'totalShare': 0.0,
+        'netBalance': 0,
+      };
+      memberMap[uId] = entry;
+      memberMap[rawName] = entry;
+      memberMap[displayName] = entry;
+    }
+
+    final uniqueMembers = memberMap.values.toSet().toList();
+    final int memberCount = uniqueMembers.length;
+
+    for (var exp in _customExpenses) {
+      final num amtNum = (exp['amount'] as num?) ?? 0;
+      final int amount = amtNum.toInt();
+      if (amount <= 0) continue;
+
+      final String payerStr = (exp['payer'] ?? '').toString().trim();
+      final String shareStr = (exp['share'] ?? '').toString().trim();
+
+      Map<String, dynamic>? payerMember;
+      for (var mEntry in uniqueMembers) {
+        if (payerStr == mEntry['displayName'] || payerStr == mEntry['name'] || (mEntry['name'].isNotEmpty && payerStr.contains(mEntry['name']))) {
+          payerMember = mEntry;
+          break;
+        }
+      }
+      payerMember ??= uniqueMembers.first;
+      payerMember['totalPaid'] = (payerMember['totalPaid'] as int) + amount;
+
+      if (shareStr == 'Không chia sẻ') {
+        payerMember['totalShare'] = (payerMember['totalShare'] as num) + amount;
+      } else if (shareStr.startsWith('Cá nhân')) {
+        final List<String> targetIds = shareStr.contains(':')
+            ? shareStr.split(':')[1].split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
+            : [];
+        List<Map<String, dynamic>> targetMembers = [];
+        if (targetIds.isNotEmpty) {
+          for (var mEntry in uniqueMembers) {
+            final String uId = (mEntry['id'] ?? '').toString();
+            final String uName = (mEntry['name'] ?? '').toString();
+            final String uDisplay = (mEntry['displayName'] ?? '').toString();
+            if (targetIds.contains(uId) || targetIds.contains(uName) || targetIds.contains(uDisplay)) {
+              targetMembers.add(mEntry);
+            }
+          }
+        }
+        if (targetMembers.isEmpty) {
+          targetMembers = [payerMember];
+        }
+        final double perPersonShare = amount / targetMembers.length;
+        for (var mEntry in targetMembers) {
+          mEntry['totalShare'] = (mEntry['totalShare'] as num) + perPersonShare;
+        }
+      } else {
+        final double perPersonShare = memberCount > 0 ? (amount / memberCount) : amount.toDouble();
+        for (var mEntry in uniqueMembers) {
+          mEntry['totalShare'] = (mEntry['totalShare'] as num) + perPersonShare;
+        }
+      }
+    }
+
+    Map<String, double> settlementPaidAdjustment = {};
+    for (var st in _settlements) {
+      if (st['isReverted'] == true) continue;
+      final String stFrom = (st['fromName'] ?? '').toString();
+      final String stTo = (st['toName'] ?? '').toString();
+      final double stAmt = (st['amount'] as num?)?.toDouble() ?? 0.0;
+
+      for (var m in uniqueMembers) {
+        final String mName = m['name'].toString();
+        final String mDisplay = m['displayName'].toString();
+
+        if (stFrom == mDisplay || stFrom == mName || (mName.isNotEmpty && stFrom.contains(mName))) {
+          settlementPaidAdjustment[mDisplay] = (settlementPaidAdjustment[mDisplay] ?? 0.0) + stAmt;
+        }
+        if (stTo == mDisplay || stTo == mName || (mName.isNotEmpty && stTo.contains(mName))) {
+          settlementPaidAdjustment[mDisplay] = (settlementPaidAdjustment[mDisplay] ?? 0.0) - stAmt;
+        }
+      }
+    }
+
+    for (var m in uniqueMembers) {
+      final String mDisplay = m['displayName'].toString();
+      final double adj = settlementPaidAdjustment[mDisplay] ?? 0.0;
+      final double paid = (m['totalPaid'] as num).toDouble() + adj;
+      final double share = (m['totalShare'] as num).toDouble();
+      m['netBalance'] = (paid - share).round();
+    }
+
+    List<Map<String, dynamic>> debtors = [];
+    List<Map<String, dynamic>> creditors = [];
+
+    for (var m in uniqueMembers) {
+      final net = m['netBalance'] as int;
+      if (net < 0) {
+        debtors.add({'member': m, 'amountOwed': -net});
+      } else if (net > 0) {
+        creditors.add({'member': m, 'amountDue': net});
+      }
+    }
+
+    List<Map<String, dynamic>> rawDebts = [];
+    int dIdx = 0;
+    int cIdx = 0;
+    while (dIdx < debtors.length && cIdx < creditors.length) {
+      final debtor = debtors[dIdx];
+      final creditor = creditors[cIdx];
+      final int dAmt = debtor['amountOwed'] as int;
+      final int cAmt = creditor['amountDue'] as int;
+      final int settleAmt = math.min(dAmt, cAmt);
+
+      rawDebts.add({
+        'from': debtor['member'],
+        'to': creditor['member'],
+        'amount': settleAmt,
+      });
+
+      debtor['amountOwed'] = dAmt - settleAmt;
+      creditor['amountDue'] = cAmt - settleAmt;
+
+      if (debtor['amountOwed'] == 0) dIdx++;
+      if (creditor['amountDue'] == 0) cIdx++;
+    }
+
+    List<Map<String, dynamic>> activeDebts = [];
+    for (var debt in rawDebts) {
+      int remainingAmount = debt['amount'] as int;
+      final fromName = debt['from']['displayName'].toString();
+      final toName = debt['to']['displayName'].toString();
+
+      for (var st in _settlements) {
+        if (st['isReverted'] == true) continue;
+        final stFrom = (st['fromName'] ?? '').toString();
+        final stTo = (st['toName'] ?? '').toString();
+        final stAmt = (st['amount'] as num?)?.toInt() ?? 0;
+
+        if ((stFrom == fromName || stFrom.contains(debt['from']['name'])) &&
+            (stTo == toName || stTo.contains(debt['to']['name']))) {
+          remainingAmount = math.max(0, remainingAmount - stAmt);
+        }
+      }
+
+      if (remainingAmount > 0) {
+        activeDebts.add({
+          ...debt,
+          'amount': remainingAmount,
+        });
+      }
+    }
+
+    int totalGroupPaid = 0;
+    for (var m in uniqueMembers) {
+      totalGroupPaid += (m['totalPaid'] as int);
+    }
+    int averageShare = memberCount > 0 ? (totalGroupPaid ~/ memberCount) : 0;
+
+    return {
+      'members': uniqueMembers,
+      'debts': activeDebts,
+      'rawDebts': rawDebts,
+      'totalGroupPaid': totalGroupPaid,
+      'averageShare': averageShare,
+    };
+  }
+
+  void _showSettleUpDialog(
+    List<Map<String, dynamic>> membersList,
+    Function() onSettled, {
+    Map<String, dynamic>? prefilledDebt,
+  }) {
+    final calcResult = _calculateGroupDebtBalances(membersList);
+    final List<Map<String, dynamic>> activeDebts = List<Map<String, dynamic>>.from(calcResult['debts'] ?? []);
+
+    if (activeDebts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tất cả các khoản nợ trong nhóm đã được thanh toán xong!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final int totalAllDebts = activeDebts.fold<int>(0, (sum, d) => sum + ((d['amount'] as num?)?.toInt() ?? 0));
+
+    int selectedDebtIndex = -1;
+    if (prefilledDebt != null) {
+      final fromId = prefilledDebt['from']['id'];
+      final toId = prefilledDebt['to']['id'];
+      final matchIdx = activeDebts.indexWhere((d) => d['from']['id'] == fromId && d['to']['id'] == toId);
+      if (matchIdx >= 0) selectedDebtIndex = matchIdx;
+    } else if (activeDebts.length == 1) {
+      selectedDebtIndex = 0;
+    }
+
+    final amountController = TextEditingController(
+      text: selectedDebtIndex == -1
+          ? totalAllDebts.toString()
+          : (activeDebts[selectedDebtIndex]['amount'] as int).toString(),
+    );
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        int totalSpent = 0;
-        for (var exp in _customExpenses) {
-          totalSpent += (exp['amount'] as num?)?.toInt() ?? 0;
-        }
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final isAllSelected = selectedDebtIndex == -1;
+            final activeDebt = !isAllSelected ? activeDebts[selectedDebtIndex] : null;
+            final fromMember = activeDebt != null ? (activeDebt['from'] as Map<String, dynamic>) : null;
+            final toMember = activeDebt != null ? (activeDebt['to'] as Map<String, dynamic>) : null;
 
-        return SafeArea(
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Số dư nhóm',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: AppTheme.primary,
-                    child: Icon(Icons.person, color: Colors.white),
-                  ),
-                  title: const Text('Bạn (Dừng Nguyễn)', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('Đã chi trả toàn bộ'),
-                  trailing: Text(
-                    _formatExpenseAmount(totalSpent),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceVariant,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.info_outline, color: AppTheme.subtitleText, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Mọi chi phí hiện tại được ghi nhận thanh toán bởi bạn.',
-                          style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Xác nhận thanh toán',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+                      ),
+                      const SizedBox(height: 16),
+
+                      if (activeDebts.length > 1) ...[
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Chọn giao dịch cần thanh toán:',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Text('Tất cả (${_formatExpenseAmount(totalAllDebts)})'),
+                                  selected: isAllSelected,
+                                  selectedColor: AppTheme.primary,
+                                  backgroundColor: const Color(0xFFF1F5F9),
+                                  side: BorderSide.none,
+                                  labelStyle: TextStyle(
+                                    color: isAllSelected ? Colors.white : AppTheme.darkText,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                  onSelected: (sel) {
+                                    if (sel) {
+                                      setModalState(() {
+                                        selectedDebtIndex = -1;
+                                        amountController.text = totalAllDebts.toString();
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              ...List.generate(activeDebts.length, (idx) {
+                                final d = activeDebts[idx];
+                                final f = d['from'] as Map<String, dynamic>;
+                                final t = d['to'] as Map<String, dynamic>;
+                                final isSel = selectedDebtIndex == idx;
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    label: Text('${f['displayName']} ➔ ${t['displayName']} (${_formatExpenseAmount(d['amount'])})'),
+                                    selected: isSel,
+                                    selectedColor: AppTheme.primary,
+                                    backgroundColor: const Color(0xFFF1F5F9),
+                                    side: BorderSide.none,
+                                    labelStyle: TextStyle(
+                                      color: isSel ? Colors.white : AppTheme.darkText,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                    onSelected: (sel) {
+                                      if (sel) {
+                                        setModalState(() {
+                                          selectedDebtIndex = idx;
+                                          amountController.text = (d['amount'] as int).toString();
+                                        });
+                                      }
+                                    },
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      if (isAllSelected) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.checklist_rtl_rounded, color: AppTheme.primary, size: 24),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Thanh toán tất cả ${activeDebts.length} giao dịch nợ',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else if (fromMember != null && toMember != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Column(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: AppTheme.primary,
+                                    foregroundImage: (fromMember['avatarUrl'] != null && fromMember['avatarUrl'].toString().isNotEmpty)
+                                        ? NetworkImage(fromMember['avatarUrl'].toString())
+                                        : null,
+                                    child: Text(
+                                      fromMember['name'].toString().isNotEmpty ? fromMember['name'].toString()[0].toUpperCase() : '?',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(fromMember['displayName'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  const Text('Người trả', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                ],
+                              ),
+                              const Icon(Icons.arrow_forward_rounded, color: AppTheme.primary, size: 24),
+                              Column(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: Colors.green,
+                                    foregroundImage: (toMember['avatarUrl'] != null && toMember['avatarUrl'].toString().isNotEmpty)
+                                        ? NetworkImage(toMember['avatarUrl'].toString())
+                                        : null,
+                                    child: Text(
+                                      toMember['name'].toString().isNotEmpty ? toMember['name'].toString()[0].toUpperCase() : '?',
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(toMember['displayName'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                  const Text('Người nhận', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+
+                      TextField(
+                        controller: amountController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Số tiền thanh toán (đ)',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: const Icon(Icons.monetization_on_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            final int parsedAmt = int.tryParse(amountController.text.trim()) ?? 0;
+                            if (parsedAmt <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Vui lòng nhập số tiền thanh toán hợp lệ')),
+                              );
+                              return;
+                            }
+
+                            final int itineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+
+                            if (selectedDebtIndex == -1) {
+                              for (int i = 0; i < activeDebts.length; i++) {
+                                final d = activeDebts[i];
+                                final f = d['from'] as Map<String, dynamic>;
+                                final t = d['to'] as Map<String, dynamic>;
+
+                                final newSt = {
+                                  'id': '${DateTime.now().millisecondsSinceEpoch}_$i',
+                                  'fromName': f['displayName'].toString(),
+                                  'fromUserId': f['id'].toString(),
+                                  'toName': t['displayName'].toString(),
+                                  'toUserId': t['id'].toString(),
+                                  'amount': d['amount'],
+                                  'date': DateTime.now().toIso8601String(),
+                                  'isReverted': false,
+                                };
+
+                                setState(() {
+                                  _settlements.insert(0, newSt);
+                                });
+
+                                if (itineraryId > 0) {
+                                  DatabaseService().addSettlement(itineraryId, newSt).then((res) {
+                                    if (res != null && res['id'] != null) {
+                                      setState(() {
+                                        newSt['id'] = res['id'].toString();
+                                      });
+                                      _saveSettlementsToPrefs();
+                                    }
+                                  });
+                                }
+                              }
+                              _saveSettlementsToPrefs();
+
+                              Navigator.pop(context);
+                              onSettled();
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Đã thanh toán tất cả các khoản nợ nhóm (${_formatExpenseAmount(parsedAmt)})! 🎉'),
+                                  backgroundColor: Colors.green,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            } else {
+                              final d = activeDebts[selectedDebtIndex];
+                              final f = d['from'] as Map<String, dynamic>;
+                              final t = d['to'] as Map<String, dynamic>;
+
+                              final newSettlement = {
+                                'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                                'fromName': f['displayName'].toString(),
+                                'fromUserId': f['id'].toString(),
+                                'toName': t['displayName'].toString(),
+                                'toUserId': t['id'].toString(),
+                                'amount': parsedAmt,
+                                'date': DateTime.now().toIso8601String(),
+                                'isReverted': false,
+                              };
+
+                              setState(() {
+                                _settlements.insert(0, newSettlement);
+                              });
+                              _saveSettlementsToPrefs();
+
+                              if (itineraryId > 0) {
+                                DatabaseService().addSettlement(itineraryId, newSettlement).then((res) {
+                                  if (res != null && res['id'] != null) {
+                                    setState(() {
+                                      newSettlement['id'] = res['id'].toString();
+                                    });
+                                    _saveSettlementsToPrefs();
+                                  }
+                                });
+                              }
+
+                              Navigator.pop(context);
+                              onSettled();
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Đã ghi nhận thanh toán ${_formatExpenseAmount(parsedAmt)} cho ${t['displayName']}!'),
+                                  backgroundColor: Colors.green,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFA5438),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                          ),
+                          child: const Text('Xác nhận thanh toán', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showTransactionHistorySheet() {
+    int activeFilter = 0; // 0: Tất cả, 1: Chi phí, 2: Thanh toán
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            List<Map<String, dynamic>> historyItems = [];
+
+            for (var exp in _customExpenses) {
+              historyItems.add({
+                'type': 'EXPENSE',
+                'title': exp['title'] ?? exp['category'] ?? 'Chi phí',
+                'amount': (exp['amount'] as num?)?.toInt() ?? 0,
+                'payer': exp['payer'] ?? 'Bạn',
+                'category': exp['category'] ?? 'Khác',
+                'date': exp['date'] != null ? DateTime.tryParse(exp['date']) : null,
+                'raw': exp,
+              });
+            }
+
+            for (var st in _settlements) {
+              historyItems.add({
+                'type': 'SETTLEMENT',
+                'title': 'Thanh toán nhóm',
+                'amount': (st['amount'] as num?)?.toInt() ?? 0,
+                'fromName': st['fromName'] ?? 'Thành viên',
+                'toName': st['toName'] ?? 'Thành viên',
+                'date': st['date'] != null ? DateTime.tryParse(st['date']) : null,
+                'isReverted': st['isReverted'] == true,
+                'raw': st,
+              });
+            }
+
+            historyItems.sort((a, b) {
+              final dA = a['date'] as DateTime? ?? DateTime(1970);
+              final dB = b['date'] as DateTime? ?? DateTime(1970);
+              return dB.compareTo(dA);
+            });
+
+            final filteredItems = historyItems.where((item) {
+              if (activeFilter == 1) return item['type'] == 'EXPENSE';
+              if (activeFilter == 2) return item['type'] == 'SETTLEMENT';
+              return true;
+            }).toList();
+
+            return SafeArea(
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.85,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+                      ),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Icon(Icons.arrow_back, color: AppTheme.darkText, size: 22),
+                          ),
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                'Lịch sử giao dịch',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.darkText,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 22),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 40,
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildFilterTab(setModalState, 'Tất cả', 0, activeFilter),
+                            _buildFilterTab(setModalState, 'Chi phí', 1, activeFilter),
+                            _buildFilterTab(setModalState, 'Thanh toán', 2, activeFilter),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Expanded(
+                      child: filteredItems.isEmpty
+                          ? Center(
+                              child: Text(
+                                'Chưa có giao dịch nào',
+                                style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              itemCount: filteredItems.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                              itemBuilder: (context, idx) {
+                                final item = filteredItems[idx];
+                                final isSettlement = item['type'] == 'SETTLEMENT';
+                                final DateTime? date = item['date'] as DateTime?;
+                                final String dateStr = date != null
+                                    ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}'
+                                    : '';
+
+                                if (isSettlement) {
+                                  final rawSt = item['raw'] as Map<String, dynamic>;
+
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: const Color(0xFFDCFCE7),
+                                          child: Icon(
+                                            Icons.check_circle_rounded,
+                                            color: Colors.green[700],
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFDCFCE7),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: Text(
+                                                      'Thanh toán',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.green[800],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(dateStr, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                '${item['fromName']} đã trả ${_formatExpenseAmount(item['amount'] as num)} cho ${item['toName']}',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        OutlinedButton(
+                                          onPressed: () {
+                                            final stId = rawSt['id'];
+                                            setModalState(() {
+                                              _settlements.removeWhere((st) => st['id'] == stId);
+                                            });
+                                            setState(() {
+                                              _settlements.removeWhere((st) => st['id'] == stId);
+                                            });
+                                            _saveSettlementsToPrefs();
+                                            if (stId != null) {
+                                              DatabaseService().deleteSettlement(stId);
+                                            }
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Đã hoàn tác và xóa giao dịch thanh toán!'),
+                                                backgroundColor: Colors.orange,
+                                                duration: Duration(seconds: 2),
+                                              ),
+                                            );
+                                          },
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            side: const BorderSide(color: Color(0xFFFA5438)),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                            minimumSize: Size.zero,
+                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          ),
+                                          child: const Text(
+                                            'Hoàn tác',
+                                            style: TextStyle(color: Color(0xFFFA5438), fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 20,
+                                        backgroundColor: const Color(0xFFEFF6FF),
+                                        child: Icon(Icons.receipt_long_rounded, color: AppTheme.primary, size: 20),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item['title'].toString(),
+                                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'Người chi: ${item['payer']} • $dateStr',
+                                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Text(
+                                        _formatExpenseAmount(item['amount'] as num),
+                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterTab(StateSetter setModalState, String title, int index, int currentIndex) {
+    final isSelected = index == currentIndex;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setModalState(() {}),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? AppTheme.darkText : Colors.grey[600],
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showGroupBalanceSheet() {
+    String selectedCurrencySymbol = 'đ';
+    String selectedCurrencyCode = 'VND';
+    int activeTab = 0; // 0: Tóm tắt của bạn, 1: Tổng quan nhóm
+
+    List<Map<String, dynamic>> membersList = [];
+    bool fetchedMembers = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+
+            if (!fetchedMembers && currentItineraryId > 0) {
+              fetchedMembers = true;
+              DatabaseService().getItineraryMembers(currentItineraryId).then((data) {
+                if (context.mounted && data != null && data['members'] is List) {
+                  setModalState(() {
+                    membersList = List<Map<String, dynamic>>.from(data['members']);
+                  });
+                }
+              });
+            }
+
+            final calcResult = _calculateGroupDebtBalances(membersList);
+            final List<Map<String, dynamic>> members = List<Map<String, dynamic>>.from(calcResult['members'] ?? []);
+            final List<Map<String, dynamic>> activeDebts = List<Map<String, dynamic>>.from(calcResult['debts'] ?? []);
+            final int totalGroupPaid = (calcResult['totalGroupPaid'] as int?) ?? 0;
+            final int averageShare = (calcResult['averageShare'] as int?) ?? 0;
+
+            final currentUser = AuthService().currentUser.value;
+            final currentUserName = currentUser?.fullName.trim() ?? 'Bạn';
+            final String curId = (currentUser?.id ?? '').toString().trim();
+
+            final myMember = members.firstWhere(
+              (m) => m['isOwner'] == true || (curId.isNotEmpty && (m['id'].toString() == curId || m['userId'].toString() == curId)),
+              orElse: () => members.isNotEmpty ? members.first : <String, dynamic>{},
+            );
+            final int myPaid = (myMember['totalPaid'] as int?) ?? 0;
+            final int myNet = (myMember['netBalance'] as int?) ?? 0;
+
+            List<Map<String, dynamic>> myDebtsIOwe = [];
+            List<Map<String, dynamic>> myDebtsOwedToMe = [];
+
+            for (var d in activeDebts) {
+              final f = d['from'] as Map<String, dynamic>;
+              final t = d['to'] as Map<String, dynamic>;
+              final bool isFromMe = f['isOwner'] == true ||
+                  (curId.isNotEmpty && (f['id'].toString() == curId || f['userId'].toString() == curId)) ||
+                  f['displayName'].toString().contains(currentUserName) ||
+                  (f['name'] != null && f['name'].toString().isNotEmpty && currentUserName.contains(f['name'].toString()));
+              final bool isToMe = t['isOwner'] == true ||
+                  (curId.isNotEmpty && (t['id'].toString() == curId || t['userId'].toString() == curId)) ||
+                  t['displayName'].toString().contains(currentUserName) ||
+                  (t['name'] != null && t['name'].toString().isNotEmpty && currentUserName.contains(t['name'].toString()));
+
+              if (isFromMe) myDebtsIOwe.add(d);
+              if (isToMe) myDebtsOwedToMe.add(d);
+            }
+
+            return SafeArea(
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.85,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+                      ),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Icon(Icons.arrow_back, color: AppTheme.darkText, size: 22),
+                          ),
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                'Tóm tắt chi phí',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.darkText,
+                                ),
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pop(context);
+                              _showShareDialog();
+                            },
+                            child: Icon(Icons.person_add_outlined, color: AppTheme.darkText, size: 22),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setModalState(() => activeTab = 0),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: activeTab == 0 ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(9),
+                                    boxShadow: activeTab == 0
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.05),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Tóm tắt của bạn',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: activeTab == 0 ? FontWeight.bold : FontWeight.w500,
+                                        color: activeTab == 0 ? AppTheme.darkText : Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setModalState(() => activeTab = 1),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: activeTab == 1 ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(9),
+                                    boxShadow: activeTab == 1
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.05),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      'Tổng quan nhóm',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: activeTab == 1 ? FontWeight.bold : FontWeight.w500,
+                                        color: activeTab == 1 ? AppTheme.darkText : Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: activeTab == 0
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Tổng tiền bạn đã chi:', style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                                            Text(_formatExpenseAmount(myPaid), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Trạng thái số dư:', style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                                            Text(
+                                              myNet > 0
+                                                  ? 'Được nhận lại ${_formatExpenseAmount(myNet)}'
+                                                  : (myNet < 0 ? 'Nợ nhóm ${_formatExpenseAmount(-myNet)}' : 'Đã cân bằng'),
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: myNet > 0 ? Colors.green : (myNet < 0 ? const Color(0xFFFA5438) : Colors.grey[800]),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  if (myDebtsIOwe.isEmpty && myDebtsOwedToMe.isEmpty) ...[
+                                    Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 24),
+                                        child: Text(
+                                          'Bạn đã cân bằng chi phí.',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            color: Colors.grey[600],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    if (myDebtsOwedToMe.isNotEmpty) ...[
+                                      Text('Các khoản người khác nợ bạn:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText)),
+                                      const SizedBox(height: 8),
+                                      ...myDebtsOwedToMe.map((d) {
+                                        final f = d['from'] as Map<String, dynamic>;
+                                        final String? avatarUrl = f['avatarUrl'] as String?;
+                                        final String name = f['name'].toString();
+
+                                        return Card(
+                                          margin: const EdgeInsets.only(bottom: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          child: ListTile(
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                            leading: CircleAvatar(
+                                              backgroundColor: Colors.green,
+                                              foregroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
+                                              child: Text(
+                                                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                              ),
+                                            ),
+                                            title: Text('${f['displayName']} nợ bạn', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                            subtitle: Text(
+                                              _formatExpenseAmount(d['amount'] as num),
+                                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 14),
+                                            ),
+                                            trailing: ElevatedButton(
+                                              onPressed: () {
+                                                _showSettleUpDialog(membersList, () {
+                                                  setModalState(() {});
+                                                }, prefilledDebt: d);
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.green,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                              child: const Text('Thanh toán', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                      const SizedBox(height: 12),
+                                    ],
+                                    if (myDebtsIOwe.isNotEmpty) ...[
+                                      Text('Các khoản bạn nợ người khác:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText)),
+                                      const SizedBox(height: 8),
+                                      ...myDebtsIOwe.map((d) {
+                                        final t = d['to'] as Map<String, dynamic>;
+                                        final String? avatarUrl = t['avatarUrl'] as String?;
+                                        final String name = t['name'].toString();
+
+                                        return Card(
+                                          margin: const EdgeInsets.only(bottom: 8),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          child: ListTile(
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                            leading: CircleAvatar(
+                                              backgroundColor: const Color(0xFFFA5438),
+                                              foregroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
+                                              child: Text(
+                                                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                              ),
+                                            ),
+                                            title: Text('Bạn nợ ${t['displayName']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                            subtitle: Text(
+                                              _formatExpenseAmount(d['amount'] as num),
+                                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFA5438), fontSize: 14),
+                                            ),
+                                            trailing: ElevatedButton(
+                                              onPressed: () {
+                                                _showSettleUpDialog(membersList, () {
+                                                  setModalState(() {});
+                                                }, prefilledDebt: d);
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFFFA5438),
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                              child: const Text('Thanh toán', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ],
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text('Tổng chi cả nhóm:', style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500)),
+                                            Text(_formatExpenseAmount(totalGroupPaid), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.darkText)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Bình quân (${members.length} người):', style: const TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500)),
+                                            Text('${_formatExpenseAmount(averageShare)} / người', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text('Số dư ròng từng thành viên:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText)),
+                                  const SizedBox(height: 8),
+                                  ...members.map((m) {
+                                    final String name = m['name'].toString();
+                                    final String displayName = m['displayName'].toString();
+                                    final String? avatarUrl = m['avatarUrl'] as String?;
+                                    final int net = m['netBalance'] as int;
+                                    final int paid = m['totalPaid'] as int;
+
+                                    String statusText = 'Đã hòa tiền';
+                                    Color statusColor = Colors.grey[700]!;
+                                    if (net > 0) {
+                                      statusText = 'Được nhận ${_formatExpenseAmount(net)}';
+                                      statusColor = Colors.green;
+                                    } else if (net < 0) {
+                                      statusText = 'Nợ ${_formatExpenseAmount(-net)}';
+                                      statusColor = const Color(0xFFFA5438);
+                                    }
+
+                                    return ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      leading: CircleAvatar(
+                                        backgroundColor: Colors.primaries[name.hashCode.abs() % Colors.primaries.length],
+                                        foregroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
+                                        child: Text(
+                                          name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      title: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      subtitle: Text('Đã chi: ${_formatExpenseAmount(paid)}'),
+                                      trailing: Text(
+                                        statusText,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: statusColor,
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                  const SizedBox(height: 16),
+                                  if (activeDebts.isNotEmpty) ...[
+                                    Text('Các khoản nợ cần thanh toán trong nhóm:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText)),
+                                    const SizedBox(height: 8),
+                                    ...activeDebts.map((d) {
+                                      final f = d['from'] as Map<String, dynamic>;
+                                      final t = d['to'] as Map<String, dynamic>;
+
+                                      return Card(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        child: ListTile(
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                          title: Text('${f['displayName']} trả cho ${t['displayName']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                          subtitle: Text(
+                                            _formatExpenseAmount(d['amount'] as num),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFA5438), fontSize: 14),
+                                          ),
+                                          trailing: ElevatedButton(
+                                            onPressed: () {
+                                              _showSettleUpDialog(membersList, () {
+                                                setModalState(() {});
+                                              }, prefilledDebt: d);
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFFFA5438),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              minimumSize: Size.zero,
+                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            ),
+                                            child: const Text('Trả', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ],
+                                ],
+                              ),
+                      ),
+                    ),
+
+                    // Bottom Floating Action Row & Settlement Button
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      decoration: const BoxDecoration(
+                        border: Border(top: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    _showTransactionHistorySheet();
+                                  },
+                                  icon: const Icon(Icons.history, size: 18, color: Colors.black87),
+                                  label: const Text(
+                                    'Lịch sử giao dịch',
+                                    style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    side: BorderSide(color: Colors.grey.shade300),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    _showCurrencyPickerSheet(selectedCurrencyCode, (symbol, code) {
+                                      setModalState(() {
+                                        selectedCurrencySymbol = symbol;
+                                        selectedCurrencyCode = code;
+                                      });
+                                    });
+                                  },
+                                  icon: const Text('\$', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
+                                  label: const Text(
+                                    'Thay đổi tiền tệ',
+                                    style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    side: BorderSide(color: Colors.grey.shade300),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                _showSettleUpDialog(membersList, () {
+                                  setModalState(() {});
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFA5438),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Thanh toán',
+                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
   }
 
   void _showExpenseAnalyticsSheet() {
+    String selectedCurrencySymbol = 'đ';
+    String selectedCurrencyCode = 'VND';
+    int activeTab = 0; // 0: Danh mục, 1: Ngày qua ngày
+    String? selectedBarLabel;
+    num? selectedBarAmount;
+
+    List<String> dbCategoryNames = [];
+    bool fetchedCategories = false;
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        Map<String, int> categoryTotals = {};
-        int totalSpent = 0;
-        for (var exp in _customExpenses) {
-          final cat = exp['category']?.toString() ?? 'Khác';
-          final amt = (exp['amount'] as num?)?.toInt() ?? 0;
-          categoryTotals[cat] = (categoryTotals[cat] ?? 0) + amt;
-          totalSpent += amt;
-        }
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            if (!fetchedCategories) {
+              fetchedCategories = true;
+              DatabaseService().getCategories().then((cats) {
+                if (context.mounted && cats.isNotEmpty) {
+                  final names = cats.map((c) => c['name']?.toString() ?? '').where((n) => n.isNotEmpty).toList();
+                  setModalState(() {
+                    dbCategoryNames = names;
+                  });
+                }
+              });
+            }
 
-        return SafeArea(
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Xem phân tích chi tiêu',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 20),
-                if (totalSpent == 0)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Center(
-                      child: Text('Chưa có chi tiêu nào để phân tích.'),
-                    ),
-                  )
-                else
-                  ...categoryTotals.entries.map((e) {
-                    final catName = e.key;
-                    final amt = e.value;
-                    final double pct = totalSpent > 0 ? (amt / totalSpent) : 0.0;
+            final Set<String> categoriesSet = {};
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            // Add categories fetched from DB Category table
+            if (dbCategoryNames.isNotEmpty) {
+              for (var name in dbCategoryNames) {
+                categoriesSet.add(name);
+              }
+            } else {
+              // Fallback categories from Category table & expense types
+              for (var name in [
+                'Chuyến bay',
+                'Chỗ ở',
+                'Xe thuê',
+                'Phương tiện công cộng',
+                'Ẩm thực',
+                'Đồ uống',
+                'Tham quan',
+                'Xăng',
+                'Hàng tạp hóa',
+                'Hoạt động',
+                'Mua sắm',
+                'Quán ăn',
+                'Nhà hàng',
+                'Khách sạn',
+                'Cà phê',
+                'Trung tâm thương mại',
+                'Công viên',
+                'Điểm tham quan',
+                'Bảo tàng',
+                'Quán bar',
+                'Check-in',
+                'Khác',
+              ]) {
+                categoriesSet.add(name);
+              }
+            }
+
+            // Also add any categories from _customExpenses
+            for (var exp in _customExpenses) {
+              final cat = exp['category']?.toString();
+              if (cat != null && cat.trim().isNotEmpty) {
+                categoriesSet.add(cat.trim());
+              }
+            }
+
+            final List<String> categoriesList = categoriesSet.toList();
+
+            // Build category data map
+            Map<String, int> catAmounts = {};
+            for (var cat in categoriesList) {
+              catAmounts[cat] = 0;
+            }
+            for (var exp in _customExpenses) {
+              final cat = exp['category']?.toString() ?? 'Khác';
+              final amt = (exp['amount'] as num?)?.toInt() ?? 0;
+              if (catAmounts.containsKey(cat)) {
+                catAmounts[cat] = catAmounts[cat]! + amt;
+              } else {
+                catAmounts['Khác'] = (catAmounts['Khác'] ?? 0) + amt;
+              }
+            }
+
+            // Build dates data list (Itinerary dates + any extra dates from expenses)
+            final startStr = _itineraryData['startDate'] as String?;
+            final startDate = startStr != null ? DateTime.tryParse(startStr) : null;
+            final numDays = (_itineraryData['days'] as num?)?.toInt() ?? 5;
+
+            Map<String, DateTime> allDatesMap = {};
+            final anchorDate = startDate ?? DateTime.now();
+            for (int i = 0; i < (numDays > 0 ? numDays : 5); i++) {
+              final d = anchorDate.add(Duration(days: i));
+              final normalized = DateTime(d.year, d.month, d.day);
+              final key = '${normalized.year}-${normalized.month.toString().padLeft(2, '0')}-${normalized.day.toString().padLeft(2, '0')}';
+              allDatesMap[key] = normalized;
+            }
+
+            for (var exp in _customExpenses) {
+              final expDateStr = exp['date']?.toString();
+              if (expDateStr != null) {
+                final expDate = DateTime.tryParse(expDateStr);
+                if (expDate != null) {
+                  final normalized = DateTime(expDate.year, expDate.month, expDate.day);
+                  final key = '${normalized.year}-${normalized.month.toString().padLeft(2, '0')}-${normalized.day.toString().padLeft(2, '0')}';
+                  allDatesMap[key] = normalized;
+                }
+              }
+            }
+
+            final sortedDates = allDatesMap.values.toList()..sort((a, b) => a.compareTo(b));
+
+            List<Map<String, dynamic>> dateItems = [];
+            for (final d in sortedDates) {
+              final label = '${d.day}/${d.month}';
+              int dayTotal = 0;
+
+              for (var exp in _customExpenses) {
+                final expDateStr = exp['date']?.toString();
+                if (expDateStr != null) {
+                  final expDate = DateTime.tryParse(expDateStr);
+                  if (expDate != null &&
+                      expDate.year == d.year &&
+                      expDate.month == d.month &&
+                      expDate.day == d.day) {
+                    dayTotal += (exp['amount'] as num?)?.toInt() ?? 0;
+                  }
+                }
+              }
+
+              dateItems.add({
+                'label': label,
+                'amount': dayTotal,
+                'date': d,
+              });
+            }
+
+            // Calculate max value for scaling chart
+            int maxCategoryVal = 0;
+            for (var val in catAmounts.values) {
+              if (val > maxCategoryVal) maxCategoryVal = val;
+            }
+            int maxDateVal = 0;
+            for (var d in dateItems) {
+              final amt = d['amount'] as int;
+              if (amt > maxDateVal) maxDateVal = amt;
+            }
+
+            final int activeMaxVal = activeTab == 0 ? maxCategoryVal : maxDateVal;
+            final int chartMax = activeMaxVal > 0 ? (activeMaxVal * 1.15).ceil() : 700000;
+
+            // Generate X-Axis ticks
+            final int tickStep = (chartMax / 6 / 10000).ceil() * 10000;
+            final int effectiveStep = tickStep > 0 ? tickStep : 100000;
+            List<int> xTicks = [];
+            for (int val = 0; val <= chartMax + effectiveStep / 2; val += effectiveStep) {
+              xTicks.add(val);
+              if (xTicks.length >= 7) break;
+            }
+
+            return SafeArea(
+              child: Container(
+                height: MediaQuery.of(context).size.height * 0.82,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  children: [
+                    // Handle Bar
+                    Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Title
+                    Text(
+                      'Phân tích chi tiêu',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Segmented Tabs
+                    Container(
+                      height: 44,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(catName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              Text('${_formatExpenseAmount(amt)} (${(pct * 100).toStringAsFixed(0)}%)'),
-                            ],
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setModalState(() {
+                                activeTab = 0;
+                                selectedBarLabel = null;
+                              }),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: activeTab == 0 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(9),
+                                  boxShadow: activeTab == 0
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.05),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Danh mục',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: activeTab == 0 ? FontWeight.bold : FontWeight.w500,
+                                      color: activeTab == 0 ? AppTheme.darkText : Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          LinearProgressIndicator(
-                            value: pct,
-                            backgroundColor: Colors.grey[200],
-                            color: AppTheme.primary,
-                            borderRadius: BorderRadius.circular(4),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setModalState(() {
+                                activeTab = 1;
+                                selectedBarLabel = null;
+                              }),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: activeTab == 1 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(9),
+                                  boxShadow: activeTab == 1
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.05),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Ngày qua ngày',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: activeTab == 1 ? FontWeight.bold : FontWeight.w500,
+                                      color: activeTab == 1 ? AppTheme.darkText : Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    );
-                  }),
-              ],
-            ),
-          ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Subtitle / Selected Info
+                    Text(
+                      selectedBarLabel != null
+                          ? '$selectedBarLabel: $selectedCurrencySymbol${(selectedBarAmount ?? 0).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}'
+                          : 'Chọn một thanh để xem số tiền',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: selectedBarLabel != null ? AppTheme.primary : AppTheme.darkText,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Chart Canvas
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Y-Axis Labels
+                                SizedBox(
+                                  width: activeTab == 0 ? 140 : 60,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: (activeTab == 0 ? categoriesList : dateItems.map((e) => e['label'] as String).toList()).map((lbl) {
+                                      return Container(
+                                        height: 38,
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.only(right: 12),
+                                        child: Text(
+                                          lbl,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.black87,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+
+                                // Vertical Divider Line
+                                Container(
+                                  width: 1.5,
+                                  height: (activeTab == 0 ? categoriesList.length : dateItems.length) * 38.0,
+                                  color: Colors.grey[400],
+                                ),
+
+                                // Bars Container
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: (activeTab == 0
+                                            ? categoriesList.map((cat) => {'label': cat, 'amount': catAmounts[cat] ?? 0}).toList()
+                                            : dateItems)
+                                        .map((item) {
+                                      final String label = item['label'] as String;
+                                      final int amt = item['amount'] as int;
+                                      final double factor = chartMax > 0 ? (amt / chartMax).clamp(0.0, 1.0) : 0.0;
+                                      final bool isSelected = selectedBarLabel == label;
+
+                                      return GestureDetector(
+                                        onTap: () {
+                                          setModalState(() {
+                                            selectedBarLabel = label;
+                                            selectedBarAmount = amt;
+                                          });
+                                        },
+                                        child: Container(
+                                          height: 38,
+                                          alignment: Alignment.centerLeft,
+                                          child: FractionallySizedBox(
+                                            widthFactor: factor > 0 ? factor : 0.005,
+                                            child: Container(
+                                              height: 24,
+                                              decoration: BoxDecoration(
+                                                color: isSelected ? const Color(0xFF818CF8) : const Color(0xFFB4C6FF),
+                                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(4)),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // Bottom Axis & X Ticks
+                            Row(
+                              children: [
+                                SizedBox(width: activeTab == 0 ? 140 : 60),
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      Container(height: 1.5, color: Colors.grey[400]),
+                                      const SizedBox(height: 4),
+                                      SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: xTicks.map((val) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(right: 6),
+                                              child: Text(
+                                                '$selectedCurrencySymbol$val',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Bottom Currency Button
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        _showCurrencyPickerSheet(selectedCurrencyCode, (symbol, code) {
+                          setModalState(() {
+                            selectedCurrencySymbol = symbol;
+                            selectedCurrencyCode = code;
+                          });
+                        });
+                      },
+                      icon: const Text('\$', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
+                      label: const Text(
+                        'Thay đổi tiền tệ',
+                        style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        side: BorderSide(color: Colors.grey.shade300),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -10660,6 +12391,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     int amount = 0,
   }) {
     String activeShare = currentShare;
+    Set<String> selectedUserIds = {};
+
+    if (currentShare.startsWith('Cá nhân')) {
+      activeShare = 'Cá nhân';
+      if (currentShare.contains(':')) {
+        selectedUserIds = currentShare
+            .split(':')[1]
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toSet();
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -10677,7 +12421,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
         List<Map<String, dynamic>> membersList = [];
         bool fetchedMembers = false;
-        Set<String> selectedUserIds = {};
 
         return StatefulBuilder(
           builder: (context, setModalState) {
@@ -10688,9 +12431,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   final list = List<Map<String, dynamic>>.from(data['members']);
                   setModalState(() {
                     membersList = list;
-                    selectedUserIds = list
-                        .map((m) => ((m['user'] as Map<String, dynamic>?)?['id'] ?? m['userId'] ?? m['id'] ?? '').toString())
-                        .toSet();
+                    if (activeShare == 'Mọi người') {
+                      selectedUserIds = list
+                          .map((m) => ((m['user'] as Map<String, dynamic>?)?['id'] ?? m['userId'] ?? m['id'] ?? '').toString())
+                          .toSet();
+                    }
                   });
                 }
               });
@@ -10755,8 +12500,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         onTap: () {
                           setModalState(() {
                             activeShare = opt;
+                            if (opt == 'Mọi người' && membersList.isNotEmpty) {
+                              selectedUserIds = membersList
+                                  .map((m) => ((m['user'] as Map<String, dynamic>?)?['id'] ?? m['userId'] ?? m['id'] ?? '').toString())
+                                  .toSet();
+                            } else if (opt == 'Cá nhân') {
+                              selectedUserIds.clear();
+                            }
                           });
-                          onSelect(opt);
+                          final String resultShare = opt == 'Cá nhân'
+                              ? (selectedUserIds.isEmpty ? 'Cá nhân' : 'Cá nhân: ${selectedUserIds.join(',')}')
+                              : opt;
+                          onSelect(resultShare);
                         },
                       );
                     }),
@@ -10793,7 +12548,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       ] else ...[
                         ...membersList.map((m) {
                           final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
-                          final String uId = (userObj['id'] ?? m['userId'] ?? '').toString();
+                          final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
                           final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? (userObj['email'] is String ? userObj['email'].split('@')[0] : null) ?? 'Thành viên').toString().trim();
                           final String rawName = nameCandidate.isNotEmpty ? nameCandidate : 'Thành viên';
 
@@ -10815,7 +12570,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             }
                           }
                           final Color avatarBgColor = Colors.primaries[rawName.hashCode.abs() % Colors.primaries.length];
-                          final isChecked = activeShare == 'Mọi người' || selectedUserIds.contains(uId);
+                          final isChecked = activeShare == 'Mọi người' || (activeShare == 'Cá nhân' && selectedUserIds.contains(uId));
 
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
@@ -10839,12 +12594,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             trailing: GestureDetector(
                               onTap: () {
                                 setModalState(() {
-                                  if (isChecked) {
+                                  if (activeShare != 'Cá nhân') {
+                                    activeShare = 'Cá nhân';
+                                    selectedUserIds.clear();
+                                  }
+                                  if (selectedUserIds.contains(uId)) {
                                     selectedUserIds.remove(uId);
                                   } else {
                                     selectedUserIds.add(uId);
                                   }
                                 });
+                                final String resultShare = selectedUserIds.isEmpty
+                                    ? 'Cá nhân'
+                                    : 'Cá nhân: ${selectedUserIds.join(',')}';
+                                onSelect(resultShare);
                               },
                               child: Container(
                                 width: 22,
@@ -10877,8 +12640,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             Builder(builder: (ctx) {
                               final int personCount = activeShare == 'Mọi người'
                                   ? (membersList.isEmpty ? 1 : membersList.length)
-                                  : (selectedUserIds.isEmpty ? 1 : selectedUserIds.length);
-                              final int perPerson = personCount > 0 ? (amount ~/ personCount) : amount;
+                                  : selectedUserIds.length;
+                              final int perPerson = personCount > 0 ? (amount ~/ personCount) : 0;
                               return Text(
                                 '${_formatExpenseAmount(perPerson)} đ/người',
                                 style: TextStyle(
@@ -10891,7 +12654,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             Builder(builder: (ctx) {
                               final int personCount = activeShare == 'Mọi người'
                                   ? (membersList.isEmpty ? 1 : membersList.length)
-                                  : (selectedUserIds.isEmpty ? 1 : selectedUserIds.length);
+                                  : selectedUserIds.length;
                               return Text(
                                 '$personCount người',
                                 style: TextStyle(
@@ -11893,13 +13656,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const SizedBox(width: 80),
-                            Text(
-                              expenseToEdit != null ? 'Chỉnh sửa chi phí' : 'Thêm chi phí',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.darkText,
+                            GestureDetector(
+                              onTap: () => Navigator.pop(context),
+                              child: const Padding(
+                                padding: EdgeInsets.all(4.0),
+                                child: Icon(Icons.close, color: Colors.grey, size: 22),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                expenseToEdit != null ? 'Chỉnh sửa chi phí' : 'Thêm chi phí',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.darkText,
+                                ),
                               ),
                             ),
                             GestureDetector(
