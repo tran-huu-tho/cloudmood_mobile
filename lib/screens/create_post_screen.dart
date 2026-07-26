@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/api_client.dart';
+import '../widgets/upload_progress_dialog.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -122,9 +123,25 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       _isUploading = true;
     });
 
+    final progressNotifier = ValueNotifier<double>(0.0);
+    final statusNotifier = ValueNotifier<String>('Đang tải lên bài viết...');
+    showUploadProgressDialog(context, progressNotifier: progressNotifier, statusNotifier: statusNotifier);
+
     try {
       final uri = Uri.parse('${ApiClient.baseUrl}/forum');
-      final request = http.MultipartRequest('POST', uri);
+      final request = ProgressMultipartRequest(
+        'POST',
+        uri,
+        onProgress: (bytes, total) {
+          if (total > 0) {
+            final p = bytes / total;
+            progressNotifier.value = p;
+            if (p >= 0.99) {
+              statusNotifier.value = 'Đang xử lý & lưu tệp...';
+            }
+          }
+        },
+      );
 
       // Thêm Authorization Header
       final prefs = await SharedPreferences.getInstance();
@@ -141,12 +158,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
       // Thêm tệp đính kèm
       for (var file in _selectedFiles) {
-        final multipartFile = await http.MultipartFile.fromPath('media', file.path);
+        final multipartFile = await http.MultipartFile.fromPath('media', file.path, filename: file.name);
         request.files.add(multipartFile);
       }
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
+
+      if (mounted) Navigator.pop(context); // Close progress dialog
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         if (mounted) {
@@ -363,7 +382,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                                     color: Colors.black87,
                                     child: const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 36)),
                                   )
-                                : Image.file(File(file.path), fit: BoxFit.cover),
+                                : Image.file(
+                                    File(file.path),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.black87,
+                                        child: const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 36)),
+                                      );
+                                    },
+                                  ),
                           ),
                           Positioned(
                             top: 4,

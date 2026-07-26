@@ -11,6 +11,9 @@ import '../widgets/avatar_image.dart';
 import '../widgets/place_detail_bottom_sheet.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../widgets/upload_progress_dialog.dart';
+import '../widgets/app_video_player_dialog.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final int postId;
@@ -455,7 +458,25 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ? '${ApiClient.baseUrl}/forum/comment/$_editingCommentId'
           : '${ApiClient.baseUrl}/forum/${widget.postId}/comment';
 
-      final request = http.MultipartRequest(isEditing ? 'PATCH' : 'POST', Uri.parse(url));
+      final progressNotifier = ValueNotifier<double>(0.0);
+      final statusNotifier = ValueNotifier<String>('Đang gửi bình luận...');
+      if (_selectedCommentMedia != null) {
+        showUploadProgressDialog(context, progressNotifier: progressNotifier, statusNotifier: statusNotifier);
+      }
+
+      final request = ProgressMultipartRequest(
+        isEditing ? 'PATCH' : 'POST',
+        Uri.parse(url),
+        onProgress: (bytes, total) {
+          if (total > 0) {
+            final p = bytes / total;
+            progressNotifier.value = p;
+            if (p >= 0.99) {
+              statusNotifier.value = 'Đang xử lý & lưu tệp...';
+            }
+          }
+        },
+      );
 
       if (token != null) {
         request.headers['Authorization'] = 'Bearer $token';
@@ -467,12 +488,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       }
 
       if (_selectedCommentMedia != null) {
-        final multipartFile = await http.MultipartFile.fromPath('media', _selectedCommentMedia!.path);
+        final multipartFile = await http.MultipartFile.fromPath(
+          'media',
+          _selectedCommentMedia!.path,
+          filename: _selectedCommentMedia!.name,
+        );
         request.files.add(multipartFile);
       }
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
+
+      if (_selectedCommentMedia != null && mounted) {
+        Navigator.pop(context); // Close progress dialog
+      }
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         _commentController.clear();
@@ -505,6 +534,122 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         _isSendingComment = false;
       });
     }
+  }
+
+  void _openMediaViewer(String rawUrl, bool isVideo) {
+    if (rawUrl.isEmpty) return;
+    if (isVideo) {
+      AppVideoPlayerDialog.show(context, rawUrl);
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: EdgeInsets.zero,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Image.network(
+                  rawUrl,
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  height: double.infinity,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 48)),
+                ),
+              ),
+              Positioned(
+                top: 40,
+                right: 16,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildMediaItem(Map<String, dynamic> item, {double? height, double? width, BoxFit fit = BoxFit.cover}) {
+    final String rawUrl = (item['url'] ?? '').toString();
+    final String mType = (item['mediaType'] ?? '').toString().toLowerCase();
+    final bool isVideo = mType == 'video' ||
+        rawUrl.toLowerCase().endsWith('.mp4') ||
+        rawUrl.toLowerCase().endsWith('.mov') ||
+        rawUrl.toLowerCase().endsWith('.avi') ||
+        rawUrl.toLowerCase().endsWith('.mkv') ||
+        rawUrl.toLowerCase().endsWith('.webm') ||
+        rawUrl.contains('/video/upload/');
+
+    Widget childWidget;
+    if (isVideo) {
+      String thumbUrl = rawUrl;
+      if (rawUrl.contains('/video/upload/')) {
+        thumbUrl = rawUrl.replaceAll(RegExp(r'\.(mp4|mov|avi|mkv|webm)$', caseSensitive: false), '.jpg');
+      }
+
+      childWidget = SizedBox(
+        height: height ?? 220,
+        width: width ?? double.infinity,
+        child: Stack(
+          alignment: Alignment.center,
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              thumbUrl,
+              height: height ?? 220,
+              width: width ?? double.infinity,
+              fit: fit,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: Colors.black87,
+                height: height ?? 220,
+                width: width ?? double.infinity,
+              ),
+            ),
+            Container(
+              color: Colors.black26,
+            ),
+            const Center(
+              child: Icon(
+                Icons.play_circle_fill_rounded,
+                color: Colors.white,
+                size: 48,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      childWidget = Image.network(
+        rawUrl,
+        height: height,
+        width: width,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: Colors.grey[200],
+          height: height ?? 200,
+          width: width ?? double.infinity,
+          child: const Icon(Icons.broken_image, color: Colors.grey),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => _openMediaViewer(rawUrl, isVideo),
+      child: childWidget,
+    );
   }
 
   void _showPlaceDetail(Map<String, dynamic> place) {
@@ -728,13 +873,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              media[index]['url'],
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Container(color: Colors.grey[200], height: 200, child: const Icon(Icons.broken_image)),
-                            ),
+                            child: _buildMediaItem(media[index] as Map<String, dynamic>, height: 220, width: double.infinity),
                           ),
                         );
                       },

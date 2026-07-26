@@ -15,6 +15,9 @@ import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../widgets/upload_progress_dialog.dart';
+import '../widgets/app_video_player_dialog.dart';
 
 class CloudmoodForumScreen extends StatefulWidget {
   const CloudmoodForumScreen({super.key});
@@ -527,6 +530,122 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
     );
   }
 
+  void _openMediaViewer(String rawUrl, bool isVideo) {
+    if (rawUrl.isEmpty) return;
+    if (isVideo) {
+      AppVideoPlayerDialog.show(context, rawUrl);
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: EdgeInsets.zero,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Image.network(
+                  rawUrl,
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  height: double.infinity,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 48)),
+                ),
+              ),
+              Positioned(
+                top: 40,
+                right: 16,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildMediaItem(Map<String, dynamic> item, {double? height, double? width, BoxFit fit = BoxFit.cover}) {
+    final String rawUrl = (item['url'] ?? '').toString();
+    final String mType = (item['mediaType'] ?? '').toString().toLowerCase();
+    final bool isVideo = mType == 'video' ||
+        rawUrl.toLowerCase().endsWith('.mp4') ||
+        rawUrl.toLowerCase().endsWith('.mov') ||
+        rawUrl.toLowerCase().endsWith('.avi') ||
+        rawUrl.toLowerCase().endsWith('.mkv') ||
+        rawUrl.toLowerCase().endsWith('.webm') ||
+        rawUrl.contains('/video/upload/');
+
+    Widget childWidget;
+    if (isVideo) {
+      String thumbUrl = rawUrl;
+      if (rawUrl.contains('/video/upload/')) {
+        thumbUrl = rawUrl.replaceAll(RegExp(r'\.(mp4|mov|avi|mkv|webm)$', caseSensitive: false), '.jpg');
+      }
+
+      childWidget = SizedBox(
+        height: height ?? 200,
+        width: width ?? double.infinity,
+        child: Stack(
+          alignment: Alignment.center,
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              thumbUrl,
+              height: height ?? 200,
+              width: width ?? double.infinity,
+              fit: fit,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: Colors.black87,
+                height: height ?? 200,
+                width: width ?? double.infinity,
+              ),
+            ),
+            Container(
+              color: Colors.black26,
+            ),
+            const Center(
+              child: Icon(
+                Icons.play_circle_fill_rounded,
+                color: Colors.white,
+                size: 48,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      childWidget = Image.network(
+        rawUrl,
+        height: height,
+        width: width,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: Colors.grey[200],
+          height: height ?? 200,
+          width: width ?? double.infinity,
+          child: const Icon(Icons.broken_image, color: Colors.grey),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => _openMediaViewer(rawUrl, isVideo),
+      child: childWidget,
+    );
+  }
+
   Widget _buildPostCard(Map<String, dynamic> post) {
     final author = post['user'] ?? {};
     final place = post['place'];
@@ -729,14 +848,7 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: media.length == 1
-                        ? Image.network(
-                            media[0]['url'],
-                            height: 200,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(color: Colors.grey[200], height: 200, child: const Icon(Icons.broken_image)),
-                          )
+                        ? _buildMediaItem(media[0] as Map<String, dynamic>, height: 200, width: double.infinity)
                         : GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
@@ -748,11 +860,12 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                             ),
                             itemCount: media.length > 4 ? 4 : media.length,
                             itemBuilder: (context, index) {
+                              final item = media[index] as Map<String, dynamic>;
                               if (index == 3 && media.length > 4) {
                                 return Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    Image.network(media[index]['url'], fit: BoxFit.cover),
+                                    _buildMediaItem(item),
                                     Container(
                                       color: Colors.black.withOpacity(0.5),
                                       child: Center(
@@ -769,12 +882,7 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                                   ],
                                 );
                               }
-                              return Image.network(
-                                media[index]['url'],
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(color: Colors.grey[200], child: const Icon(Icons.broken_image)),
-                              );
+                              return _buildMediaItem(item);
                             },
                           ),
                   ),
@@ -1038,16 +1146,28 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                           scrollDirection: Axis.horizontal,
                           itemCount: media.length,
                           itemBuilder: (context, idx) {
+                            final mType = media[idx]['mediaType'] ?? '';
+                            final url = (media[idx]['url'] ?? '').toString().toLowerCase();
+                            final isVid = mType == 'video' || url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.avi') || url.endsWith('.mkv') || url.endsWith('.webm');
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
-                                child: Image.network(
-                                  media[idx]['url'],
-                                  width: 60,
-                                  height: 60,
-                                  fit: BoxFit.cover,
-                                ),
+                                child: isVid
+                                    ? Container(
+                                        width: 60,
+                                        height: 60,
+                                        color: Colors.black87,
+                                        child: const Center(
+                                          child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 28),
+                                        ),
+                                      )
+                                    : Image.network(
+                                        media[idx]['url'],
+                                        width: 60,
+                                        height: 60,
+                                        fit: BoxFit.cover,
+                                      ),
                               ),
                             );
                           },
@@ -1075,18 +1195,47 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                           scrollDirection: Axis.horizontal,
                           itemCount: selectedEditFiles.length,
                           itemBuilder: (context, idx) {
+                            final path = selectedEditFiles[idx].path.toLowerCase();
+                            final mime = (selectedEditFiles[idx].mimeType ?? '').toLowerCase();
+                            final isVideo = mime.startsWith('video') ||
+                                path.contains('video') ||
+                                path.endsWith('.mp4') ||
+                                path.endsWith('.mov') ||
+                                path.endsWith('.avi') ||
+                                path.endsWith('.mkv') ||
+                                path.endsWith('.webm') ||
+                                path.endsWith('.3gp');
                             return Stack(
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(6),
-                                    child: Image.file(
-                                      File(selectedEditFiles[idx].path),
-                                      width: 60,
-                                      height: 60,
-                                      fit: BoxFit.cover,
-                                    ),
+                                    child: isVideo
+                                        ? Container(
+                                            width: 60,
+                                            height: 60,
+                                            color: Colors.black87,
+                                            child: const Center(
+                                              child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 28),
+                                            ),
+                                          )
+                                        : Image.file(
+                                            File(selectedEditFiles[idx].path),
+                                            width: 60,
+                                            height: 60,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                width: 60,
+                                                height: 60,
+                                                color: Colors.black87,
+                                                child: const Center(
+                                                  child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 28),
+                                                ),
+                                              );
+                                            },
+                                          ),
                                   ),
                                 ),
                                 Positioned(
@@ -1182,16 +1331,25 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
 
     if (updated != true) return;
 
-    // Show loading overlay
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
-    );
+    final progressNotifier = ValueNotifier<double>(0.0);
+    final statusNotifier = ValueNotifier<String>('Đang tải lên thay đổi...');
+    showUploadProgressDialog(context, progressNotifier: progressNotifier, statusNotifier: statusNotifier);
 
     try {
       final uri = Uri.parse('${ApiClient.baseUrl}/forum/${post['id']}');
-      final request = http.MultipartRequest('PATCH', uri);
+      final request = ProgressMultipartRequest(
+        'PATCH',
+        uri,
+        onProgress: (bytes, total) {
+          if (total > 0) {
+            final p = bytes / total;
+            progressNotifier.value = p;
+            if (p >= 0.99) {
+              statusNotifier.value = 'Đang xử lý & lưu tệp...';
+            }
+          }
+        },
+      );
 
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('jwt_token');
@@ -1212,7 +1370,7 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
 
       // Add selected files
       for (var file in selectedEditFiles) {
-        final multipartFile = await http.MultipartFile.fromPath('media', file.path);
+        final multipartFile = await http.MultipartFile.fromPath('media', file.path, filename: file.name);
         request.files.add(multipartFile);
       }
 
