@@ -965,5 +965,32 @@ class DatabaseService {
       return false;
     }
   }
+
+  /// Lấy bảng tỷ giá hối đoái mới nhất từ Server
+  Future<Map<String, double>> getCurrencyRates() async {
+    try {
+      final response = await ApiClient.get('/itineraries/currency-rates');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['rates'] is Map) {
+          final Map<String, dynamic> rawRates = data['rates'];
+          final Map<String, double> rates = {};
+          rawRates.forEach((k, v) {
+            rates[k] = (v as num).toDouble();
+          });
+          return rates;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getCurrencyRates: $e');
+    }
+    return {
+      'VND': 1.0,
+      'USD': 26320.01,
+      'EUR': 28500.0,
+      'JPY': 165.0,
+      'KRW': 19.5,
+    };
+  }
 }
 

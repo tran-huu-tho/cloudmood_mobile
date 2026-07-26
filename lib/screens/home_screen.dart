@@ -65,10 +65,12 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       final response = await ApiClient.get('/weather/current', query: queryParams);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        setState(() {
-          _weatherData = data;
-          _weatherQuote = _getQuoteForCondition(data['condition'] ?? '');
-        });
+        if (mounted) {
+          setState(() {
+            _weatherData = data;
+            _weatherQuote = _getQuoteForCondition(data['condition'] ?? '');
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error fetching weather: $e');

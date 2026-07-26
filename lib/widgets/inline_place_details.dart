@@ -44,6 +44,8 @@ class _InlinePlaceWhiteCardExtensionState
     extends State<InlinePlaceWhiteCardExtension> {
   late bool isVisited;
   late double cost;
+  String expenseCurrencySymbol = 'đ';
+  String expenseCurrencyCode = 'VND';
   List<dynamic> reactions = [];
 
   String? startTime;
@@ -99,6 +101,13 @@ class _InlinePlaceWhiteCardExtensionState
       }
     }
     cost = expenseCost;
+    if (expenseObj is Map<String, dynamic>) {
+      expenseCurrencySymbol = expenseObj['currencySymbol']?.toString() ?? 'đ';
+      expenseCurrencyCode = expenseObj['currencyCode']?.toString() ?? 'VND';
+    } else {
+      expenseCurrencySymbol = 'đ';
+      expenseCurrencyCode = 'VND';
+    }
 
     final String text =
         widget.detail['noteText'] ?? widget.detail['notetext'] ?? '';
@@ -391,7 +400,15 @@ class _InlinePlaceWhiteCardExtensionState
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '${cost.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ',
+                    () {
+                      final formatted = cost.toInt().toString().replaceAllMapped(
+                        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.',
+                      );
+                      final isSuffix = expenseCurrencySymbol == 'đ' ||
+                          expenseCurrencyCode == 'VND' ||
+                          expenseCurrencyCode == 'VNĐ';
+                      return isSuffix ? '$formatted đ' : '$expenseCurrencySymbol$formatted';
+                    }(),
                     style: const TextStyle(
                       color: Color(0xFF4F46E5),
                       fontWeight: FontWeight.bold,

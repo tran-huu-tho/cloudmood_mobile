@@ -74,10 +74,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   bool _checkCanEdit({bool showToast = true}) {
     if (_isViewer) {
       if (showToast && mounted) {
-        final String label = _itineraryData['isGuide'] == true ? 'hướng dẫn' : 'chuyến đi';
+        final String label = _itineraryData['isGuide'] == true
+            ? 'hướng dẫn'
+            : 'chuyến đi';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Bạn chỉ có quyền Xem (VIEWER), không thể chỉnh sửa $label này.'),
+            content: Text(
+              'Bạn chỉ có quyền Xem (VIEWER), không thể chỉnh sửa $label này.',
+            ),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
           ),
@@ -143,6 +147,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   List<Map<String, dynamic>> _itineraryMembers = [];
   String _sortExpensesOption = 'NEWEST';
   int _tripBudget = 0;
+  Map<String, double> _currencyRates = {
+    'VND': 1.0,
+    'USD': 26320.01,
+    'EUR': 28500.0,
+    'JPY': 165.0,
+    'KRW': 19.5,
+    'THB': 720.0,
+    'CNY': 3620.0,
+    'GBP': 33500.0,
+    'SGD': 19400.0,
+  };
 
   // Itinerary Tab custom items
   final Map<int, String> _daySubtitles = {};
@@ -175,9 +190,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     super.initState();
     _itineraryData = widget.itinerary;
     final currentUser = AuthService().currentUser.value;
-    final ownerId = (_itineraryData['userId'] ?? _itineraryData['user']?['id'])?.toString();
-    if (currentUser != null && ownerId != null && currentUser.id.toString() != ownerId) {
-      _currentRole = (_itineraryData['role'] ?? 'VIEWER').toString().toUpperCase();
+    final ownerId = (_itineraryData['userId'] ?? _itineraryData['user']?['id'])
+        ?.toString();
+    if (currentUser != null &&
+        ownerId != null &&
+        currentUser.id.toString() != ownerId) {
+      _currentRole = (_itineraryData['role'] ?? 'VIEWER')
+          .toString()
+          .toUpperCase();
     } else {
       _currentRole = 'OWNER';
     }
@@ -225,7 +245,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final updatedByUserId = data['updatedByUserId']?.toString();
     final currentUserId = AuthService().currentUser.value?.id?.toString();
 
-    if (eventItinId == currentItinId && updatedByUserId != currentUserId && mounted) {
+    if (eventItinId == currentItinId &&
+        updatedByUserId != currentUserId &&
+        mounted) {
       final int noteId = data['noteId'] as int;
       final String text = data['text'] as String;
       final bool isItineraryDetail = data['isItineraryDetail'] == true;
@@ -249,8 +271,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final currentUserId = AuthService().currentUser.value?.id?.toString();
 
     // Chỉ reload khi người gửi là BẠN ĐỒNG HÀNH, không reload khi chính người dùng hiện tại thực hiện
-    if (eventItinId == currentItinId && updatedByUserId != currentUserId && mounted) {
-      debugPrint('⚡ Real-time update từ bạn đồng hành: Đang cập nhật dữ liệu ngầm không quay màn hình...');
+    if (eventItinId == currentItinId &&
+        updatedByUserId != currentUserId &&
+        mounted) {
+      debugPrint(
+        '⚡ Real-time update từ bạn đồng hành: Đang cập nhật dữ liệu ngầm không quay màn hình...',
+      );
       _loadData(silent: true);
     }
   }
@@ -282,7 +308,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ? _itineraryData['id']
         : int.parse(_itineraryData['id'].toString());
     ItinerarySocketService().removeUpdateListener(_onItinerarySocketUpdated);
-    ItinerarySocketService().removeActiveMembersListener(_onActiveMembersUpdated);
+    ItinerarySocketService().removeActiveMembersListener(
+      _onActiveMembersUpdated,
+    );
     ItinerarySocketService().leaveItinerary(itinId);
 
     _currentNotification?.remove();
@@ -654,7 +682,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             _currentRole = membersData['currentRole'].toString().toUpperCase();
           }
           if (membersData['members'] is List) {
-            _itineraryMembers = List<Map<String, dynamic>>.from(membersData['members']);
+            _itineraryMembers = List<Map<String, dynamic>>.from(
+              membersData['members'],
+            );
           }
         });
       }
@@ -714,13 +744,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           int scoreA = 0;
           int scoreB = 0;
 
-          final catA = (a['category']?['name'] ?? a['category'] ?? '').toString();
-          final catB = (b['category']?['name'] ?? b['category'] ?? '').toString();
+          final catA = (a['category']?['name'] ?? a['category'] ?? '')
+              .toString();
+          final catB = (b['category']?['name'] ?? b['category'] ?? '')
+              .toString();
 
           for (var userCat in selectedCats) {
             final uCatStr = userCat.toString().toLowerCase();
-            if (catA.toLowerCase().contains(uCatStr) || uCatStr.contains(catA.toLowerCase())) scoreA += 5;
-            if (catB.toLowerCase().contains(uCatStr) || uCatStr.contains(catB.toLowerCase())) scoreB += 5;
+            if (catA.toLowerCase().contains(uCatStr) ||
+                uCatStr.contains(catA.toLowerCase()))
+              scoreA += 5;
+            if (catB.toLowerCase().contains(uCatStr) ||
+                uCatStr.contains(catB.toLowerCase()))
+              scoreB += 5;
           }
 
           final subCatA = (a['subCategories'] ?? []).toString().toLowerCase();
@@ -740,10 +776,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
         // Mark top matched places with dynamic preference tag
         for (var p in places) {
-          final catP = (p['category']?['name'] ?? p['category'] ?? '').toString();
-          bool matchesCat = selectedCats.any((c) =>
-              catP.toLowerCase().contains(c.toString().toLowerCase()) ||
-              c.toString().toLowerCase().contains(catP.toLowerCase()));
+          final catP = (p['category']?['name'] ?? p['category'] ?? '')
+              .toString();
+          bool matchesCat = selectedCats.any(
+            (c) =>
+                catP.toLowerCase().contains(c.toString().toLowerCase()) ||
+                c.toString().toLowerCase().contains(catP.toLowerCase()),
+          );
           if (matchesCat) {
             p['isRecommendedForYou'] = true;
           }
@@ -801,7 +840,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     _checkedSections ??= Set.from(_sectionNames);
 
     // Restore custom expenses and budget
-    _tripBudget = prefs.getInt('budget_$itineraryId') ?? (_itineraryData['budget'] as num?)?.toInt() ?? 0;
+    _tripBudget =
+        prefs.getInt('budget_$itineraryId') ??
+        (_itineraryData['budget'] as num?)?.toInt() ??
+        0;
     final savedExpenses = prefs.getString('expenses_$itineraryId');
     if (savedExpenses != null) {
       try {
@@ -836,11 +878,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       });
 
       DatabaseService().getSettlements(currentItineraryId).then((serverSt) {
-        if (mounted && serverSt.isNotEmpty) {
+        if (mounted) {
           setState(() {
             _settlements = serverSt;
           });
           _saveSettlementsToPrefs();
+        }
+      });
+
+      DatabaseService().getCurrencyRates().then((rates) {
+        if (mounted && rates.isNotEmpty) {
+          setState(() {
+            _currencyRates = rates;
+          });
         }
       });
     }
@@ -1160,7 +1210,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     Icons.share_outlined,
                     color: Color(0xFF2563EB),
                   ),
-                  title: const Text('Chia sẻ chuyến đi', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                  title: const Text(
+                    'Chia sẻ chuyến đi',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2563EB),
+                    ),
+                  ),
                   subtitle: const Text('Mời bạn bè qua Email hoặc Copy Link'),
                   onTap: () {
                     Navigator.pop(context);
@@ -1182,7 +1238,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     Icons.people_alt_outlined,
                     color: Color(0xFF059669),
                   ),
-                  title: const Text('Quản lý thành viên', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                  title: const Text(
+                    'Quản lý thành viên',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF059669),
+                    ),
+                  ),
                   subtitle: const Text('Xem danh sách & quyền hạn thành viên'),
                   onTap: () {
                     Navigator.pop(context);
@@ -1395,12 +1457,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       'placeId': placeId,
       'place': place,
       'section': sectionOrDay,
-      'day': sectionOrDay.startsWith('Ngày') ? (int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1) : null,
+      'day': sectionOrDay.startsWith('Ngày')
+          ? (int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1)
+          : null,
       'sortOrder': 9999,
     };
 
     setState(() {
-      if (sectionOrDay.startsWith('Ngày') && _itineraryData['isGuide'] != true) {
+      if (sectionOrDay.startsWith('Ngày') &&
+          _itineraryData['isGuide'] != true) {
         _details.add(tempItem);
       } else {
         _savedPlaces.add(tempItem);
@@ -1433,11 +1498,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     // Cập nhật id thật từ Server trả về mà không cần reload xóa mục tạm
     if (result != null && result['id'] != null) {
       setState(() {
-        if (sectionOrDay.startsWith('Ngày') && _itineraryData['isGuide'] != true) {
+        if (sectionOrDay.startsWith('Ngày') &&
+            _itineraryData['isGuide'] != true) {
           final idx = _details.indexWhere((d) => d['id'] == tempItem['id']);
           if (idx != -1) _details[idx] = result;
         } else {
-          final idx = _savedPlaces.indexWhere((sp) => sp['id'] == tempItem['id']);
+          final idx = _savedPlaces.indexWhere(
+            (sp) => sp['id'] == tempItem['id'],
+          );
           if (idx != -1) _savedPlaces[idx] = result;
         }
       });
@@ -1856,20 +1924,28 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     const Text(
                       'Mời bạn đồng hành',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Row(
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setModalState(() => selectedRole = 'EDITOR'),
+                            onTap: () =>
+                                setModalState(() => selectedRole = 'EDITOR'),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: selectedRole == 'EDITOR' ? Colors.blue.shade50 : Colors.grey.shade100,
+                                color: selectedRole == 'EDITOR'
+                                    ? Colors.blue.shade50
+                                    : Colors.grey.shade100,
                                 border: Border.all(
-                                  color: selectedRole == 'EDITOR' ? AppTheme.primary : Colors.transparent,
+                                  color: selectedRole == 'EDITOR'
+                                      ? AppTheme.primary
+                                      : Colors.transparent,
                                   width: 1.5,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
@@ -1878,8 +1954,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               child: Text(
                                 'Có thể chỉnh sửa',
                                 style: TextStyle(
-                                  color: selectedRole == 'EDITOR' ? AppTheme.primary : AppTheme.subtitleText,
-                                  fontWeight: selectedRole == 'EDITOR' ? FontWeight.bold : FontWeight.normal,
+                                  color: selectedRole == 'EDITOR'
+                                      ? AppTheme.primary
+                                      : AppTheme.subtitleText,
+                                  fontWeight: selectedRole == 'EDITOR'
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                               ),
                             ),
@@ -1888,13 +1968,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         const SizedBox(width: 12),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setModalState(() => selectedRole = 'VIEWER'),
+                            onTap: () =>
+                                setModalState(() => selectedRole = 'VIEWER'),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               decoration: BoxDecoration(
-                                color: selectedRole == 'VIEWER' ? Colors.blue.shade50 : Colors.grey.shade100,
+                                color: selectedRole == 'VIEWER'
+                                    ? Colors.blue.shade50
+                                    : Colors.grey.shade100,
                                 border: Border.all(
-                                  color: selectedRole == 'VIEWER' ? AppTheme.primary : Colors.transparent,
+                                  color: selectedRole == 'VIEWER'
+                                      ? AppTheme.primary
+                                      : Colors.transparent,
                                   width: 1.5,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
@@ -1903,8 +1988,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               child: Text(
                                 'Chỉ xem',
                                 style: TextStyle(
-                                  color: selectedRole == 'VIEWER' ? AppTheme.primary : AppTheme.subtitleText,
-                                  fontWeight: selectedRole == 'VIEWER' ? FontWeight.bold : FontWeight.normal,
+                                  color: selectedRole == 'VIEWER'
+                                      ? AppTheme.primary
+                                      : AppTheme.subtitleText,
+                                  fontWeight: selectedRole == 'VIEWER'
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                                 ),
                               ),
                             ),
@@ -1920,8 +2009,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             controller: emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
-                              hintText: selectedRole == 'EDITOR' ? 'Nhập email để mời chỉnh sửa...' : 'Chỉ chia sẻ qua Link cho người xem',
-                              prefixIcon: const Icon(Icons.person_add_alt_1_rounded),
+                              hintText: selectedRole == 'EDITOR'
+                                  ? 'Nhập email để mời chỉnh sửa...'
+                                  : 'Chỉ chia sẻ qua Link cho người xem',
+                              prefixIcon: const Icon(
+                                Icons.person_add_alt_1_rounded,
+                              ),
                               filled: true,
                               fillColor: Colors.grey.shade100,
                               enabled: selectedRole == 'EDITOR',
@@ -1940,30 +2033,48 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 : () async {
                                     final email = emailController.text.trim();
                                     if (email.isEmpty || !email.contains('@')) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Vui lòng nhập email hợp lệ')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Vui lòng nhập email hợp lệ',
+                                          ),
+                                        ),
                                       );
                                       return;
                                     }
                                     setModalState(() => isSending = true);
                                     final itinId = _itineraryData['id'] is int
                                         ? _itineraryData['id']
-                                        : int.parse(_itineraryData['id'].toString());
-                                    final res = await DatabaseService().inviteByEmail(itinId, email);
+                                        : int.parse(
+                                            _itineraryData['id'].toString(),
+                                          );
+                                    final res = await DatabaseService()
+                                        .inviteByEmail(itinId, email);
                                     setModalState(() => isSending = false);
 
                                     if (res != null && res['success'] == true) {
                                       emailController.clear();
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(
-                                          content: Text(res['message'] ?? 'Đã gửi lời mời thành công!'),
+                                          content: Text(
+                                            res['message'] ??
+                                                'Đã gửi lời mời thành công!',
+                                          ),
                                           backgroundColor: Colors.green,
                                         ),
                                       );
                                     } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(
-                                          content: Text(res?['message'] ?? 'Gửi thất bại'),
+                                          content: Text(
+                                            res?['message'] ?? 'Gửi thất bại',
+                                          ),
                                           backgroundColor: Colors.red,
                                         ),
                                       );
@@ -1972,12 +2083,29 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.primary,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
                             child: isSending
-                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Text('Gửi', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Gửi',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                           ),
                         ],
                       ],
@@ -1993,15 +2121,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   setModalState(() => isGenerating = true);
                                   final itinId = _itineraryData['id'] is int
                                       ? _itineraryData['id']
-                                      : int.parse(_itineraryData['id'].toString());
-                                  final res = await DatabaseService().getShareLink(itinId);
+                                      : int.parse(
+                                          _itineraryData['id'].toString(),
+                                        );
+                                  final res = await DatabaseService()
+                                      .getShareLink(itinId);
                                   setModalState(() => isGenerating = false);
 
                                   if (res != null && res['shareUrl'] != null) {
-                                    Clipboard.setData(ClipboardData(text: res['shareUrl']));
+                                    Clipboard.setData(
+                                      ClipboardData(text: res['shareUrl']),
+                                    );
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text('Đã sao chép liên kết chia sẻ (Chỉ xem)!'),
+                                        content: Text(
+                                          'Đã sao chép liên kết chia sẻ (Chỉ xem)!',
+                                        ),
                                         backgroundColor: Colors.green,
                                       ),
                                     );
@@ -2018,16 +2153,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             final itinId = _itineraryData['id'] is int
                                 ? _itineraryData['id']
                                 : int.parse(_itineraryData['id'].toString());
-                            final res = await DatabaseService().getShareLink(itinId);
+                            final res = await DatabaseService().getShareLink(
+                              itinId,
+                            );
                             if (res != null && res['shareUrl'] != null) {
-                              Clipboard.setData(ClipboardData(text: res['shareUrl']));
+                              Clipboard.setData(
+                                ClipboardData(text: res['shareUrl']),
+                              );
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Đã chép liên kết để chia sẻ qua các ứng dụng khác!')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Đã chép liên kết để chia sẻ qua các ứng dụng khác!',
+                                  ),
+                                ),
                               );
                             }
                           },
                           borderRadius: BorderRadius.circular(30),
-                          child: _buildShareIconOption(Icons.ios_share_rounded, 'Khác'),
+                          child: _buildShareIconOption(
+                            Icons.ios_share_rounded,
+                            'Khác',
+                          ),
                         ),
                       ],
                     ),
@@ -2050,7 +2196,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             itineraryId: _itineraryData['id'] is int
                                 ? _itineraryData['id']
                                 : int.parse(_itineraryData['id'].toString()),
-                            itineraryTitle: _itineraryData['title'] ?? 'Chuyến đi',
+                            itineraryTitle:
+                                _itineraryData['title'] ?? 'Chuyến đi',
                           ),
                         );
                       },
@@ -2166,10 +2313,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   void _showPrivacySettingsSheet() {
     if (_currentRole != 'OWNER') {
       if (mounted) {
-        final String label = _itineraryData['isGuide'] == true ? 'hướng dẫn' : 'chuyến đi';
+        final String label = _itineraryData['isGuide'] == true
+            ? 'hướng dẫn'
+            : 'chuyến đi';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Chỉ chủ sở hữu (OWNER) mới có quyền cài đặt quyền riêng tư cho $label này.'),
+            content: Text(
+              'Chỉ chủ sở hữu (OWNER) mới có quyền cài đặt quyền riêng tư cho $label này.',
+            ),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
           ),
@@ -4471,69 +4622,149 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     // Active online members avatars stacked
                                     if (_activeMembers.isNotEmpty)
                                       Padding(
-                                        padding: const EdgeInsets.only(right: 6),
+                                        padding: const EdgeInsets.only(
+                                          right: 6,
+                                        ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             SizedBox(
                                               height: 28,
-                                              width: (_activeMembers.take(3).length * 18.0) + 10.0,
+                                              width:
+                                                  (_activeMembers
+                                                          .take(3)
+                                                          .length *
+                                                      18.0) +
+                                                  10.0,
                                               child: Stack(
                                                 clipBehavior: Clip.none,
-                                                children: _activeMembers.take(3).toList().asMap().entries.map((entry) {
+                                                children: _activeMembers.take(3).toList().asMap().entries.map((
+                                                  entry,
+                                                ) {
                                                   final idx = entry.key;
                                                   final member = entry.value;
-                                                  final name = member['fullName'] ?? 'Thành viên';
-                                                  final String? rawAvatar = member['avatarUrl'] ?? member['avatar'];
+                                                  final name =
+                                                      member['fullName'] ??
+                                                      'Thành viên';
+                                                  final String? rawAvatar =
+                                                      member['avatarUrl'] ??
+                                                      member['avatar'];
                                                   String? avatarUrl;
-                                                  if (rawAvatar != null && rawAvatar.trim().isNotEmpty && !rawAvatar.contains('default-avatar')) {
-                                                    final trimmed = rawAvatar.trim();
-                                                    if (trimmed.startsWith('http')) {
+                                                  if (rawAvatar != null &&
+                                                      rawAvatar
+                                                          .trim()
+                                                          .isNotEmpty &&
+                                                      !rawAvatar.contains(
+                                                        'default-avatar',
+                                                      )) {
+                                                    final trimmed = rawAvatar
+                                                        .trim();
+                                                    if (trimmed.startsWith(
+                                                      'http',
+                                                    )) {
                                                       avatarUrl = trimmed;
-                                                    } else if (trimmed.startsWith('/')) {
-                                                      avatarUrl = 'http://localhost:3000$trimmed';
+                                                    } else if (trimmed
+                                                        .startsWith('/')) {
+                                                      avatarUrl =
+                                                          'http://localhost:3000$trimmed';
                                                     } else {
-                                                      avatarUrl = 'http://localhost:3000/$trimmed';
+                                                      avatarUrl =
+                                                          'http://localhost:3000/$trimmed';
                                                     }
                                                   }
-                                                  final Color avatarBgColor = Colors.primaries[name.hashCode.abs() % Colors.primaries.length];
-                                                  final roleStr = member['role'] == 'OWNER' ? 'Chủ sở hữu' : 'Có thể chỉnh sửa';
+                                                  final Color avatarBgColor =
+                                                      Colors.primaries[name
+                                                              .hashCode
+                                                              .abs() %
+                                                          Colors
+                                                              .primaries
+                                                              .length];
+                                                  final roleStr =
+                                                      member['role'] == 'OWNER'
+                                                      ? 'Chủ sở hữu'
+                                                      : 'Có thể chỉnh sửa';
 
                                                   return Positioned(
                                                     left: idx * 18.0,
                                                     child: Tooltip(
                                                       richMessage: WidgetSpan(
                                                         child: Container(
-                                                          padding: const EdgeInsets.all(12),
+                                                          padding:
+                                                              const EdgeInsets.all(
+                                                                12,
+                                                              ),
                                                           width: 210,
                                                           child: Row(
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
                                                             children: [
                                                               CircleAvatar(
                                                                 radius: 18,
-                                                                backgroundColor: avatarBgColor,
-                                                                foregroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                                                                backgroundColor:
+                                                                    avatarBgColor,
+                                                                foregroundImage:
+                                                                    avatarUrl !=
+                                                                        null
+                                                                    ? NetworkImage(
+                                                                        avatarUrl,
+                                                                      )
+                                                                    : null,
                                                                 child: Text(
-                                                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                                                  style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.bold),
+                                                                  name.isNotEmpty
+                                                                      ? name[0]
+                                                                            .toUpperCase()
+                                                                      : 'U',
+                                                                  style: const TextStyle(
+                                                                    fontSize:
+                                                                        13,
+                                                                    color: Colors
+                                                                        .white,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                  ),
                                                                 ),
                                                               ),
-                                                              const SizedBox(width: 10),
+                                                              const SizedBox(
+                                                                width: 10,
+                                                              ),
                                                               Expanded(
                                                                 child: Column(
-                                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  crossAxisAlignment:
+                                                                      CrossAxisAlignment
+                                                                          .start,
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
                                                                   children: [
                                                                     Text(
                                                                       name,
-                                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
-                                                                      maxLines: 1,
-                                                                      overflow: TextOverflow.ellipsis,
+                                                                      style: const TextStyle(
+                                                                        fontWeight:
+                                                                            FontWeight.bold,
+                                                                        fontSize:
+                                                                            13,
+                                                                        color: Colors
+                                                                            .black87,
+                                                                      ),
+                                                                      maxLines:
+                                                                          1,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
                                                                     ),
-                                                                    const SizedBox(height: 2),
+                                                                    const SizedBox(
+                                                                      height: 2,
+                                                                    ),
                                                                     Text(
                                                                       roleStr,
-                                                                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                                                      style: TextStyle(
+                                                                        fontSize:
+                                                                            11,
+                                                                        color: Colors
+                                                                            .grey[600],
+                                                                      ),
                                                                     ),
                                                                   ],
                                                                 ),
@@ -4544,12 +4775,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                       ),
                                                       decoration: BoxDecoration(
                                                         color: Colors.white,
-                                                        borderRadius: BorderRadius.circular(16),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              16,
+                                                            ),
                                                         boxShadow: const [
                                                           BoxShadow(
-                                                            color: Colors.black12,
+                                                            color:
+                                                                Colors.black12,
                                                             blurRadius: 10,
-                                                            offset: Offset(0, 4),
+                                                            offset: Offset(
+                                                              0,
+                                                              4,
+                                                            ),
                                                           ),
                                                         ],
                                                       ),
@@ -4558,29 +4796,65 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                         onTap: () {
                                                           showModalBottomSheet(
                                                             context: context,
-                                                            isScrollControlled: true,
-                                                            backgroundColor: Colors.transparent,
+                                                            isScrollControlled:
+                                                                true,
+                                                            backgroundColor:
+                                                                Colors
+                                                                    .transparent,
                                                             builder: (ctx) => ManageMembersModal(
-                                                              itineraryId: _itineraryData['id'] is int
+                                                              itineraryId:
+                                                                  _itineraryData['id']
+                                                                      is int
                                                                   ? _itineraryData['id']
-                                                                  : int.parse(_itineraryData['id'].toString()),
-                                                              itineraryTitle: _itineraryData['title'] ?? 'Chuyến đi',
+                                                                  : int.parse(
+                                                                      _itineraryData['id']
+                                                                          .toString(),
+                                                                    ),
+                                                              itineraryTitle:
+                                                                  _itineraryData['title'] ??
+                                                                  'Chuyến đi',
                                                             ),
                                                           );
                                                         },
-                                                        borderRadius: BorderRadius.circular(14),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              14,
+                                                            ),
                                                         child: Container(
-                                                          decoration: BoxDecoration(
-                                                            shape: BoxShape.circle,
-                                                            border: Border.all(color: Colors.white, width: 1.5),
-                                                          ),
+                                                          decoration:
+                                                              BoxDecoration(
+                                                                shape: BoxShape
+                                                                    .circle,
+                                                                border: Border.all(
+                                                                  color: Colors
+                                                                      .white,
+                                                                  width: 1.5,
+                                                                ),
+                                                              ),
                                                           child: CircleAvatar(
                                                             radius: 12,
-                                                            backgroundColor: avatarBgColor,
-                                                            foregroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                                                            backgroundColor:
+                                                                avatarBgColor,
+                                                            foregroundImage:
+                                                                avatarUrl !=
+                                                                    null
+                                                                ? NetworkImage(
+                                                                    avatarUrl,
+                                                                  )
+                                                                : null,
                                                             child: Text(
-                                                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                                              style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                                                              name.isNotEmpty
+                                                                  ? name[0]
+                                                                        .toUpperCase()
+                                                                  : 'U',
+                                                              style: const TextStyle(
+                                                                fontSize: 10,
+                                                                color: Colors
+                                                                    .white,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
                                                             ),
                                                           ),
                                                         ),
@@ -4596,25 +4870,47 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                   showModalBottomSheet(
                                                     context: context,
                                                     isScrollControlled: true,
-                                                    backgroundColor: Colors.transparent,
+                                                    backgroundColor:
+                                                        Colors.transparent,
                                                     builder: (ctx) => ManageMembersModal(
-                                                      itineraryId: _itineraryData['id'] is int
+                                                      itineraryId:
+                                                          _itineraryData['id']
+                                                              is int
                                                           ? _itineraryData['id']
-                                                          : int.parse(_itineraryData['id'].toString()),
-                                                      itineraryTitle: _itineraryData['title'] ?? 'Chuyến đi',
+                                                          : int.parse(
+                                                              _itineraryData['id']
+                                                                  .toString(),
+                                                            ),
+                                                      itineraryTitle:
+                                                          _itineraryData['title'] ??
+                                                          'Chuyến đi',
                                                     ),
                                                   );
                                                 },
                                                 child: Container(
-                                                  margin: const EdgeInsets.only(left: 2),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                  margin: const EdgeInsets.only(
+                                                    left: 2,
+                                                  ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 5,
+                                                        vertical: 2,
+                                                      ),
                                                   decoration: BoxDecoration(
                                                     color: Colors.grey.shade200,
-                                                    borderRadius: BorderRadius.circular(10),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
+                                                        ),
                                                   ),
                                                   child: Text(
                                                     '+${_activeMembers.length - 3}',
-                                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Colors.black87,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -4895,7 +5191,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           }
                                           return TabBarView(
                                             controller: _tabController,
-                                            children: _itineraryData['isGuide'] == true
+                                            children:
+                                                _itineraryData['isGuide'] ==
+                                                    true
                                                 ? [
                                                     _buildOverviewTab(),
                                                     _buildExploreTab(),
@@ -5077,8 +5375,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   Future<void> _addNoteInline(String section) async {
     if (!_checkCanEdit()) return;
     final itineraryId = _itineraryData['id'] as int;
-    final isDay = section.startsWith('Ngày') && _itineraryData['isGuide'] != true;
-    final int? day = isDay ? (int.tryParse(section.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1) : null;
+    final isDay =
+        section.startsWith('Ngày') && _itineraryData['isGuide'] != true;
+    final int? day = isDay
+        ? (int.tryParse(section.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1)
+        : null;
 
     final tempItem = {
       'id': DateTime.now().millisecondsSinceEpoch,
@@ -5137,7 +5438,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           final idx = _details.indexWhere((d) => d['id'] == tempItem['id']);
           if (idx != -1) _details[idx] = result;
         } else {
-          final idx = _savedPlaces.indexWhere((sp) => sp['id'] == tempItem['id']);
+          final idx = _savedPlaces.indexWhere(
+            (sp) => sp['id'] == tempItem['id'],
+          );
           if (idx != -1) _savedPlaces[idx] = result;
         }
       });
@@ -5876,7 +6179,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     child: isEditing
                         ? Builder(
                             builder: (context) {
-                              if (editController != null && editController.text.isNotEmpty) {
+                              if (editController != null &&
+                                  editController.text.isNotEmpty) {
                                 editController.selection = TextSelection(
                                   baseOffset: 0,
                                   extentOffset: editController.text.length,
@@ -5892,7 +6196,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                                 onChanged: (val) {
                                   final itinId = _itineraryData['id'] as int;
-                                  final userId = AuthService().currentUser.value?.id?.toString();
+                                  final userId = AuthService()
+                                      .currentUser
+                                      .value
+                                      ?.id
+                                      ?.toString();
                                   ItinerarySocketService().sendTypingNote(
                                     itineraryId: itinId,
                                     noteId: id,
@@ -5901,48 +6209,56 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     userId: userId,
                                   );
                                 },
-                            decoration: InputDecoration(
-                              hintText: isTodo
-                                  ? 'Tên danh sách...'
-                                  : 'Nhập ghi chú...',
-                              hintStyle: const TextStyle(
-                                color: Colors.black26,
-                                fontSize: 13,
-                              ),
-                              border: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              errorBorder: InputBorder.none,
-                              disabledBorder: InputBorder.none,
-                              filled: false,
-                              fillColor: Colors.transparent,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                            onSubmitted: (val) async {
-                              final cleanVal = val.trim();
-                              String finalVal = cleanVal.isEmpty
-                                  ? (isTodo
-                                        ? 'Danh sách công việc'
-                                        : 'Ghi chú mới')
-                                  : cleanVal;
-                              if (isTodo) finalVal = '[TODO] $finalVal';
-                              setState(() {
-                                if (isItineraryDetail) {
-                                  final idx = _details.indexWhere((d) => d['id'] == id);
-                                  if (idx != -1) _details[idx]['noteText'] = finalVal;
-                                } else {
-                                  final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
-                                  if (idx != -1) _savedPlaces[idx]['noteText'] = finalVal;
-                                }
-                                _editingNoteId = null;
-                              });
-                              DatabaseService().updateNoteOrDetail(id, {
-                                'noteText': finalVal,
-                              }, isItineraryDetail);
+                                decoration: InputDecoration(
+                                  hintText: isTodo
+                                      ? 'Tên danh sách...'
+                                      : 'Nhập ghi chú...',
+                                  hintStyle: const TextStyle(
+                                    color: Colors.black26,
+                                    fontSize: 13,
+                                  ),
+                                  border: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  errorBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
+                                  filled: false,
+                                  fillColor: Colors.transparent,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onSubmitted: (val) async {
+                                  final cleanVal = val.trim();
+                                  String finalVal = cleanVal.isEmpty
+                                      ? (isTodo
+                                            ? 'Danh sách công việc'
+                                            : 'Ghi chú mới')
+                                      : cleanVal;
+                                  if (isTodo) finalVal = '[TODO] $finalVal';
+                                  setState(() {
+                                    if (isItineraryDetail) {
+                                      final idx = _details.indexWhere(
+                                        (d) => d['id'] == id,
+                                      );
+                                      if (idx != -1)
+                                        _details[idx]['noteText'] = finalVal;
+                                    } else {
+                                      final idx = _savedPlaces.indexWhere(
+                                        (sp) => sp['id'] == id,
+                                      );
+                                      if (idx != -1)
+                                        _savedPlaces[idx]['noteText'] =
+                                            finalVal;
+                                    }
+                                    _editingNoteId = null;
+                                  });
+                                  DatabaseService().updateNoteOrDetail(id, {
+                                    'noteText': finalVal,
+                                  }, isItineraryDetail);
+                                },
+                              );
                             },
-                          );
-                        })
+                          )
                         : GestureDetector(
                             onTap: () {
                               if (!_checkCanEdit()) return;
@@ -5980,8 +6296,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           final idx = _details.indexWhere((d) => d['id'] == id);
                           if (idx != -1) _details[idx]['noteText'] = finalVal;
                         } else {
-                          final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
-                          if (idx != -1) _savedPlaces[idx]['noteText'] = finalVal;
+                          final idx = _savedPlaces.indexWhere(
+                            (sp) => sp['id'] == id,
+                          );
+                          if (idx != -1)
+                            _savedPlaces[idx]['noteText'] = finalVal;
                         }
                         _editingNoteId = null;
                       });
@@ -6002,10 +6321,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       setState(() {
                         if (isItineraryDetail) {
                           final idx = _details.indexWhere((d) => d['id'] == id);
-                          if (idx != -1) _details[idx]['isCollapsed'] = newCollapsed;
+                          if (idx != -1)
+                            _details[idx]['isCollapsed'] = newCollapsed;
                         } else {
-                          final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
-                          if (idx != -1) _savedPlaces[idx]['isCollapsed'] = newCollapsed;
+                          final idx = _savedPlaces.indexWhere(
+                            (sp) => sp['id'] == id,
+                          );
+                          if (idx != -1)
+                            _savedPlaces[idx]['isCollapsed'] = newCollapsed;
                         }
                       });
                       DatabaseService().updateNoteOrDetail(id, {
@@ -6057,7 +6380,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         final idx = _details.indexWhere((d) => d['id'] == id);
                         if (idx != -1) _details[idx]['todoItems'] = updated;
                       } else {
-                        final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
+                        final idx = _savedPlaces.indexWhere(
+                          (sp) => sp['id'] == id,
+                        );
                         if (idx != -1) _savedPlaces[idx]['todoItems'] = updated;
                       }
                     });
@@ -6089,11 +6414,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               }).toList();
                               setState(() {
                                 if (isItineraryDetail) {
-                                  final idx = _details.indexWhere((d) => d['id'] == id);
-                                  if (idx != -1) _details[idx]['todoItems'] = updated;
+                                  final idx = _details.indexWhere(
+                                    (d) => d['id'] == id,
+                                  );
+                                  if (idx != -1)
+                                    _details[idx]['todoItems'] = updated;
                                 } else {
-                                  final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
-                                  if (idx != -1) _savedPlaces[idx]['todoItems'] = updated;
+                                  final idx = _savedPlaces.indexWhere(
+                                    (sp) => sp['id'] == id,
+                                  );
+                                  if (idx != -1)
+                                    _savedPlaces[idx]['todoItems'] = updated;
                                 }
                               });
                               DatabaseService().updateNoteOrDetail(id, {
@@ -6147,11 +6478,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   ..removeWhere((it) => it['text'] == itemText);
                                 setState(() {
                                   if (isItineraryDetail) {
-                                    final idx = _details.indexWhere((d) => d['id'] == id);
-                                    if (idx != -1) _details[idx]['todoItems'] = updated;
+                                    final idx = _details.indexWhere(
+                                      (d) => d['id'] == id,
+                                    );
+                                    if (idx != -1)
+                                      _details[idx]['todoItems'] = updated;
                                   } else {
-                                    final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
-                                    if (idx != -1) _savedPlaces[idx]['todoItems'] = updated;
+                                    final idx = _savedPlaces.indexWhere(
+                                      (sp) => sp['id'] == id,
+                                    );
+                                    if (idx != -1)
+                                      _savedPlaces[idx]['todoItems'] = updated;
                                   }
                                   _focusedTodoItemKey = null;
                                 });
@@ -6228,11 +6565,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               ..add({'text': cleanVal, 'done': false});
                             setState(() {
                               if (isItineraryDetail) {
-                                final idx = _details.indexWhere((d) => d['id'] == id);
-                                if (idx != -1) _details[idx]['todoItems'] = updated;
+                                final idx = _details.indexWhere(
+                                  (d) => d['id'] == id,
+                                );
+                                if (idx != -1)
+                                  _details[idx]['todoItems'] = updated;
                               } else {
-                                final idx = _savedPlaces.indexWhere((sp) => sp['id'] == id);
-                                if (idx != -1) _savedPlaces[idx]['todoItems'] = updated;
+                                final idx = _savedPlaces.indexWhere(
+                                  (sp) => sp['id'] == id,
+                                );
+                                if (idx != -1)
+                                  _savedPlaces[idx]['todoItems'] = updated;
                               }
                             });
                             DatabaseService().updateNoteOrDetail(id, {
@@ -7591,7 +7934,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             );
                           },
                           onOpenExpenseSheet: () {
-                            _openPlaceExpenseSheet(detail, isItineraryDetail: false);
+                            _openPlaceExpenseSheet(
+                              detail,
+                              isItineraryDetail: false,
+                            );
                           },
                         ),
                       if (!isCollapsed)
@@ -7824,7 +8170,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         child: Row(
                                           children: [
                                             Text(
-                                              _sectionTypes[section] == 'ITINERARY'
+                                              _sectionTypes[section] ==
+                                                      'ITINERARY'
                                                   ? 'Hành trình'
                                                   : 'Danh sách',
                                               style: TextStyle(
@@ -7849,72 +8196,73 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         });
                                         _syncSectionsToDatabase();
                                       },
-                                itemBuilder: (context) => [
-                                  PopupMenuItem(
-                                    value: 'LIST',
-                                    height: 48,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.format_list_bulleted_rounded,
-                                          size: 20,
-                                          color: AppTheme.darkText,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'Danh sách',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: AppTheme.darkText,
+                                      itemBuilder: (context) => [
+                                        PopupMenuItem(
+                                          value: 'LIST',
+                                          height: 48,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons
+                                                    .format_list_bulleted_rounded,
+                                                size: 20,
+                                                color: AppTheme.darkText,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Text(
+                                                'Danh sách',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                              ),
+                                              if (_sectionTypes[section] !=
+                                                  'ITINERARY')
+                                                const Spacer(),
+                                              if (_sectionTypes[section] !=
+                                                  'ITINERARY')
+                                                Icon(
+                                                  Icons.check_rounded,
+                                                  size: 20,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                            ],
                                           ),
                                         ),
-                                        if (_sectionTypes[section] !=
-                                            'ITINERARY')
-                                          const Spacer(),
-                                        if (_sectionTypes[section] !=
-                                            'ITINERARY')
-                                          Icon(
-                                            Icons.check_rounded,
-                                            size: 20,
-                                            color: AppTheme.darkText,
+                                        PopupMenuItem(
+                                          value: 'ITINERARY',
+                                          height: 48,
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.calendar_month_rounded,
+                                                size: 20,
+                                                color: AppTheme.darkText,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Text(
+                                                'Hành trình',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                              ),
+                                              if (_sectionTypes[section] ==
+                                                  'ITINERARY')
+                                                const Spacer(),
+                                              if (_sectionTypes[section] ==
+                                                  'ITINERARY')
+                                                Icon(
+                                                  Icons.check_rounded,
+                                                  size: 20,
+                                                  color: AppTheme.darkText,
+                                                ),
+                                            ],
                                           ),
+                                        ),
                                       ],
                                     ),
                                   ),
-                                  PopupMenuItem(
-                                    value: 'ITINERARY',
-                                    height: 48,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.calendar_month_rounded,
-                                          size: 20,
-                                          color: AppTheme.darkText,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'Hành trình',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: AppTheme.darkText,
-                                          ),
-                                        ),
-                                        if (_sectionTypes[section] ==
-                                            'ITINERARY')
-                                          const Spacer(),
-                                        if (_sectionTypes[section] ==
-                                            'ITINERARY')
-                                          Icon(
-                                            Icons.check_rounded,
-                                            size: 20,
-                                            color: AppTheme.darkText,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ),
                         Theme(
                           data: Theme.of(context).copyWith(
@@ -8419,9 +8767,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 height: 70,
                                 child: ListView.builder(
                                   scrollDirection: Axis.horizontal,
-                                  itemCount: availableRecommendations.length + 1,
+                                  itemCount:
+                                      availableRecommendations.length + 1,
                                   itemBuilder: (context, rIdx) {
-                                    if (rIdx == availableRecommendations.length) {
+                                    if (rIdx ==
+                                        availableRecommendations.length) {
                                       // "Khám phá" card at the end
                                       return GestureDetector(
                                         onTap: () => _tabController.animateTo(
@@ -8431,7 +8781,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         ),
                                         child: Container(
                                           width: 120,
-                                          margin: const EdgeInsets.only(right: 8),
+                                          margin: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: Colors.white,
                                             borderRadius: BorderRadius.circular(
@@ -8466,7 +8818,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       );
                                     }
 
-                                    final place = availableRecommendations[rIdx];
+                                    final place =
+                                        availableRecommendations[rIdx];
                                     return GestureDetector(
                                       onTap: () {
                                         if (!_checkCanEdit()) return;
@@ -8478,7 +8831,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         padding: const EdgeInsets.all(6),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                           border: Border.all(
                                             color: AppTheme.border,
                                           ),
@@ -8486,9 +8841,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         child: Row(
                                           children: [
                                             ClipRRect(
-                                              borderRadius: BorderRadius.circular(
-                                                8,
-                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                               child: Image.network(
                                                 place['image'] ?? '',
                                                 width: 42,
@@ -8512,7 +8866,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                   Text(
                                                     place['name'] ?? '',
                                                     style: const TextStyle(
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       fontSize: 10,
                                                     ),
                                                     maxLines: 1,
@@ -9492,7 +9847,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   );
                                 },
                                 onOpenExpenseSheet: () {
-                                  _openPlaceExpenseSheet(detail, isItineraryDetail: true, dayIndex: (detail['day'] as int? ?? 1) - 1);
+                                  _openPlaceExpenseSheet(
+                                    detail,
+                                    isItineraryDetail: true,
+                                    dayIndex: (detail['day'] as int? ?? 1) - 1,
+                                  );
                                 },
                               ),
                           ],
@@ -10303,19 +10662,37 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final name = catName.toLowerCase().trim();
     if (name.contains('bay') || name.contains('flight')) {
       return const Color(0xFF0284C7); // Sky Blue
-    } else if (name.contains('ở') || name.contains('khách') || name.contains('chỗ') || name.contains('hotel')) {
+    } else if (name.contains('ở') ||
+        name.contains('khách') ||
+        name.contains('chỗ') ||
+        name.contains('hotel')) {
       return const Color(0xFF7C3AED); // Purple
-    } else if (name.contains('xe') || name.contains('tiện') || name.contains('transit') || name.contains('car')) {
+    } else if (name.contains('xe') ||
+        name.contains('tiện') ||
+        name.contains('transit') ||
+        name.contains('car')) {
       return const Color(0xFF2563EB); // Royal Blue
-    } else if (name.contains('thực') || name.contains('ăn') || name.contains('food') || name.contains('restaurant')) {
+    } else if (name.contains('thực') ||
+        name.contains('ăn') ||
+        name.contains('food') ||
+        name.contains('restaurant')) {
       return const Color(0xFFF59E0B); // Amber / Warm Orange
-    } else if (name.contains('uống') || name.contains('bar') || name.contains('cafe') || name.contains('đồ uống')) {
+    } else if (name.contains('uống') ||
+        name.contains('bar') ||
+        name.contains('cafe') ||
+        name.contains('đồ uống')) {
       return const Color(0xFFD97706); // Dark Amber
-    } else if (name.contains('quan') || name.contains('tham') || name.contains('sights')) {
+    } else if (name.contains('quan') ||
+        name.contains('tham') ||
+        name.contains('sights')) {
       return const Color(0xFFEC4899); // Pink
-    } else if (name.contains('động') || name.contains('hoạt') || name.contains('activity')) {
+    } else if (name.contains('động') ||
+        name.contains('hoạt') ||
+        name.contains('activity')) {
       return const Color(0xFF10B981); // Emerald
-    } else if (name.contains('sắm') || name.contains('mua') || name.contains('shop')) {
+    } else if (name.contains('sắm') ||
+        name.contains('mua') ||
+        name.contains('shop')) {
       return const Color(0xFF8B5CF6); // Violet
     } else if (name.contains('xăng') || name.contains('gas')) {
       return const Color(0xFFEF4444); // Red
@@ -10325,20 +10702,36 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     return const Color(0xFF6366F1); // Indigo default
   }
 
-
   String? _getPayerAvatarUrl(String payer) {
     if (_itineraryMembers.isNotEmpty) {
       final firstPayer = payer.split(',').first.trim();
       for (var m in _itineraryMembers) {
         final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
-        final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? '').toString().trim();
-        final bool isOwner = m['role'] == 'OWNER' ||
-            (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
-        final String displayName = isOwner ? 'Bạn ($nameCandidate)' : nameCandidate;
+        final String nameCandidate =
+            (userObj['fullName'] ??
+                    userObj['name'] ??
+                    userObj['username'] ??
+                    m['fullName'] ??
+                    m['name'] ??
+                    '')
+                .toString()
+                .trim();
+        final bool isOwner =
+            m['role'] == 'OWNER' ||
+            (m['userId'] != null &&
+                _itineraryData['userId'] != null &&
+                m['userId'].toString() == _itineraryData['userId'].toString());
+        final String displayName = isOwner
+            ? 'Bạn ($nameCandidate)'
+            : nameCandidate;
 
-        if (firstPayer == displayName || firstPayer == nameCandidate || (nameCandidate.isNotEmpty && firstPayer.contains(nameCandidate))) {
+        if (firstPayer == displayName ||
+            firstPayer == nameCandidate ||
+            (nameCandidate.isNotEmpty && firstPayer.contains(nameCandidate))) {
           final String? rawAvatar = userObj['avatarUrl'] ?? userObj['avatar'];
-          if (rawAvatar != null && rawAvatar.trim().isNotEmpty && !rawAvatar.contains('default-avatar')) {
+          if (rawAvatar != null &&
+              rawAvatar.trim().isNotEmpty &&
+              !rawAvatar.contains('default-avatar')) {
             final trimmed = rawAvatar.trim();
             if (trimmed.startsWith('http')) return trimmed;
             if (trimmed.startsWith('/')) return 'http://localhost:3000$trimmed';
@@ -10348,7 +10741,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
     final currentUser = AuthService().currentUser.value;
-    if (currentUser != null && currentUser.avatar != null && currentUser.avatar!.isNotEmpty) {
+    if (currentUser != null &&
+        currentUser.avatar != null &&
+        currentUser.avatar!.isNotEmpty) {
       final raw = currentUser.avatar!.trim();
       if (raw.startsWith('http')) return raw;
       if (raw.startsWith('/')) return 'http://localhost:3000$raw';
@@ -10370,23 +10765,251 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     }
   }
 
-  String _formatExpenseAmount(num amount) {
-    final intVal = amount.toInt();
-    if (intVal == 0) return 'đ0';
-    final formatted = intVal.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]}.',
-    );
-    return 'đ$formatted';
+  num _convertExpenseToItineraryCurrency(Map<String, dynamic> exp) {
+    final num amt = (exp['amount'] as num?) ?? 0;
+    if (amt <= 0) return 0;
+
+    String expCode = (exp['currencyCode'] ?? exp['currency'] ?? '')
+        .toString()
+        .trim()
+        .toUpperCase();
+    String expSymbol = (exp['currencySymbol'] ?? '').toString().trim();
+
+    if (expCode.isEmpty) {
+      if (expSymbol == r'$' || expSymbol == 'USD') {
+        expCode = 'USD';
+      } else if (expSymbol == '€' || expSymbol == 'EUR') {
+        expCode = 'EUR';
+      } else if (expSymbol == '¥' || expSymbol == 'JPY' || expSymbol == 'CNY') {
+        expCode = 'JPY';
+      } else if (expSymbol == '₩' || expSymbol == 'KRW') {
+        expCode = 'KRW';
+      } else if (expSymbol == '£' || expSymbol == 'GBP') {
+        expCode = 'GBP';
+      } else if (expSymbol == '฿' || expSymbol == 'THB') {
+        expCode = 'THB';
+      } else {
+        expCode = 'VND';
+      }
+    }
+
+    final String targetCode = (_itineraryData['currencyCode'] ?? 'VND')
+        .toString()
+        .trim()
+        .toUpperCase();
+
+    if (expCode == targetCode) return amt;
+
+    final double expRate = _currencyRates[expCode] ?? 1.0;
+    final double targetRate = _currencyRates[targetCode] ?? 1.0;
+
+    final double valueInTarget = (amt * expRate) / targetRate;
+    return valueInTarget;
+  }
+
+  String _formatExpenseAmount(
+    num amount, {
+    String? currencySymbol,
+    String? currencyCode,
+  }) {
+    String symbol = (currencySymbol != null && currencySymbol.trim().isNotEmpty)
+        ? currencySymbol.trim()
+        : '';
+    String code = (currencyCode != null && currencyCode.trim().isNotEmpty)
+        ? currencyCode.trim().toUpperCase()
+        : '';
+
+    if (symbol.isEmpty) {
+      symbol = _itineraryData['currencySymbol']?.toString().trim() ?? '';
+    }
+    if (code.isEmpty) {
+      code =
+          _itineraryData['currencyCode']?.toString().trim().toUpperCase() ?? '';
+    }
+
+    if ((symbol.isEmpty || symbol == 'đ') && code.isNotEmpty && code != 'VND') {
+      switch (code) {
+        case 'USD':
+        case 'AUD':
+        case 'CAD':
+        case 'SGD':
+          symbol = r'$';
+          break;
+        case 'EUR':
+          symbol = '€';
+          break;
+        case 'JPY':
+        case 'CNY':
+          symbol = '¥';
+          break;
+        case 'KRW':
+          symbol = '₩';
+          break;
+        case 'GBP':
+          symbol = '£';
+          break;
+        case 'THB':
+          symbol = '฿';
+          break;
+      }
+    }
+
+    if (symbol == 'USD' || code == 'USD') {
+      symbol = r'$';
+    } else if (symbol == 'EUR' || code == 'EUR') {
+      symbol = '€';
+    } else if (symbol == 'JPY' ||
+        code == 'JPY' ||
+        symbol == 'CNY' ||
+        code == 'CNY') {
+      symbol = '¥';
+    } else if (symbol == 'KRW' || code == 'KRW') {
+      symbol = '₩';
+    } else if (symbol == 'GBP' || code == 'GBP') {
+      symbol = '£';
+    } else if (symbol == 'THB' || code == 'THB') {
+      symbol = '฿';
+    } else if (symbol == 'SGD' || code == 'SGD') {
+      symbol = r'S$';
+    } else if (symbol == 'AUD' || code == 'AUD') {
+      symbol = r'A$';
+    } else if (symbol == 'CAD' || code == 'CAD') {
+      symbol = r'CA$';
+    } else if (symbol == 'TWD' || code == 'TWD') {
+      symbol = r'NT$';
+    }
+
+    if (symbol.isEmpty) symbol = 'đ';
+
+    final bool isSuffix = symbol == 'đ' || symbol == 'VNĐ' || symbol == 'VND';
+
+    String formatted;
+    if (isSuffix || symbol == '¥' || symbol == '₩') {
+      final intVal = amount.round();
+      formatted = intVal.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]}.',
+      );
+    } else {
+      final double doubleVal = amount.toDouble();
+      if ((doubleVal - doubleVal.roundToDouble()).abs() < 0.01) {
+        formatted = doubleVal.round().toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+        );
+      } else {
+        final String fixedStr = doubleVal.toStringAsFixed(2);
+        final parts = fixedStr.split('.');
+        final whole = parts[0].replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+        );
+        formatted = '$whole.${parts[1]}';
+      }
+    }
+
+    if (isSuffix) {
+      return '$formatted đ';
+    } else {
+      return '$symbol$formatted';
+    }
+  }
+
+  String _formatShareDisplay(String? shareStr, [List? members]) {
+    if (shareStr == null || shareStr.isEmpty) return 'Không chia sẻ';
+    if (!shareStr.startsWith('Cá nhân')) return shareStr;
+    if (!shareStr.contains(':')) return 'Cá nhân';
+
+    final rawPart = shareStr.split(':')[1].trim();
+    if (rawPart.isEmpty) return 'Cá nhân';
+
+    final idsOrNames =
+        rawPart.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    final List memList = (members != null && members.isNotEmpty)
+        ? members
+        : (_itineraryData['members'] as List? ?? []);
+
+    List<String> formatted = [];
+    for (var item in idsOrNames) {
+      dynamic found;
+      for (var mem in memList) {
+        if (mem is Map) {
+          final userObj = (mem['user'] as Map<String, dynamic>?) ?? mem;
+          final idStr =
+              (userObj['id'] ?? mem['userId'] ?? mem['id'] ?? '').toString();
+          final nameStr = (userObj['fullName'] ??
+                  userObj['name'] ??
+                  mem['fullName'] ??
+                  mem['name'] ??
+                  '')
+              .toString()
+              .trim();
+          if (idStr == item || nameStr == item) {
+            found = mem;
+            break;
+          }
+        }
+      }
+
+      if (found != null && found is Map) {
+        final userObj = (found['user'] as Map<String, dynamic>?) ?? found;
+        final nameCandidate = (userObj['fullName'] ??
+                userObj['name'] ??
+                userObj['username'] ??
+                found['fullName'] ??
+                found['name'] ??
+                item)
+            .toString()
+            .trim();
+        formatted.add(nameCandidate.isNotEmpty ? nameCandidate : item);
+      } else {
+        formatted.add(item);
+      }
+    }
+
+    return 'Cá nhân: ${formatted.join(', ')}';
   }
 
   void _showSetBudgetSheet() {
+    String selectedCurrencyCode =
+        _itineraryData['currencyCode']?.toString().toUpperCase() ?? 'VND';
+    String selectedCurrencySymbol =
+        _itineraryData['currencySymbol']?.toString() ?? '';
+
+    if (selectedCurrencySymbol.isEmpty ||
+        selectedCurrencySymbol == 'đ' && selectedCurrencyCode != 'VND') {
+      switch (selectedCurrencyCode) {
+        case 'USD':
+        case 'AUD':
+        case 'CAD':
+        case 'SGD':
+          selectedCurrencySymbol = r'$';
+          break;
+        case 'EUR':
+          selectedCurrencySymbol = '€';
+          break;
+        case 'JPY':
+        case 'CNY':
+          selectedCurrencySymbol = '¥';
+          break;
+        case 'KRW':
+          selectedCurrencySymbol = '₩';
+          break;
+        case 'GBP':
+          selectedCurrencySymbol = '£';
+          break;
+        case 'THB':
+          selectedCurrencySymbol = '฿';
+          break;
+        default:
+          selectedCurrencySymbol = 'đ';
+      }
+    }
+
     String currentBudgetStr = _tripBudget > 0 ? _tripBudget.toString() : '0';
     final budgetController = TextEditingController(
       text: _tripBudget > 0 ? _tripBudget.toString() : '',
     );
-    String selectedCurrencySymbol = 'đ';
-    String selectedCurrencyCode = 'VND';
 
     showModalBottomSheet(
       context: context,
@@ -10404,7 +11027,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               ),
               child: SafeArea(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -10442,13 +11068,30 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           ),
                           GestureDetector(
                             onTap: () async {
-                              final b = int.tryParse(currentBudgetStr) ?? 0;
+                              final b =
+                                  int.tryParse(budgetController.text.trim()) ??
+                                  int.tryParse(currentBudgetStr) ??
+                                  0;
                               setState(() {
                                 _tripBudget = b;
+                                _itineraryData['budget'] = b;
+                                _itineraryData['currencySymbol'] =
+                                    selectedCurrencySymbol;
+                                _itineraryData['currencyCode'] =
+                                    selectedCurrencyCode;
                               });
-                              final prefs = await SharedPreferences.getInstance();
-                              final itinId = _itineraryData['id'] as int;
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              final itinId =
+                                  (_itineraryData['id'] as num?)?.toInt() ?? 0;
                               await prefs.setInt('budget_$itinId', b);
+                              if (itinId > 0) {
+                                DatabaseService().updateItinerary(itinId, {
+                                  'budget': b,
+                                  'currencySymbol': selectedCurrencySymbol,
+                                  'currencyCode': selectedCurrencyCode,
+                                });
+                              }
                               Navigator.pop(context);
                             },
                             child: Text(
@@ -10469,29 +11112,70 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         children: [
                           GestureDetector(
                             onTap: () {
-                              _showCurrencyPickerSheet(selectedCurrencyCode, (symbol, code) {
+                              _showCurrencyPickerSheet(selectedCurrencyCode, (
+                                symbol,
+                                code,
+                              ) {
                                 setModalState(() {
+                                  if (selectedCurrencyCode != code) {
+                                    final num currentAmt =
+                                        num.tryParse(
+                                          budgetController.text.trim(),
+                                        ) ??
+                                        0;
+                                    if (currentAmt > 0) {
+                                      final double oldRate =
+                                          _currencyRates[selectedCurrencyCode] ??
+                                          1.0;
+                                      final double newRate =
+                                          _currencyRates[code] ?? 1.0;
+                                      final double amountInVnd =
+                                          currentAmt * oldRate;
+                                      final double newAmount =
+                                          amountInVnd / newRate;
+                                      final int roundedNewAmount = newAmount
+                                          .round();
+                                      budgetController.text = roundedNewAmount
+                                          .toString();
+                                      currentBudgetStr = roundedNewAmount
+                                          .toString();
+                                    }
+                                  }
                                   selectedCurrencySymbol = symbol;
                                   selectedCurrencyCode = code;
                                 });
                               });
                             },
-                            child: Row(
-                              children: [
-                                Text(
-                                  selectedCurrencySymbol,
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppTheme.darkText,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '$selectedCurrencySymbol $selectedCurrencyCode',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.darkText,
+                                    ),
                                   ),
-                                ),
-                                const Icon(Icons.arrow_drop_down, color: Colors.grey),
-                              ],
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.arrow_drop_down,
+                                    color: Colors.grey,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           SizedBox(
-                            width: 200,
+                            width: 180,
                             child: TextField(
                               controller: budgetController,
                               keyboardType: TextInputType.number,
@@ -10527,7 +11211,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  Map<String, dynamic> _calculateGroupDebtBalances(List<Map<String, dynamic>> membersList) {
+  Map<String, dynamic> _calculateGroupDebtBalances(
+    List<Map<String, dynamic>> membersList,
+  ) {
     final currentUser = AuthService().currentUser.value;
     final String currentUserIdStr = (currentUser?.id ?? '').toString();
     final String currentUserName = currentUser?.fullName.trim() ?? 'Bạn';
@@ -10537,8 +11223,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       allMembers = membersList;
     } else {
       final ownerObj = _itineraryData['user'] as Map<String, dynamic>?;
-      final ownerName = (ownerObj?['fullName'] ?? ownerObj?['name'] ?? currentUserName).toString().trim();
-      final ownerAvatar = ownerObj?['avatarUrl'] ?? ownerObj?['avatar'] ?? currentUser?.avatar;
+      final ownerName =
+          (ownerObj?['fullName'] ?? ownerObj?['name'] ?? currentUserName)
+              .toString()
+              .trim();
+      final ownerAvatar =
+          ownerObj?['avatarUrl'] ?? ownerObj?['avatar'] ?? currentUser?.avatar;
       allMembers = [
         {
           'id': currentUserIdStr.isNotEmpty ? currentUserIdStr : '1',
@@ -10547,22 +11237,41 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           'fullName': ownerName,
           'avatarUrl': ownerAvatar,
           'role': 'OWNER',
-        }
+        },
       ];
     }
 
     Map<String, Map<String, dynamic>> memberMap = {};
     for (var m in allMembers) {
       final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
-      final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
-      final String rawName = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? 'Thành viên').toString().trim();
-      final bool isOwner = m['role'] == 'OWNER' ||
-          (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
+      final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '')
+          .toString();
+      final String rawName =
+          (userObj['fullName'] ??
+                  userObj['name'] ??
+                  userObj['username'] ??
+                  m['fullName'] ??
+                  m['name'] ??
+                  'Thành viên')
+              .toString()
+              .trim();
+      final bool isOwner =
+          m['role'] == 'OWNER' ||
+          (m['userId'] != null &&
+              _itineraryData['userId'] != null &&
+              m['userId'].toString() == _itineraryData['userId'].toString());
       final String displayName = isOwner ? 'Bạn ($rawName)' : rawName;
 
-      final String? rawAvatar = userObj['avatarUrl'] ?? userObj['avatar'] ?? m['avatarUrl'] ?? m['avatar'] ?? (isOwner ? currentUser?.avatar : null);
+      final String? rawAvatar =
+          userObj['avatarUrl'] ??
+          userObj['avatar'] ??
+          m['avatarUrl'] ??
+          m['avatar'] ??
+          (isOwner ? currentUser?.avatar : null);
       String? avatarUrl;
-      if (rawAvatar != null && rawAvatar.toString().trim().isNotEmpty && !rawAvatar.toString().contains('default-avatar')) {
+      if (rawAvatar != null &&
+          rawAvatar.toString().trim().isNotEmpty &&
+          !rawAvatar.toString().contains('default-avatar')) {
         final str = rawAvatar.toString().trim();
         if (str.startsWith('http')) {
           avatarUrl = str;
@@ -10592,8 +11301,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final int memberCount = uniqueMembers.length;
 
     for (var exp in _customExpenses) {
+      final String currCode = (exp['currencyCode'] ?? exp['currency'] ?? 'VND')
+          .toString()
+          .toUpperCase();
+      final double rate = _currencyRates[currCode] ?? 1.0;
       final num amtNum = (exp['amount'] as num?) ?? 0;
-      final int amount = amtNum.toInt();
+      final int amount = (amtNum.toDouble() * rate).round();
       if (amount <= 0) continue;
 
       final String payerStr = (exp['payer'] ?? '').toString().trim();
@@ -10601,7 +11314,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
       Map<String, dynamic>? payerMember;
       for (var mEntry in uniqueMembers) {
-        if (payerStr == mEntry['displayName'] || payerStr == mEntry['name'] || (mEntry['name'].isNotEmpty && payerStr.contains(mEntry['name']))) {
+        if (payerStr == mEntry['displayName'] ||
+            payerStr == mEntry['name'] ||
+            (mEntry['name'].isNotEmpty && payerStr.contains(mEntry['name']))) {
           payerMember = mEntry;
           break;
         }
@@ -10613,7 +11328,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         payerMember['totalShare'] = (payerMember['totalShare'] as num) + amount;
       } else if (shareStr.startsWith('Cá nhân')) {
         final List<String> targetIds = shareStr.contains(':')
-            ? shareStr.split(':')[1].split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
+            ? shareStr
+                  .split(':')[1]
+                  .split(',')
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList()
             : [];
         List<Map<String, dynamic>> targetMembers = [];
         if (targetIds.isNotEmpty) {
@@ -10621,7 +11341,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             final String uId = (mEntry['id'] ?? '').toString();
             final String uName = (mEntry['name'] ?? '').toString();
             final String uDisplay = (mEntry['displayName'] ?? '').toString();
-            if (targetIds.contains(uId) || targetIds.contains(uName) || targetIds.contains(uDisplay)) {
+            if (targetIds.contains(uId) ||
+                targetIds.contains(uName) ||
+                targetIds.contains(uDisplay)) {
               targetMembers.add(mEntry);
             }
           }
@@ -10634,7 +11356,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           mEntry['totalShare'] = (mEntry['totalShare'] as num) + perPersonShare;
         }
       } else {
-        final double perPersonShare = memberCount > 0 ? (amount / memberCount) : amount.toDouble();
+        final double perPersonShare = memberCount > 0
+            ? (amount / memberCount)
+            : amount.toDouble();
         for (var mEntry in uniqueMembers) {
           mEntry['totalShare'] = (mEntry['totalShare'] as num) + perPersonShare;
         }
@@ -10652,11 +11376,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         final String mName = m['name'].toString();
         final String mDisplay = m['displayName'].toString();
 
-        if (stFrom == mDisplay || stFrom == mName || (mName.isNotEmpty && stFrom.contains(mName))) {
-          settlementPaidAdjustment[mDisplay] = (settlementPaidAdjustment[mDisplay] ?? 0.0) + stAmt;
+        if (stFrom == mDisplay ||
+            stFrom == mName ||
+            (mName.isNotEmpty && stFrom.contains(mName))) {
+          settlementPaidAdjustment[mDisplay] =
+              (settlementPaidAdjustment[mDisplay] ?? 0.0) + stAmt;
         }
-        if (stTo == mDisplay || stTo == mName || (mName.isNotEmpty && stTo.contains(mName))) {
-          settlementPaidAdjustment[mDisplay] = (settlementPaidAdjustment[mDisplay] ?? 0.0) - stAmt;
+        if (stTo == mDisplay ||
+            stTo == mName ||
+            (mName.isNotEmpty && stTo.contains(mName))) {
+          settlementPaidAdjustment[mDisplay] =
+              (settlementPaidAdjustment[mDisplay] ?? 0.0) - stAmt;
         }
       }
     }
@@ -10667,6 +11397,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       final double paid = (m['totalPaid'] as num).toDouble() + adj;
       final double share = (m['totalShare'] as num).toDouble();
       m['netBalance'] = (paid - share).round();
+    }
+
+    int totalNetSum = 0;
+    for (var m in uniqueMembers) {
+      totalNetSum += (m['netBalance'] as int);
+    }
+    if (totalNetSum != 0 && uniqueMembers.isNotEmpty) {
+      var maxMember = uniqueMembers.first;
+      for (var m in uniqueMembers) {
+        if ((m['netBalance'] as int).abs() >
+            (maxMember['netBalance'] as int).abs()) {
+          maxMember = m;
+        }
+      }
+      maxMember['netBalance'] = (maxMember['netBalance'] as int) - totalNetSum;
     }
 
     List<Map<String, dynamic>> debtors = [];
@@ -10722,11 +11467,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         }
       }
 
-      if (remainingAmount > 0) {
-        activeDebts.add({
-          ...debt,
-          'amount': remainingAmount,
-        });
+      if (remainingAmount > 1) {
+        activeDebts.add({...debt, 'amount': remainingAmount});
       }
     }
 
@@ -10734,7 +11476,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     for (var m in uniqueMembers) {
       totalGroupPaid += (m['totalPaid'] as int);
     }
-    int averageShare = memberCount > 0 ? (totalGroupPaid ~/ memberCount) : 0;
+    num averageShare = memberCount > 0 ? (totalGroupPaid / memberCount) : 0;
 
     return {
       'members': uniqueMembers,
@@ -10751,12 +11493,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     Map<String, dynamic>? prefilledDebt,
   }) {
     final calcResult = _calculateGroupDebtBalances(membersList);
-    final List<Map<String, dynamic>> activeDebts = List<Map<String, dynamic>>.from(calcResult['debts'] ?? []);
+    final List<Map<String, dynamic>> activeDebts =
+        List<Map<String, dynamic>>.from(calcResult['debts'] ?? []);
 
     if (activeDebts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Tất cả các khoản nợ trong nhóm đã được thanh toán xong!'),
+          content: Text(
+            'Tất cả các khoản nợ trong nhóm đã được thanh toán xong!',
+          ),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
         ),
@@ -10764,13 +11509,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       return;
     }
 
-    final int totalAllDebts = activeDebts.fold<int>(0, (sum, d) => sum + ((d['amount'] as num?)?.toInt() ?? 0));
+    final int totalAllDebts = activeDebts.fold<int>(
+      0,
+      (sum, d) => sum + ((d['amount'] as num?)?.toInt() ?? 0),
+    );
 
     int selectedDebtIndex = -1;
     if (prefilledDebt != null) {
       final fromId = prefilledDebt['from']['id'];
       final toId = prefilledDebt['to']['id'];
-      final matchIdx = activeDebts.indexWhere((d) => d['from']['id'] == fromId && d['to']['id'] == toId);
+      final matchIdx = activeDebts.indexWhere(
+        (d) => d['from']['id'] == fromId && d['to']['id'] == toId,
+      );
       if (matchIdx >= 0) selectedDebtIndex = matchIdx;
     } else if (activeDebts.length == 1) {
       selectedDebtIndex = 0;
@@ -10793,9 +11543,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         return StatefulBuilder(
           builder: (context, setModalState) {
             final isAllSelected = selectedDebtIndex == -1;
-            final activeDebt = !isAllSelected ? activeDebts[selectedDebtIndex] : null;
-            final fromMember = activeDebt != null ? (activeDebt['from'] as Map<String, dynamic>) : null;
-            final toMember = activeDebt != null ? (activeDebt['to'] as Map<String, dynamic>) : null;
+            final activeDebt = !isAllSelected
+                ? activeDebts[selectedDebtIndex]
+                : null;
+            final fromMember = activeDebt != null
+                ? (activeDebt['from'] as Map<String, dynamic>)
+                : null;
+            final toMember = activeDebt != null
+                ? (activeDebt['to'] as Map<String, dynamic>)
+                : null;
 
             return Padding(
               padding: EdgeInsets.only(
@@ -10818,7 +11574,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       const SizedBox(height: 16),
                       Text(
                         'Xác nhận thanh toán',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
                       ),
                       const SizedBox(height: 16),
 
@@ -10827,7 +11587,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           alignment: Alignment.centerLeft,
                           child: Text(
                             'Chọn giao dịch cần thanh toán:',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -10838,13 +11602,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               Padding(
                                 padding: const EdgeInsets.only(right: 8),
                                 child: ChoiceChip(
-                                  label: Text('Tất cả (${_formatExpenseAmount(totalAllDebts)})'),
+                                  label: Text(
+                                    'Tất cả (${_formatExpenseAmount(totalAllDebts)})',
+                                  ),
                                   selected: isAllSelected,
                                   selectedColor: AppTheme.primary,
                                   backgroundColor: const Color(0xFFF1F5F9),
                                   side: BorderSide.none,
                                   labelStyle: TextStyle(
-                                    color: isAllSelected ? Colors.white : AppTheme.darkText,
+                                    color: isAllSelected
+                                        ? Colors.white
+                                        : AppTheme.darkText,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
                                   ),
@@ -10852,7 +11620,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     if (sel) {
                                       setModalState(() {
                                         selectedDebtIndex = -1;
-                                        amountController.text = totalAllDebts.toString();
+                                        amountController.text = totalAllDebts
+                                            .toString();
                                       });
                                     }
                                   },
@@ -10867,13 +11636,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 8),
                                   child: ChoiceChip(
-                                    label: Text('${f['displayName']} ➔ ${t['displayName']} (${_formatExpenseAmount(d['amount'])})'),
+                                    label: Text(
+                                      '${f['displayName']} ➔ ${t['displayName']} (${_formatExpenseAmount(d['amount'])})',
+                                    ),
                                     selected: isSel,
                                     selectedColor: AppTheme.primary,
                                     backgroundColor: const Color(0xFFF1F5F9),
                                     side: BorderSide.none,
                                     labelStyle: TextStyle(
-                                      color: isSel ? Colors.white : AppTheme.darkText,
+                                      color: isSel
+                                          ? Colors.white
+                                          : AppTheme.darkText,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),
@@ -10881,7 +11654,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       if (sel) {
                                         setModalState(() {
                                           selectedDebtIndex = idx;
-                                          amountController.text = (d['amount'] as int).toString();
+                                          amountController.text =
+                                              (d['amount'] as int).toString();
                                         });
                                       }
                                     },
@@ -10904,11 +11678,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.checklist_rtl_rounded, color: AppTheme.primary, size: 24),
+                              const Icon(
+                                Icons.checklist_rtl_rounded,
+                                color: AppTheme.primary,
+                                size: 24,
+                              ),
                               const SizedBox(width: 10),
                               Text(
                                 'Thanh toán tất cả ${activeDebts.length} giao dịch nợ',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: AppTheme.darkText,
+                                ),
                               ),
                             ],
                           ),
@@ -10927,35 +11709,89 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 children: [
                                   CircleAvatar(
                                     backgroundColor: AppTheme.primary,
-                                    foregroundImage: (fromMember['avatarUrl'] != null && fromMember['avatarUrl'].toString().isNotEmpty)
-                                        ? NetworkImage(fromMember['avatarUrl'].toString())
+                                    foregroundImage:
+                                        (fromMember['avatarUrl'] != null &&
+                                            fromMember['avatarUrl']
+                                                .toString()
+                                                .isNotEmpty)
+                                        ? NetworkImage(
+                                            fromMember['avatarUrl'].toString(),
+                                          )
                                         : null,
                                     child: Text(
-                                      fromMember['name'].toString().isNotEmpty ? fromMember['name'].toString()[0].toUpperCase() : '?',
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      fromMember['name'].toString().isNotEmpty
+                                          ? fromMember['name']
+                                                .toString()[0]
+                                                .toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  Text(fromMember['displayName'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                  const Text('Người trả', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  Text(
+                                    fromMember['displayName'].toString(),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Người trả',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                                 ],
                               ),
-                              const Icon(Icons.arrow_forward_rounded, color: AppTheme.primary, size: 24),
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                color: AppTheme.primary,
+                                size: 24,
+                              ),
                               Column(
                                 children: [
                                   CircleAvatar(
                                     backgroundColor: Colors.green,
-                                    foregroundImage: (toMember['avatarUrl'] != null && toMember['avatarUrl'].toString().isNotEmpty)
-                                        ? NetworkImage(toMember['avatarUrl'].toString())
+                                    foregroundImage:
+                                        (toMember['avatarUrl'] != null &&
+                                            toMember['avatarUrl']
+                                                .toString()
+                                                .isNotEmpty)
+                                        ? NetworkImage(
+                                            toMember['avatarUrl'].toString(),
+                                          )
                                         : null,
                                     child: Text(
-                                      toMember['name'].toString().isNotEmpty ? toMember['name'].toString()[0].toUpperCase() : '?',
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      toMember['name'].toString().isNotEmpty
+                                          ? toMember['name']
+                                                .toString()[0]
+                                                .toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  Text(toMember['displayName'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                  const Text('Người nhận', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  Text(
+                                    toMember['displayName'].toString(),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Người nhận',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -10969,8 +11805,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           labelText: 'Số tiền thanh toán (đ)',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          prefixIcon: const Icon(Icons.monetization_on_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.monetization_on_outlined,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -10980,15 +11820,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         height: 50,
                         child: ElevatedButton(
                           onPressed: () {
-                            final int parsedAmt = int.tryParse(amountController.text.trim()) ?? 0;
+                            final int parsedAmt =
+                                int.tryParse(amountController.text.trim()) ?? 0;
                             if (parsedAmt <= 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Vui lòng nhập số tiền thanh toán hợp lệ')),
+                                const SnackBar(
+                                  content: Text(
+                                    'Vui lòng nhập số tiền thanh toán hợp lệ',
+                                  ),
+                                ),
                               );
                               return;
                             }
 
-                            final int itineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+                            final int itineraryId =
+                                (_itineraryData['id'] as num?)?.toInt() ?? 0;
 
                             if (selectedDebtIndex == -1) {
                               for (int i = 0; i < activeDebts.length; i++) {
@@ -10997,7 +11843,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 final t = d['to'] as Map<String, dynamic>;
 
                                 final newSt = {
-                                  'id': '${DateTime.now().millisecondsSinceEpoch}_$i',
+                                  'id':
+                                      '${DateTime.now().millisecondsSinceEpoch}_$i',
                                   'fromName': f['displayName'].toString(),
                                   'fromUserId': f['id'].toString(),
                                   'toName': t['displayName'].toString(),
@@ -11012,14 +11859,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 });
 
                                 if (itineraryId > 0) {
-                                  DatabaseService().addSettlement(itineraryId, newSt).then((res) {
-                                    if (res != null && res['id'] != null) {
-                                      setState(() {
-                                        newSt['id'] = res['id'].toString();
+                                  DatabaseService()
+                                      .addSettlement(itineraryId, newSt)
+                                      .then((res) {
+                                        if (res != null && res['id'] != null) {
+                                          setState(() {
+                                            newSt['id'] = res['id'].toString();
+                                          });
+                                          _saveSettlementsToPrefs();
+                                        }
                                       });
-                                      _saveSettlementsToPrefs();
-                                    }
-                                  });
                                 }
                               }
                               _saveSettlementsToPrefs();
@@ -11029,7 +11878,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Đã thanh toán tất cả các khoản nợ nhóm (${_formatExpenseAmount(parsedAmt)})! 🎉'),
+                                  content: Text(
+                                    'Đã thanh toán tất cả các khoản nợ nhóm (${_formatExpenseAmount(parsedAmt)})! 🎉',
+                                  ),
                                   backgroundColor: Colors.green,
                                   duration: const Duration(seconds: 2),
                                 ),
@@ -11040,7 +11891,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               final t = d['to'] as Map<String, dynamic>;
 
                               final newSettlement = {
-                                'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                                'id': DateTime.now().millisecondsSinceEpoch
+                                    .toString(),
                                 'fromName': f['displayName'].toString(),
                                 'fromUserId': f['id'].toString(),
                                 'toName': t['displayName'].toString(),
@@ -11056,14 +11908,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               _saveSettlementsToPrefs();
 
                               if (itineraryId > 0) {
-                                DatabaseService().addSettlement(itineraryId, newSettlement).then((res) {
-                                  if (res != null && res['id'] != null) {
-                                    setState(() {
-                                      newSettlement['id'] = res['id'].toString();
+                                DatabaseService()
+                                    .addSettlement(itineraryId, newSettlement)
+                                    .then((res) {
+                                      if (res != null && res['id'] != null) {
+                                        setState(() {
+                                          newSettlement['id'] = res['id']
+                                              .toString();
+                                        });
+                                        _saveSettlementsToPrefs();
+                                      }
                                     });
-                                    _saveSettlementsToPrefs();
-                                  }
-                                });
                               }
 
                               Navigator.pop(context);
@@ -11071,7 +11926,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Đã ghi nhận thanh toán ${_formatExpenseAmount(parsedAmt)} cho ${t['displayName']}!'),
+                                  content: Text(
+                                    'Đã ghi nhận thanh toán ${_formatExpenseAmount(parsedAmt)} cho ${t['displayName']}!',
+                                  ),
                                   backgroundColor: Colors.green,
                                   duration: const Duration(seconds: 2),
                                 ),
@@ -11080,9 +11937,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFFA5438),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
                           ),
-                          child: const Text('Xác nhận thanh toán', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            'Xác nhận thanh toán',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -11097,8 +11963,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showTransactionHistorySheet() {
-    int activeFilter = 0; // 0: Tất cả, 1: Chi phí, 2: Thanh toán
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -11109,44 +11973,30 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            List<Map<String, dynamic>> historyItems = [];
+            final List<Map<String, dynamic>> historyItems =
+                _settlements
+                    .map(
+                      (st) => {
+                        'type': 'SETTLEMENT',
+                        'title': 'Thanh toán nhóm',
+                        'amount': (st['amount'] as num?)?.toInt() ?? 0,
+                        'fromName': st['fromName'] ?? 'Thành viên',
+                        'toName': st['toName'] ?? 'Thành viên',
+                        'date': st['date'] != null
+                            ? DateTime.tryParse(st['date'])
+                            : null,
+                        'isReverted': st['isReverted'] == true,
+                        'raw': st,
+                      },
+                    )
+                    .toList()
+                  ..sort((a, b) {
+                    final dA = a['date'] as DateTime? ?? DateTime(1970);
+                    final dB = b['date'] as DateTime? ?? DateTime(1970);
+                    return dB.compareTo(dA);
+                  });
 
-            for (var exp in _customExpenses) {
-              historyItems.add({
-                'type': 'EXPENSE',
-                'title': exp['title'] ?? exp['category'] ?? 'Chi phí',
-                'amount': (exp['amount'] as num?)?.toInt() ?? 0,
-                'payer': exp['payer'] ?? 'Bạn',
-                'category': exp['category'] ?? 'Khác',
-                'date': exp['date'] != null ? DateTime.tryParse(exp['date']) : null,
-                'raw': exp,
-              });
-            }
-
-            for (var st in _settlements) {
-              historyItems.add({
-                'type': 'SETTLEMENT',
-                'title': 'Thanh toán nhóm',
-                'amount': (st['amount'] as num?)?.toInt() ?? 0,
-                'fromName': st['fromName'] ?? 'Thành viên',
-                'toName': st['toName'] ?? 'Thành viên',
-                'date': st['date'] != null ? DateTime.tryParse(st['date']) : null,
-                'isReverted': st['isReverted'] == true,
-                'raw': st,
-              });
-            }
-
-            historyItems.sort((a, b) {
-              final dA = a['date'] as DateTime? ?? DateTime(1970);
-              final dB = b['date'] as DateTime? ?? DateTime(1970);
-              return dB.compareTo(dA);
-            });
-
-            final filteredItems = historyItems.where((item) {
-              if (activeFilter == 1) return item['type'] == 'EXPENSE';
-              if (activeFilter == 2) return item['type'] == 'SETTLEMENT';
-              return true;
-            }).toList();
+            final filteredItems = historyItems;
 
             return SafeArea(
               child: SizedBox(
@@ -11154,15 +12004,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: const BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Color(0xFFF1F5F9),
+                            width: 1,
+                          ),
+                        ),
                       ),
                       child: Row(
                         children: [
                           GestureDetector(
                             onTap: () => Navigator.pop(context),
-                            child: Icon(Icons.arrow_back, color: AppTheme.darkText, size: 22),
+                            child: Icon(
+                              Icons.arrow_back,
+                              color: AppTheme.darkText,
+                              size: 22,
+                            ),
                           ),
                           Expanded(
                             child: Center(
@@ -11181,59 +12043,54 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       ),
                     ),
 
-                    const SizedBox(height: 12),
-
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        height: 40,
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            _buildFilterTab(setModalState, 'Tất cả', 0, activeFilter),
-                            _buildFilterTab(setModalState, 'Chi phí', 1, activeFilter),
-                            _buildFilterTab(setModalState, 'Thanh toán', 2, activeFilter),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
 
                     Expanded(
                       child: filteredItems.isEmpty
                           ? Center(
                               child: Text(
                                 'Chưa có giao dịch nào',
-                                style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 14,
+                                ),
                               ),
                             )
                           : ListView.separated(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
                               itemCount: filteredItems.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                              separatorBuilder: (_, __) => const Divider(
+                                height: 1,
+                                color: Color(0xFFF1F5F9),
+                              ),
                               itemBuilder: (context, idx) {
                                 final item = filteredItems[idx];
-                                final isSettlement = item['type'] == 'SETTLEMENT';
-                                final DateTime? date = item['date'] as DateTime?;
+                                final isSettlement =
+                                    item['type'] == 'SETTLEMENT';
+                                final DateTime? date =
+                                    item['date'] as DateTime?;
                                 final String dateStr = date != null
                                     ? '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}'
                                     : '';
 
                                 if (isSettlement) {
-                                  final rawSt = item['raw'] as Map<String, dynamic>;
+                                  final rawSt =
+                                      item['raw'] as Map<String, dynamic>;
 
                                   return Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                    ),
                                     child: Row(
                                       children: [
                                         CircleAvatar(
                                           radius: 20,
-                                          backgroundColor: const Color(0xFFDCFCE7),
+                                          backgroundColor: const Color(
+                                            0xFFDCFCE7,
+                                          ),
                                           child: Icon(
                                             Icons.check_circle_rounded,
                                             color: Colors.green[700],
@@ -11243,32 +12100,50 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Row(
                                                 children: [
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
                                                     decoration: BoxDecoration(
-                                                      color: const Color(0xFFDCFCE7),
-                                                      borderRadius: BorderRadius.circular(4),
+                                                      color: const Color(
+                                                        0xFFDCFCE7,
+                                                      ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
                                                     ),
                                                     child: Text(
                                                       'Thanh toán',
                                                       style: TextStyle(
                                                         fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: Colors.green[800],
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            Colors.green[800],
                                                       ),
                                                     ),
                                                   ),
                                                   const SizedBox(width: 6),
-                                                  Text(dateStr, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                  Text(
+                                                    dateStr,
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
                                                 ],
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                '${item['fromName']} đã trả ${_formatExpenseAmount(item['amount'] as num)} cho ${item['toName']}',
+                                                '${item['fromName']} đã trả ${_formatExpenseAmount(item['amount'] as num, currencySymbol: item['raw']?['currencySymbol']?.toString(), currencyCode: item['raw']?['currencyCode']?.toString())} cho ${item['toName']}',
                                                 style: TextStyle(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.w600,
@@ -11282,33 +12157,55 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           onPressed: () {
                                             final stId = rawSt['id'];
                                             setModalState(() {
-                                              _settlements.removeWhere((st) => st['id'] == stId);
+                                              _settlements.removeWhere(
+                                                (st) => st['id'] == stId,
+                                              );
                                             });
                                             setState(() {
-                                              _settlements.removeWhere((st) => st['id'] == stId);
+                                              _settlements.removeWhere(
+                                                (st) => st['id'] == stId,
+                                              );
                                             });
                                             _saveSettlementsToPrefs();
                                             if (stId != null) {
-                                              DatabaseService().deleteSettlement(stId);
+                                              DatabaseService()
+                                                  .deleteSettlement(stId);
                                             }
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               const SnackBar(
-                                                content: Text('Đã hoàn tác và xóa giao dịch thanh toán!'),
+                                                content: Text(
+                                                  'Đã hoàn tác và xóa giao dịch thanh toán!',
+                                                ),
                                                 backgroundColor: Colors.orange,
                                                 duration: Duration(seconds: 2),
                                               ),
                                             );
                                           },
                                           style: OutlinedButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                            side: const BorderSide(color: Color(0xFFFA5438)),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            side: const BorderSide(
+                                              color: Color(0xFFFA5438),
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
                                             minimumSize: Size.zero,
-                                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            tapTargetSize: MaterialTapTargetSize
+                                                .shrinkWrap,
                                           ),
                                           child: const Text(
                                             'Hoàn tác',
-                                            style: TextStyle(color: Color(0xFFFA5438), fontSize: 12, fontWeight: FontWeight.bold),
+                                            style: TextStyle(
+                                              color: Color(0xFFFA5438),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -11317,34 +12214,56 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 }
 
                                 return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 10,
+                                  ),
                                   child: Row(
                                     children: [
                                       CircleAvatar(
                                         radius: 20,
-                                        backgroundColor: const Color(0xFFEFF6FF),
-                                        child: Icon(Icons.receipt_long_rounded, color: AppTheme.primary, size: 20),
+                                        backgroundColor: const Color(
+                                          0xFFEFF6FF,
+                                        ),
+                                        child: Icon(
+                                          Icons.receipt_long_rounded,
+                                          color: AppTheme.primary,
+                                          size: 20,
+                                        ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               item['title'].toString(),
-                                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.darkText,
+                                              ),
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
                                               'Người chi: ${item['payer']} • $dateStr',
-                                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey,
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ),
                                       Text(
-                                        _formatExpenseAmount(item['amount'] as num),
-                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.darkText),
+                                        _formatExpenseAmount(
+                                          item['amount'] as num,
+                                        ),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppTheme.darkText,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -11362,7 +12281,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  Widget _buildFilterTab(StateSetter setModalState, String title, int index, int currentIndex) {
+  Widget _buildFilterTab(
+    StateSetter setModalState,
+    String title,
+    int index,
+    int currentIndex,
+  ) {
     final isSelected = index == currentIndex;
     return Expanded(
       child: GestureDetector(
@@ -11397,8 +12321,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showGroupBalanceSheet() {
-    String selectedCurrencySymbol = 'đ';
-    String selectedCurrencyCode = 'VND';
+    String selectedCurrencySymbol =
+        _itineraryData['currencySymbol']?.toString() ?? 'đ';
+    String selectedCurrencyCode =
+        _itineraryData['currencyCode']?.toString() ?? 'VND';
     int activeTab = 0; // 0: Tóm tắt của bạn, 1: Tổng quan nhóm
 
     List<Map<String, dynamic>> membersList = [];
@@ -11414,32 +12340,47 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+            final int currentItineraryId =
+                (_itineraryData['id'] as num?)?.toInt() ?? 0;
 
             if (!fetchedMembers && currentItineraryId > 0) {
               fetchedMembers = true;
-              DatabaseService().getItineraryMembers(currentItineraryId).then((data) {
-                if (context.mounted && data != null && data['members'] is List) {
+              DatabaseService().getItineraryMembers(currentItineraryId).then((
+                data,
+              ) {
+                if (context.mounted &&
+                    data != null &&
+                    data['members'] is List) {
                   setModalState(() {
-                    membersList = List<Map<String, dynamic>>.from(data['members']);
+                    membersList = List<Map<String, dynamic>>.from(
+                      data['members'],
+                    );
                   });
                 }
               });
             }
 
             final calcResult = _calculateGroupDebtBalances(membersList);
-            final List<Map<String, dynamic>> members = List<Map<String, dynamic>>.from(calcResult['members'] ?? []);
-            final List<Map<String, dynamic>> activeDebts = List<Map<String, dynamic>>.from(calcResult['debts'] ?? []);
-            final int totalGroupPaid = (calcResult['totalGroupPaid'] as int?) ?? 0;
-            final int averageShare = (calcResult['averageShare'] as int?) ?? 0;
+            final List<Map<String, dynamic>> members =
+                List<Map<String, dynamic>>.from(calcResult['members'] ?? []);
+            final List<Map<String, dynamic>> activeDebts =
+                List<Map<String, dynamic>>.from(calcResult['debts'] ?? []);
+            final int totalGroupPaid =
+                (calcResult['totalGroupPaid'] as int?) ?? 0;
+            final num averageShare = (calcResult['averageShare'] as num?) ?? 0;
 
             final currentUser = AuthService().currentUser.value;
             final currentUserName = currentUser?.fullName.trim() ?? 'Bạn';
             final String curId = (currentUser?.id ?? '').toString().trim();
 
             final myMember = members.firstWhere(
-              (m) => m['isOwner'] == true || (curId.isNotEmpty && (m['id'].toString() == curId || m['userId'].toString() == curId)),
-              orElse: () => members.isNotEmpty ? members.first : <String, dynamic>{},
+              (m) =>
+                  m['isOwner'] == true ||
+                  (curId.isNotEmpty &&
+                      (m['id'].toString() == curId ||
+                          m['userId'].toString() == curId)),
+              orElse: () =>
+                  members.isNotEmpty ? members.first : <String, dynamic>{},
             );
             final int myPaid = (myMember['totalPaid'] as int?) ?? 0;
             final int myNet = (myMember['netBalance'] as int?) ?? 0;
@@ -11450,17 +12391,39 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             for (var d in activeDebts) {
               final f = d['from'] as Map<String, dynamic>;
               final t = d['to'] as Map<String, dynamic>;
-              final bool isFromMe = f['isOwner'] == true ||
-                  (curId.isNotEmpty && (f['id'].toString() == curId || f['userId'].toString() == curId)) ||
+              final bool isFromMe =
+                  f['isOwner'] == true ||
+                  (curId.isNotEmpty &&
+                      (f['id'].toString() == curId ||
+                          f['userId'].toString() == curId)) ||
                   f['displayName'].toString().contains(currentUserName) ||
-                  (f['name'] != null && f['name'].toString().isNotEmpty && currentUserName.contains(f['name'].toString()));
-              final bool isToMe = t['isOwner'] == true ||
-                  (curId.isNotEmpty && (t['id'].toString() == curId || t['userId'].toString() == curId)) ||
+                  (f['name'] != null &&
+                      f['name'].toString().isNotEmpty &&
+                      currentUserName.contains(f['name'].toString()));
+              final bool isToMe =
+                  t['isOwner'] == true ||
+                  (curId.isNotEmpty &&
+                      (t['id'].toString() == curId ||
+                          t['userId'].toString() == curId)) ||
                   t['displayName'].toString().contains(currentUserName) ||
-                  (t['name'] != null && t['name'].toString().isNotEmpty && currentUserName.contains(t['name'].toString()));
+                  (t['name'] != null &&
+                      t['name'].toString().isNotEmpty &&
+                      currentUserName.contains(t['name'].toString()));
 
               if (isFromMe) myDebtsIOwe.add(d);
               if (isToMe) myDebtsOwedToMe.add(d);
+            }
+
+            String formatVal(num amountVND) {
+              final double rate = _currencyRates[selectedCurrencyCode] ?? 1.0;
+              final double converted = rate > 0
+                  ? (amountVND / rate)
+                  : amountVND.toDouble();
+              return _formatExpenseAmount(
+                converted,
+                currencySymbol: selectedCurrencySymbol,
+                currencyCode: selectedCurrencyCode,
+              );
             }
 
             return SafeArea(
@@ -11469,15 +12432,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       decoration: const BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Color(0xFFF1F5F9),
+                            width: 1,
+                          ),
+                        ),
                       ),
                       child: Row(
                         children: [
                           GestureDetector(
                             onTap: () => Navigator.pop(context),
-                            child: Icon(Icons.arrow_back, color: AppTheme.darkText, size: 22),
+                            child: Icon(
+                              Icons.arrow_back,
+                              color: AppTheme.darkText,
+                              size: 22,
+                            ),
                           ),
                           Expanded(
                             child: Center(
@@ -11496,7 +12471,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               Navigator.pop(context);
                               _showShareDialog();
                             },
-                            child: Icon(Icons.person_add_outlined, color: AppTheme.darkText, size: 22),
+                            child: Icon(
+                              Icons.person_add_outlined,
+                              color: AppTheme.darkText,
+                              size: 22,
+                            ),
                           ),
                         ],
                       ),
@@ -11520,12 +12499,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 onTap: () => setModalState(() => activeTab = 0),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: activeTab == 0 ? Colors.white : Colors.transparent,
+                                    color: activeTab == 0
+                                        ? Colors.white
+                                        : Colors.transparent,
                                     borderRadius: BorderRadius.circular(9),
                                     boxShadow: activeTab == 0
                                         ? [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.05),
+                                              color: Colors.black.withValues(
+                                                alpha: 0.05,
+                                              ),
                                               blurRadius: 4,
                                               offset: const Offset(0, 2),
                                             ),
@@ -11537,8 +12520,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       'Tóm tắt của bạn',
                                       style: TextStyle(
                                         fontSize: 14,
-                                        fontWeight: activeTab == 0 ? FontWeight.bold : FontWeight.w500,
-                                        color: activeTab == 0 ? AppTheme.darkText : Colors.grey[600],
+                                        fontWeight: activeTab == 0
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        color: activeTab == 0
+                                            ? AppTheme.darkText
+                                            : Colors.grey[600],
                                       ),
                                     ),
                                   ),
@@ -11550,12 +12537,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 onTap: () => setModalState(() => activeTab = 1),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: activeTab == 1 ? Colors.white : Colors.transparent,
+                                    color: activeTab == 1
+                                        ? Colors.white
+                                        : Colors.transparent,
                                     borderRadius: BorderRadius.circular(9),
                                     boxShadow: activeTab == 1
                                         ? [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.05),
+                                              color: Colors.black.withValues(
+                                                alpha: 0.05,
+                                              ),
                                               blurRadius: 4,
                                               offset: const Offset(0, 2),
                                             ),
@@ -11567,8 +12558,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       'Tổng quan nhóm',
                                       style: TextStyle(
                                         fontSize: 14,
-                                        fontWeight: activeTab == 1 ? FontWeight.bold : FontWeight.w500,
-                                        color: activeTab == 1 ? AppTheme.darkText : Colors.grey[600],
+                                        fontWeight: activeTab == 1
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        color: activeTab == 1
+                                            ? AppTheme.darkText
+                                            : Colors.grey[600],
                                       ),
                                     ),
                                   ),
@@ -11598,28 +12593,61 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text('Tổng tiền bạn đã chi:', style: TextStyle(fontSize: 13, color: Colors.grey[700])),
-                                            Text(_formatExpenseAmount(myPaid), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                            Text(
+                                              'Tổng tiền bạn đã chi:',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey[700],
+                                              ),
+                                            ),
+                                            Text(
+                                              formatVal(myPaid),
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                         const SizedBox(height: 6),
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text('Trạng thái số dư:', style: TextStyle(fontSize: 13, color: Colors.grey[700])),
                                             Text(
-                                              myNet > 0
-                                                  ? 'Được nhận lại ${_formatExpenseAmount(myNet)}'
-                                                  : (myNet < 0 ? 'Nợ nhóm ${_formatExpenseAmount(-myNet)}' : 'Đã cân bằng'),
+                                              'Trạng thái số dư:',
                                               style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: myNet > 0 ? Colors.green : (myNet < 0 ? const Color(0xFFFA5438) : Colors.grey[800]),
+                                                fontSize: 13,
+                                                color: Colors.grey[700],
+                                              ),
+                                            ),
+                                            Flexible(
+                                              child: Text(
+                                                myNet > 0
+                                                    ? 'Được nhận lại ${formatVal(myNet)}'
+                                                    : (myNet < 0
+                                                          ? 'Nợ nhóm ${formatVal(-myNet)}'
+                                                          : 'Đã cân bằng'),
+                                                textAlign: TextAlign.right,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: myNet > 0
+                                                      ? Colors.green
+                                                      : (myNet < 0
+                                                            ? const Color(
+                                                                0xFFFA5438,
+                                                              )
+                                                            : Colors.grey[800]),
+                                                ),
                                               ),
                                             ),
                                           ],
@@ -11628,10 +12656,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     ),
                                   ),
                                   const SizedBox(height: 16),
-                                  if (myDebtsIOwe.isEmpty && myDebtsOwedToMe.isEmpty) ...[
+                                  if (myDebtsIOwe.isEmpty &&
+                                      myDebtsOwedToMe.isEmpty) ...[
                                     Center(
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 24),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 24,
+                                        ),
                                         child: Text(
                                           'Bạn đã cân bằng chi phí.',
                                           style: TextStyle(
@@ -11644,45 +12675,104 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     ),
                                   ] else ...[
                                     if (myDebtsOwedToMe.isNotEmpty) ...[
-                                      Text('Các khoản người khác nợ bạn:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText)),
+                                      Text(
+                                        'Các khoản người khác nợ bạn:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: AppTheme.darkText,
+                                        ),
+                                      ),
                                       const SizedBox(height: 8),
                                       ...myDebtsOwedToMe.map((d) {
-                                        final f = d['from'] as Map<String, dynamic>;
-                                        final String? avatarUrl = f['avatarUrl'] as String?;
-                                        final String name = f['name'].toString();
+                                        final f =
+                                            d['from'] as Map<String, dynamic>;
+                                        final String? avatarUrl =
+                                            f['avatarUrl'] as String?;
+                                        final String name = f['name']
+                                            .toString();
 
                                         return Card(
-                                          margin: const EdgeInsets.only(bottom: 8),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          margin: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
                                           child: ListTile(
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 4,
+                                                ),
                                             leading: CircleAvatar(
                                               backgroundColor: Colors.green,
-                                              foregroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
+                                              foregroundImage:
+                                                  (avatarUrl != null &&
+                                                      avatarUrl.isNotEmpty)
+                                                  ? NetworkImage(avatarUrl)
+                                                  : null,
                                               child: Text(
-                                                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                                name.isNotEmpty
+                                                    ? name[0].toUpperCase()
+                                                    : '?',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
                                             ),
-                                            title: Text('${f['displayName']} nợ bạn', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                            title: Text(
+                                              '${f['displayName']} nợ bạn',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
                                             subtitle: Text(
-                                              _formatExpenseAmount(d['amount'] as num),
-                                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 14),
+                                              formatVal(d['amount'] as num),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.green,
+                                                fontSize: 14,
+                                              ),
                                             ),
                                             trailing: ElevatedButton(
                                               onPressed: () {
-                                                _showSettleUpDialog(membersList, () {
-                                                  setModalState(() {});
-                                                }, prefilledDebt: d);
+                                                _showSettleUpDialog(
+                                                  membersList,
+                                                  () {
+                                                    setModalState(() {});
+                                                  },
+                                                  prefilledDebt: d,
+                                                );
                                               },
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor: Colors.green,
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6,
+                                                    ),
                                                 minimumSize: Size.zero,
-                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
                                               ),
-                                              child: const Text('Thanh toán', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                              child: const Text(
+                                                'Thanh toán',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         );
@@ -11690,45 +12780,108 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       const SizedBox(height: 12),
                                     ],
                                     if (myDebtsIOwe.isNotEmpty) ...[
-                                      Text('Các khoản bạn nợ người khác:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText)),
+                                      Text(
+                                        'Các khoản bạn nợ người khác:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: AppTheme.darkText,
+                                        ),
+                                      ),
                                       const SizedBox(height: 8),
                                       ...myDebtsIOwe.map((d) {
-                                        final t = d['to'] as Map<String, dynamic>;
-                                        final String? avatarUrl = t['avatarUrl'] as String?;
-                                        final String name = t['name'].toString();
+                                        final t =
+                                            d['to'] as Map<String, dynamic>;
+                                        final String? avatarUrl =
+                                            t['avatarUrl'] as String?;
+                                        final String name = t['name']
+                                            .toString();
 
                                         return Card(
-                                          margin: const EdgeInsets.only(bottom: 8),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          margin: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
                                           child: ListTile(
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 4,
+                                                ),
                                             leading: CircleAvatar(
-                                              backgroundColor: const Color(0xFFFA5438),
-                                              foregroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
+                                              backgroundColor: const Color(
+                                                0xFFFA5438,
+                                              ),
+                                              foregroundImage:
+                                                  (avatarUrl != null &&
+                                                      avatarUrl.isNotEmpty)
+                                                  ? NetworkImage(avatarUrl)
+                                                  : null,
                                               child: Text(
-                                                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                                name.isNotEmpty
+                                                    ? name[0].toUpperCase()
+                                                    : '?',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
                                             ),
-                                            title: Text('Bạn nợ ${t['displayName']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                            title: Text(
+                                              'Bạn nợ ${t['displayName']}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
                                             subtitle: Text(
-                                              _formatExpenseAmount(d['amount'] as num),
-                                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFA5438), fontSize: 14),
+                                              formatVal(d['amount'] as num),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFFFA5438),
+                                                fontSize: 14,
+                                              ),
                                             ),
                                             trailing: ElevatedButton(
                                               onPressed: () {
-                                                _showSettleUpDialog(membersList, () {
-                                                  setModalState(() {});
-                                                }, prefilledDebt: d);
+                                                _showSettleUpDialog(
+                                                  membersList,
+                                                  () {
+                                                    setModalState(() {});
+                                                  },
+                                                  prefilledDebt: d,
+                                                );
                                               },
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFFFA5438),
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                backgroundColor: const Color(
+                                                  0xFFFA5438,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6,
+                                                    ),
                                                 minimumSize: Size.zero,
-                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
                                               ),
-                                              child: const Text('Thanh toán', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                              child: const Text(
+                                                'Thanh toán',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         );
@@ -11746,60 +12899,121 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFF8FAFC),
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      border: Border.all(
+                                        color: const Color(0xFFE2E8F0),
+                                      ),
                                     ),
                                     child: Column(
                                       children: [
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            const Text('Tổng chi cả nhóm:', style: TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500)),
-                                            Text(_formatExpenseAmount(totalGroupPaid), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.darkText)),
+                                            const Text(
+                                              'Tổng chi cả nhóm:',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            Text(
+                                              formatVal(totalGroupPaid),
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.darkText,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                         const SizedBox(height: 6),
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text('Bình quân (${members.length} người):', style: const TextStyle(fontSize: 13, color: Colors.grey, fontWeight: FontWeight.w500)),
-                                            Text('${_formatExpenseAmount(averageShare)} / người', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                                            Text(
+                                              'Bình quân (${members.length} người):',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${formatVal(averageShare)} / người',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.primary,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ],
                                     ),
                                   ),
                                   const SizedBox(height: 16),
-                                  Text('Số dư ròng từng thành viên:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText)),
+                                  Text(
+                                    'Số dư ròng từng thành viên:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: AppTheme.darkText,
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   ...members.map((m) {
                                     final String name = m['name'].toString();
-                                    final String displayName = m['displayName'].toString();
-                                    final String? avatarUrl = m['avatarUrl'] as String?;
+                                    final String displayName = m['displayName']
+                                        .toString();
+                                    final String? avatarUrl =
+                                        m['avatarUrl'] as String?;
                                     final int net = m['netBalance'] as int;
                                     final int paid = m['totalPaid'] as int;
 
                                     String statusText = 'Đã hòa tiền';
                                     Color statusColor = Colors.grey[700]!;
                                     if (net > 0) {
-                                      statusText = 'Được nhận ${_formatExpenseAmount(net)}';
+                                      statusText =
+                                          'Được nhận ${formatVal(net)}';
                                       statusColor = Colors.green;
                                     } else if (net < 0) {
-                                      statusText = 'Nợ ${_formatExpenseAmount(-net)}';
+                                      statusText = 'Nợ ${formatVal(-net)}';
                                       statusColor = const Color(0xFFFA5438);
                                     }
 
                                     return ListTile(
                                       contentPadding: EdgeInsets.zero,
                                       leading: CircleAvatar(
-                                        backgroundColor: Colors.primaries[name.hashCode.abs() % Colors.primaries.length],
-                                        foregroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) ? NetworkImage(avatarUrl) : null,
+                                        backgroundColor:
+                                            Colors.primaries[name.hashCode
+                                                    .abs() %
+                                                Colors.primaries.length],
+                                        foregroundImage:
+                                            (avatarUrl != null &&
+                                                avatarUrl.isNotEmpty)
+                                            ? NetworkImage(avatarUrl)
+                                            : null,
                                         child: Text(
-                                          name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                          name.isNotEmpty
+                                              ? name[0].toUpperCase()
+                                              : '?',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
-                                      title: Text(displayName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      subtitle: Text('Đã chi: ${_formatExpenseAmount(paid)}'),
+                                      title: Text(
+                                        displayName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        'Đã chi: ${formatVal(paid)}',
+                                      ),
                                       trailing: Text(
                                         statusText,
                                         style: TextStyle(
@@ -11810,43 +13024,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       ),
                                     );
                                   }),
-                                  const SizedBox(height: 16),
-                                  if (activeDebts.isNotEmpty) ...[
-                                    Text('Các khoản nợ cần thanh toán trong nhóm:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.darkText)),
-                                    const SizedBox(height: 8),
-                                    ...activeDebts.map((d) {
-                                      final f = d['from'] as Map<String, dynamic>;
-                                      final t = d['to'] as Map<String, dynamic>;
-
-                                      return Card(
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                        child: ListTile(
-                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                          title: Text('${f['displayName']} trả cho ${t['displayName']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                          subtitle: Text(
-                                            _formatExpenseAmount(d['amount'] as num),
-                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFA5438), fontSize: 14),
-                                          ),
-                                          trailing: ElevatedButton(
-                                            onPressed: () {
-                                              _showSettleUpDialog(membersList, () {
-                                                setModalState(() {});
-                                              }, prefilledDebt: d);
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFFFA5438),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                            ),
-                                            child: const Text('Trả', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                          ),
-                                        ),
-                                      );
-                                    }),
-                                  ],
                                 ],
                               ),
                       ),
@@ -11856,7 +13033,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     Container(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                       decoration: const BoxDecoration(
-                        border: Border(top: BorderSide(color: Color(0xFFF1F5F9), width: 1)),
+                        border: Border(
+                          top: BorderSide(color: Color(0xFFF1F5F9), width: 1),
+                        ),
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -11869,15 +13048,29 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     Navigator.pop(context);
                                     _showTransactionHistorySheet();
                                   },
-                                  icon: const Icon(Icons.history, size: 18, color: Colors.black87),
+                                  icon: const Icon(
+                                    Icons.history,
+                                    size: 18,
+                                    color: Colors.black87,
+                                  ),
                                   label: const Text(
                                     'Lịch sử giao dịch',
-                                    style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600),
+                                    style: TextStyle(
+                                      color: Colors.black87,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    side: BorderSide(color: Colors.grey.shade300),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    side: BorderSide(
+                                      color: Colors.grey.shade300,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -11885,22 +13078,79 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: () {
-                                    _showCurrencyPickerSheet(selectedCurrencyCode, (symbol, code) {
-                                      setModalState(() {
-                                        selectedCurrencySymbol = symbol;
-                                        selectedCurrencyCode = code;
-                                      });
-                                    });
+                                    _showCurrencyPickerSheet(
+                                      selectedCurrencyCode,
+                                      (symbol, code) {
+                                        setModalState(() {
+                                          selectedCurrencySymbol = symbol;
+                                          selectedCurrencyCode = code;
+                                        });
+                                        setState(() {
+                                          if (_itineraryData['currencyCode'] !=
+                                                  code &&
+                                              _tripBudget > 0) {
+                                            final String oldCode =
+                                                _itineraryData['currencyCode']
+                                                    ?.toString()
+                                                    .toUpperCase() ??
+                                                'VND';
+                                            final double oldRate =
+                                                _currencyRates[oldCode] ?? 1.0;
+                                            final double newRate =
+                                                _currencyRates[code] ?? 1.0;
+                                            final int convertedBudget =
+                                                ((_tripBudget * oldRate) /
+                                                        newRate)
+                                                    .round();
+                                            _tripBudget = convertedBudget;
+                                            _itineraryData['budget'] =
+                                                convertedBudget;
+                                          }
+                                          _itineraryData['currencySymbol'] =
+                                              symbol;
+                                          _itineraryData['currencyCode'] = code;
+                                        });
+                                        final itinId =
+                                            (_itineraryData['id'] as num?)
+                                                ?.toInt() ??
+                                            0;
+                                        if (itinId > 0) {
+                                          DatabaseService()
+                                              .updateItinerary(itinId, {
+                                                'budget': _tripBudget,
+                                                'currencySymbol': symbol,
+                                                'currencyCode': code,
+                                              });
+                                        }
+                                      },
+                                    );
                                   },
-                                  icon: const Text('\$', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
-                                  label: const Text(
-                                    'Thay đổi tiền tệ',
-                                    style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600),
+                                  icon: Text(
+                                    selectedCurrencySymbol,
+                                    style: const TextStyle(
+                                      color: Colors.black87,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  label: Text(
+                                    'Tiền tệ ($selectedCurrencyCode)',
+                                    style: const TextStyle(
+                                      color: Colors.black87,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    side: BorderSide(color: Colors.grey.shade300),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    side: BorderSide(
+                                      color: Colors.grey.shade300,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -11918,12 +13168,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFA5438),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(26),
+                                ),
                                 elevation: 0,
                               ),
                               child: const Text(
                                 'Thanh toán',
-                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -11941,8 +13197,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showExpenseAnalyticsSheet() {
-    String selectedCurrencySymbol = 'đ';
-    String selectedCurrencyCode = 'VND';
+    String selectedCurrencySymbol =
+        _itineraryData['currencySymbol']?.toString() ?? 'đ';
+    String selectedCurrencyCode =
+        _itineraryData['currencyCode']?.toString() ?? 'VND';
     int activeTab = 0; // 0: Danh mục, 1: Ngày qua ngày
     String? selectedBarLabel;
     num? selectedBarAmount;
@@ -11964,7 +13222,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               fetchedCategories = true;
               DatabaseService().getCategories().then((cats) {
                 if (context.mounted && cats.isNotEmpty) {
-                  final names = cats.map((c) => c['name']?.toString() ?? '').where((n) => n.isNotEmpty).toList();
+                  final names = cats
+                      .map((c) => c['name']?.toString() ?? '')
+                      .where((n) => n.isNotEmpty)
+                      .toList();
                   setModalState(() {
                     dbCategoryNames = names;
                   });
@@ -12036,7 +13297,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
             // Build dates data list (Itinerary dates + any extra dates from expenses)
             final startStr = _itineraryData['startDate'] as String?;
-            final startDate = startStr != null ? DateTime.tryParse(startStr) : null;
+            final startDate = startStr != null
+                ? DateTime.tryParse(startStr)
+                : null;
             final numDays = (_itineraryData['days'] as num?)?.toInt() ?? 5;
 
             Map<String, DateTime> allDatesMap = {};
@@ -12044,7 +13307,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             for (int i = 0; i < (numDays > 0 ? numDays : 5); i++) {
               final d = anchorDate.add(Duration(days: i));
               final normalized = DateTime(d.year, d.month, d.day);
-              final key = '${normalized.year}-${normalized.month.toString().padLeft(2, '0')}-${normalized.day.toString().padLeft(2, '0')}';
+              final key =
+                  '${normalized.year}-${normalized.month.toString().padLeft(2, '0')}-${normalized.day.toString().padLeft(2, '0')}';
               allDatesMap[key] = normalized;
             }
 
@@ -12053,14 +13317,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               if (expDateStr != null) {
                 final expDate = DateTime.tryParse(expDateStr);
                 if (expDate != null) {
-                  final normalized = DateTime(expDate.year, expDate.month, expDate.day);
-                  final key = '${normalized.year}-${normalized.month.toString().padLeft(2, '0')}-${normalized.day.toString().padLeft(2, '0')}';
+                  final normalized = DateTime(
+                    expDate.year,
+                    expDate.month,
+                    expDate.day,
+                  );
+                  final key =
+                      '${normalized.year}-${normalized.month.toString().padLeft(2, '0')}-${normalized.day.toString().padLeft(2, '0')}';
                   allDatesMap[key] = normalized;
                 }
               }
             }
 
-            final sortedDates = allDatesMap.values.toList()..sort((a, b) => a.compareTo(b));
+            final sortedDates = allDatesMap.values.toList()
+              ..sort((a, b) => a.compareTo(b));
 
             List<Map<String, dynamic>> dateItems = [];
             for (final d in sortedDates) {
@@ -12080,11 +13350,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 }
               }
 
-              dateItems.add({
-                'label': label,
-                'amount': dayTotal,
-                'date': d,
-              });
+              dateItems.add({'label': label, 'amount': dayTotal, 'date': d});
             }
 
             // Calculate max value for scaling chart
@@ -12098,14 +13364,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               if (amt > maxDateVal) maxDateVal = amt;
             }
 
-            final int activeMaxVal = activeTab == 0 ? maxCategoryVal : maxDateVal;
-            final int chartMax = activeMaxVal > 0 ? (activeMaxVal * 1.15).ceil() : 700000;
+            final int activeMaxVal = activeTab == 0
+                ? maxCategoryVal
+                : maxDateVal;
+            final int chartMax = activeMaxVal > 0
+                ? (activeMaxVal * 1.15).ceil()
+                : 700000;
 
             // Generate X-Axis ticks
             final int tickStep = (chartMax / 6 / 10000).ceil() * 10000;
             final int effectiveStep = tickStep > 0 ? tickStep : 100000;
             List<int> xTicks = [];
-            for (int val = 0; val <= chartMax + effectiveStep / 2; val += effectiveStep) {
+            for (
+              int val = 0;
+              val <= chartMax + effectiveStep / 2;
+              val += effectiveStep
+            ) {
               xTicks.add(val);
               if (xTicks.length >= 7) break;
             }
@@ -12156,12 +13430,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               }),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: activeTab == 0 ? Colors.white : Colors.transparent,
+                                  color: activeTab == 0
+                                      ? Colors.white
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(9),
                                   boxShadow: activeTab == 0
                                       ? [
                                           BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.05),
+                                            color: Colors.black.withValues(
+                                              alpha: 0.05,
+                                            ),
                                             blurRadius: 4,
                                             offset: const Offset(0, 2),
                                           ),
@@ -12173,8 +13451,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     'Danh mục',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: activeTab == 0 ? FontWeight.bold : FontWeight.w500,
-                                      color: activeTab == 0 ? AppTheme.darkText : Colors.grey[600],
+                                      fontWeight: activeTab == 0
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                      color: activeTab == 0
+                                          ? AppTheme.darkText
+                                          : Colors.grey[600],
                                     ),
                                   ),
                                 ),
@@ -12189,12 +13471,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               }),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: activeTab == 1 ? Colors.white : Colors.transparent,
+                                  color: activeTab == 1
+                                      ? Colors.white
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(9),
                                   boxShadow: activeTab == 1
                                       ? [
                                           BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.05),
+                                            color: Colors.black.withValues(
+                                              alpha: 0.05,
+                                            ),
                                             blurRadius: 4,
                                             offset: const Offset(0, 2),
                                           ),
@@ -12206,8 +13492,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     'Ngày qua ngày',
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: activeTab == 1 ? FontWeight.bold : FontWeight.w500,
-                                      color: activeTab == 1 ? AppTheme.darkText : Colors.grey[600],
+                                      fontWeight: activeTab == 1
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                      color: activeTab == 1
+                                          ? AppTheme.darkText
+                                          : Colors.grey[600],
                                     ),
                                   ),
                                 ),
@@ -12228,7 +13518,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: selectedBarLabel != null ? AppTheme.primary : AppTheme.darkText,
+                        color: selectedBarLabel != null
+                            ? AppTheme.primary
+                            : AppTheme.darkText,
                       ),
                     ),
 
@@ -12247,69 +13539,123 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   width: activeTab == 0 ? 140 : 60,
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: (activeTab == 0 ? categoriesList : dateItems.map((e) => e['label'] as String).toList()).map((lbl) {
-                                      return Container(
-                                        height: 38,
-                                        alignment: Alignment.centerRight,
-                                        padding: const EdgeInsets.only(right: 12),
-                                        child: Text(
-                                          lbl,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black87,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      );
-                                    }).toList(),
+                                    children:
+                                        (activeTab == 0
+                                                ? categoriesList
+                                                : dateItems
+                                                      .map(
+                                                        (e) =>
+                                                            e['label']
+                                                                as String,
+                                                      )
+                                                      .toList())
+                                            .map((lbl) {
+                                              return Container(
+                                                height: 38,
+                                                alignment:
+                                                    Alignment.centerRight,
+                                                padding: const EdgeInsets.only(
+                                                  right: 12,
+                                                ),
+                                                child: Text(
+                                                  lbl,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Colors.black87,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              );
+                                            })
+                                            .toList(),
                                   ),
                                 ),
 
                                 // Vertical Divider Line
                                 Container(
                                   width: 1.5,
-                                  height: (activeTab == 0 ? categoriesList.length : dateItems.length) * 38.0,
+                                  height:
+                                      (activeTab == 0
+                                          ? categoriesList.length
+                                          : dateItems.length) *
+                                      38.0,
                                   color: Colors.grey[400],
                                 ),
 
                                 // Bars Container
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: (activeTab == 0
-                                            ? categoriesList.map((cat) => {'label': cat, 'amount': catAmounts[cat] ?? 0}).toList()
-                                            : dateItems)
-                                        .map((item) {
-                                      final String label = item['label'] as String;
-                                      final int amt = item['amount'] as int;
-                                      final double factor = chartMax > 0 ? (amt / chartMax).clamp(0.0, 1.0) : 0.0;
-                                      final bool isSelected = selectedBarLabel == label;
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children:
+                                        (activeTab == 0
+                                                ? categoriesList
+                                                      .map(
+                                                        (cat) => {
+                                                          'label': cat,
+                                                          'amount':
+                                                              catAmounts[cat] ??
+                                                              0,
+                                                        },
+                                                      )
+                                                      .toList()
+                                                : dateItems)
+                                            .map((item) {
+                                              final String label =
+                                                  item['label'] as String;
+                                              final int amt =
+                                                  item['amount'] as int;
+                                              final double factor = chartMax > 0
+                                                  ? (amt / chartMax).clamp(
+                                                      0.0,
+                                                      1.0,
+                                                    )
+                                                  : 0.0;
+                                              final bool isSelected =
+                                                  selectedBarLabel == label;
 
-                                      return GestureDetector(
-                                        onTap: () {
-                                          setModalState(() {
-                                            selectedBarLabel = label;
-                                            selectedBarAmount = amt;
-                                          });
-                                        },
-                                        child: Container(
-                                          height: 38,
-                                          alignment: Alignment.centerLeft,
-                                          child: FractionallySizedBox(
-                                            widthFactor: factor > 0 ? factor : 0.005,
-                                            child: Container(
-                                              height: 24,
-                                              decoration: BoxDecoration(
-                                                color: isSelected ? const Color(0xFF818CF8) : const Color(0xFFB4C6FF),
-                                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(4)),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
+                                              return GestureDetector(
+                                                onTap: () {
+                                                  setModalState(() {
+                                                    selectedBarLabel = label;
+                                                    selectedBarAmount = amt;
+                                                  });
+                                                },
+                                                child: Container(
+                                                  height: 38,
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: FractionallySizedBox(
+                                                    widthFactor: factor > 0
+                                                        ? factor
+                                                        : 0.005,
+                                                    child: Container(
+                                                      height: 24,
+                                                      decoration: BoxDecoration(
+                                                        color: isSelected
+                                                            ? const Color(
+                                                                0xFF818CF8,
+                                                              )
+                                                            : const Color(
+                                                                0xFFB4C6FF,
+                                                              ),
+                                                        borderRadius:
+                                                            const BorderRadius.horizontal(
+                                                              right:
+                                                                  Radius.circular(
+                                                                    4,
+                                                                  ),
+                                                            ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            })
+                                            .toList(),
                                   ),
                                 ),
                               ],
@@ -12322,15 +13668,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 Expanded(
                                   child: Column(
                                     children: [
-                                      Container(height: 1.5, color: Colors.grey[400]),
+                                      Container(
+                                        height: 1.5,
+                                        color: Colors.grey[400],
+                                      ),
                                       const SizedBox(height: 4),
                                       SingleChildScrollView(
                                         scrollDirection: Axis.horizontal,
                                         child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: xTicks.map((val) {
                                             return Padding(
-                                              padding: const EdgeInsets.only(right: 6),
+                                              padding: const EdgeInsets.only(
+                                                right: 6,
+                                              ),
                                               child: Text(
                                                 '$selectedCurrencySymbol$val',
                                                 style: TextStyle(
@@ -12357,22 +13709,70 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     // Bottom Currency Button
                     OutlinedButton.icon(
                       onPressed: () {
-                        _showCurrencyPickerSheet(selectedCurrencyCode, (symbol, code) {
+                        _showCurrencyPickerSheet(selectedCurrencyCode, (
+                          symbol,
+                          code,
+                        ) {
                           setModalState(() {
                             selectedCurrencySymbol = symbol;
                             selectedCurrencyCode = code;
                           });
+                          setState(() {
+                            if (_itineraryData['currencyCode'] != code &&
+                                _tripBudget > 0) {
+                              final String oldCode =
+                                  _itineraryData['currencyCode']
+                                      ?.toString()
+                                      .toUpperCase() ??
+                                  'VND';
+                              final double oldRate =
+                                  _currencyRates[oldCode] ?? 1.0;
+                              final double newRate =
+                                  _currencyRates[code] ?? 1.0;
+                              final int convertedBudget =
+                                  ((_tripBudget * oldRate) / newRate).round();
+                              _tripBudget = convertedBudget;
+                              _itineraryData['budget'] = convertedBudget;
+                            }
+                            _itineraryData['currencySymbol'] = symbol;
+                            _itineraryData['currencyCode'] = code;
+                          });
+                          final itinId =
+                              (_itineraryData['id'] as num?)?.toInt() ?? 0;
+                          if (itinId > 0) {
+                            DatabaseService().updateItinerary(itinId, {
+                              'budget': _tripBudget,
+                              'currencySymbol': symbol,
+                              'currencyCode': code,
+                            });
+                          }
                         });
                       },
-                      icon: const Text('\$', style: TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold)),
+                      icon: const Text(
+                        '\$',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       label: const Text(
                         'Thay đổi tiền tệ',
-                        style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
                         side: BorderSide(color: Colors.grey.shade300),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
                       ),
                     ),
                   ],
@@ -12389,6 +13789,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     String currentShare,
     Function(String selectedShare) onSelect, {
     int amount = 0,
+    String? currencySymbol,
+    String? currencyCode,
   }) {
     String activeShare = currentShare;
     Set<String> selectedUserIds = {};
@@ -12414,7 +13816,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       ),
       builder: (context) {
         final options = ['Cá nhân', 'Mọi người', 'Không chia sẻ'];
-        final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+        final int currentItineraryId =
+            (_itineraryData['id'] as num?)?.toInt() ?? 0;
         final currentUser = AuthService().currentUser.value;
         final currentUserIdStr = currentUser?.id.toString();
         final currentUserName = currentUser?.fullName.trim();
@@ -12426,14 +13829,25 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           builder: (context, setModalState) {
             if (!fetchedMembers && currentItineraryId > 0) {
               fetchedMembers = true;
-              DatabaseService().getItineraryMembers(currentItineraryId).then((data) {
-                if (context.mounted && data != null && data['members'] is List) {
+              DatabaseService().getItineraryMembers(currentItineraryId).then((
+                data,
+              ) {
+                if (context.mounted &&
+                    data != null &&
+                    data['members'] is List) {
                   final list = List<Map<String, dynamic>>.from(data['members']);
                   setModalState(() {
                     membersList = list;
                     if (activeShare == 'Mọi người') {
                       selectedUserIds = list
-                          .map((m) => ((m['user'] as Map<String, dynamic>?)?['id'] ?? m['userId'] ?? m['id'] ?? '').toString())
+                          .map(
+                            (m) =>
+                                ((m['user'] as Map<String, dynamic>?)?['id'] ??
+                                        m['userId'] ??
+                                        m['id'] ??
+                                        '')
+                                    .toString(),
+                          )
                           .toSet();
                     }
                   });
@@ -12441,11 +13855,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               });
             }
 
-            final showMembersList = activeShare == 'Cá nhân' || activeShare == 'Mọi người';
+            final showMembersList =
+                activeShare == 'Cá nhân' || activeShare == 'Mọi người';
 
             return SafeArea(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -12454,7 +13872,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       children: [
                         GestureDetector(
                           onTap: () => Navigator.pop(context),
-                          child: Icon(Icons.arrow_back, color: AppTheme.darkText),
+                          child: Icon(
+                            Icons.arrow_back,
+                            color: AppTheme.darkText,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -12490,7 +13911,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           opt,
                           style: TextStyle(
                             fontSize: 15,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
                             color: AppTheme.darkText,
                           ),
                         ),
@@ -12502,14 +13925,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             activeShare = opt;
                             if (opt == 'Mọi người' && membersList.isNotEmpty) {
                               selectedUserIds = membersList
-                                  .map((m) => ((m['user'] as Map<String, dynamic>?)?['id'] ?? m['userId'] ?? m['id'] ?? '').toString())
+                                  .map(
+                                    (m) =>
+                                        ((m['user']
+                                                    as Map<
+                                                      String,
+                                                      dynamic
+                                                    >?)?['id'] ??
+                                                m['userId'] ??
+                                                m['id'] ??
+                                                '')
+                                            .toString(),
+                                  )
                                   .toSet();
                             } else if (opt == 'Cá nhân') {
                               selectedUserIds.clear();
                             }
                           });
                           final String resultShare = opt == 'Cá nhân'
-                              ? (selectedUserIds.isEmpty ? 'Cá nhân' : 'Cá nhân: ${selectedUserIds.join(',')}')
+                              ? (selectedUserIds.isEmpty
+                                    ? 'Cá nhân'
+                                    : _formatShareDisplay('Cá nhân: ${selectedUserIds.join(',')}', membersList))
                               : opt;
                           onSelect(resultShare);
                         },
@@ -12525,7 +13961,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           leading: CircleAvatar(
                             radius: 18,
                             backgroundColor: AppTheme.primary,
-                            child: const Icon(Icons.person, color: Colors.white, size: 20),
+                            child: const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                           ),
                           title: Text(
                             'Bạn (${currentUserName ?? "Dừng"})',
@@ -12542,24 +13982,53 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               color: AppTheme.primary,
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Icon(Icons.check, color: Colors.white, size: 16),
+                            child: const Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
                         ),
                       ] else ...[
                         ...membersList.map((m) {
-                          final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
-                          final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
-                          final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? (userObj['email'] is String ? userObj['email'].split('@')[0] : null) ?? 'Thành viên').toString().trim();
-                          final String rawName = nameCandidate.isNotEmpty ? nameCandidate : 'Thành viên';
+                          final userObj =
+                              (m['user'] as Map<String, dynamic>?) ?? m;
+                          final String uId =
+                              (userObj['id'] ?? m['userId'] ?? m['id'] ?? '')
+                                  .toString();
+                          final String nameCandidate =
+                              (userObj['fullName'] ??
+                                      userObj['name'] ??
+                                      userObj['username'] ??
+                                      m['fullName'] ??
+                                      m['name'] ??
+                                      (userObj['email'] is String
+                                          ? userObj['email'].split('@')[0]
+                                          : null) ??
+                                      'Thành viên')
+                                  .toString()
+                                  .trim();
+                          final String rawName = nameCandidate.isNotEmpty
+                              ? nameCandidate
+                              : 'Thành viên';
 
-                          final bool isOwner = m['role'] == 'OWNER' ||
-                              (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
+                          final bool isOwner =
+                              m['role'] == 'OWNER' ||
+                              (m['userId'] != null &&
+                                  _itineraryData['userId'] != null &&
+                                  m['userId'].toString() ==
+                                      _itineraryData['userId'].toString());
 
-                          final String displayName = isOwner ? 'Bạn ($rawName)' : rawName;
+                          final String displayName = isOwner
+                              ? 'Bạn ($rawName)'
+                              : rawName;
 
-                          final String? rawAvatar = userObj['avatarUrl'] ?? userObj['avatar'];
+                          final String? rawAvatar =
+                              userObj['avatarUrl'] ?? userObj['avatar'];
                           String? avatarUrl;
-                          if (rawAvatar != null && rawAvatar.trim().isNotEmpty && !rawAvatar.contains('default-avatar')) {
+                          if (rawAvatar != null &&
+                              rawAvatar.trim().isNotEmpty &&
+                              !rawAvatar.contains('default-avatar')) {
                             final trimmed = rawAvatar.trim();
                             if (trimmed.startsWith('http')) {
                               avatarUrl = trimmed;
@@ -12569,18 +14038,30 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               avatarUrl = 'http://localhost:3000/$trimmed';
                             }
                           }
-                          final Color avatarBgColor = Colors.primaries[rawName.hashCode.abs() % Colors.primaries.length];
-                          final isChecked = activeShare == 'Mọi người' || (activeShare == 'Cá nhân' && selectedUserIds.contains(uId));
+                          final Color avatarBgColor =
+                              Colors.primaries[rawName.hashCode.abs() %
+                                  Colors.primaries.length];
+                          final isChecked =
+                              activeShare == 'Mọi người' ||
+                              (activeShare == 'Cá nhân' &&
+                                  selectedUserIds.contains(uId));
 
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: CircleAvatar(
                               radius: 18,
                               backgroundColor: avatarBgColor,
-                              foregroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                              foregroundImage: avatarUrl != null
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
                               child: Text(
-                                rawName.isNotEmpty ? rawName[0].toUpperCase() : '?',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                rawName.isNotEmpty
+                                    ? rawName[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             title: Text(
@@ -12604,24 +14085,33 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     selectedUserIds.add(uId);
                                   }
                                 });
-                                final String resultShare = selectedUserIds.isEmpty
+                                final String resultShare =
+                                    selectedUserIds.isEmpty
                                     ? 'Cá nhân'
-                                    : 'Cá nhân: ${selectedUserIds.join(',')}';
+                                    : _formatShareDisplay('Cá nhân: ${selectedUserIds.join(',')}', membersList);
                                 onSelect(resultShare);
                               },
                               child: Container(
                                 width: 22,
                                 height: 22,
                                 decoration: BoxDecoration(
-                                  color: isChecked ? AppTheme.primary : Colors.transparent,
+                                  color: isChecked
+                                      ? AppTheme.primary
+                                      : Colors.transparent,
                                   border: Border.all(
-                                    color: isChecked ? AppTheme.primary : Colors.grey.shade400,
+                                    color: isChecked
+                                        ? AppTheme.primary
+                                        : Colors.grey.shade400,
                                     width: 1.5,
                                   ),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: isChecked
-                                    ? const Icon(Icons.check, color: Colors.white, size: 16)
+                                    ? const Icon(
+                                        Icons.check,
+                                        color: Colors.white,
+                                        size: 16,
+                                      )
                                     : null,
                               ),
                             ),
@@ -12630,40 +14120,53 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       ],
                     ],
 
-                    if (activeShare == 'Mọi người' || activeShare == 'Cá nhân') ...[
+                    if (activeShare == 'Mọi người' ||
+                        activeShare == 'Cá nhân') ...[
                       const Divider(height: 1),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Builder(builder: (ctx) {
-                              final int personCount = activeShare == 'Mọi người'
-                                  ? (membersList.isEmpty ? 1 : membersList.length)
-                                  : selectedUserIds.length;
-                              final int perPerson = personCount > 0 ? (amount ~/ personCount) : 0;
-                              return Text(
-                                '${_formatExpenseAmount(perPerson)} đ/người',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.darkText,
-                                ),
-                              );
-                            }),
-                            Builder(builder: (ctx) {
-                              final int personCount = activeShare == 'Mọi người'
-                                  ? (membersList.isEmpty ? 1 : membersList.length)
-                                  : selectedUserIds.length;
-                              return Text(
-                                '$personCount người',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.darkText,
-                                ),
-                              );
-                            }),
+                            Builder(
+                              builder: (ctx) {
+                                final int personCount =
+                                    activeShare == 'Mọi người'
+                                    ? (membersList.isEmpty
+                                          ? 1
+                                          : membersList.length)
+                                    : selectedUserIds.length;
+                                final int perPerson = personCount > 0
+                                    ? (amount ~/ personCount)
+                                    : 0;
+                                return Text(
+                                  '${_formatExpenseAmount(perPerson, currencySymbol: currencySymbol, currencyCode: currencyCode)}/người',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkText,
+                                  ),
+                                );
+                              },
+                            ),
+                            Builder(
+                              builder: (ctx) {
+                                final int personCount =
+                                    activeShare == 'Mọi người'
+                                    ? (membersList.isEmpty
+                                          ? 1
+                                          : membersList.length)
+                                    : selectedUserIds.length;
+                                return Text(
+                                  '$personCount người',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkText,
+                                  ),
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -12690,7 +14193,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+        final int currentItineraryId =
+            (_itineraryData['id'] as num?)?.toInt() ?? 0;
         final currentUser = AuthService().currentUser.value;
         final currentUserName = currentUser?.fullName.trim();
 
@@ -12702,25 +14206,50 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           builder: (context, setModalState) {
             if (!fetchedMembers && currentItineraryId > 0) {
               fetchedMembers = true;
-              DatabaseService().getItineraryMembers(currentItineraryId).then((data) {
-                if (context.mounted && data != null && data['members'] is List) {
+              DatabaseService().getItineraryMembers(currentItineraryId).then((
+                data,
+              ) {
+                if (context.mounted &&
+                    data != null &&
+                    data['members'] is List) {
                   final list = List<Map<String, dynamic>>.from(data['members']);
                   setModalState(() {
                     membersList = list;
 
                     // Match currentPayer string to member IDs strictly
                     final Set<String> matchedIds = {};
-                    final currentPayerList = currentPayer.split(',').map((s) => s.trim()).toList();
+                    final currentPayerList = currentPayer
+                        .split(',')
+                        .map((s) => s.trim())
+                        .toList();
 
                     // Pass 1: Match exact displayName (e.g. "Bạn (Dửng)" vs "Dửng")
                     for (var m in list) {
                       final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
-                      final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
-                      final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? 'Thành viên').toString().trim();
-                      final String rawName = nameCandidate.isNotEmpty ? nameCandidate : 'Thành viên';
-                      final bool isOwner = m['role'] == 'OWNER' ||
-                          (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
-                      final String displayName = isOwner ? 'Bạn ($rawName)' : rawName;
+                      final String uId =
+                          (userObj['id'] ?? m['userId'] ?? m['id'] ?? '')
+                              .toString();
+                      final String nameCandidate =
+                          (userObj['fullName'] ??
+                                  userObj['name'] ??
+                                  userObj['username'] ??
+                                  m['fullName'] ??
+                                  m['name'] ??
+                                  'Thành viên')
+                              .toString()
+                              .trim();
+                      final String rawName = nameCandidate.isNotEmpty
+                          ? nameCandidate
+                          : 'Thành viên';
+                      final bool isOwner =
+                          m['role'] == 'OWNER' ||
+                          (m['userId'] != null &&
+                              _itineraryData['userId'] != null &&
+                              m['userId'].toString() ==
+                                  _itineraryData['userId'].toString());
+                      final String displayName = isOwner
+                          ? 'Bạn ($rawName)'
+                          : rawName;
 
                       if (currentPayerList.contains(displayName)) {
                         matchedIds.add(uId);
@@ -12730,10 +14259,23 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     // Pass 2: If no exact displayName match, match rawName (stop at first match)
                     if (matchedIds.isEmpty) {
                       for (var m in list) {
-                        final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
-                        final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
-                        final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? 'Thành viên').toString().trim();
-                        final String rawName = nameCandidate.isNotEmpty ? nameCandidate : 'Thành viên';
+                        final userObj =
+                            (m['user'] as Map<String, dynamic>?) ?? m;
+                        final String uId =
+                            (userObj['id'] ?? m['userId'] ?? m['id'] ?? '')
+                                .toString();
+                        final String nameCandidate =
+                            (userObj['fullName'] ??
+                                    userObj['name'] ??
+                                    userObj['username'] ??
+                                    m['fullName'] ??
+                                    m['name'] ??
+                                    'Thành viên')
+                                .toString()
+                                .trim();
+                        final String rawName = nameCandidate.isNotEmpty
+                            ? nameCandidate
+                            : 'Thành viên';
 
                         if (currentPayerList.contains(rawName)) {
                           matchedIds.add(uId);
@@ -12743,13 +14285,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     }
 
                     // Pass 3: Default to OWNER only if matchedIds is empty AND currentPayer is empty or "Bạn"
-                    if (matchedIds.isEmpty && (currentPayer.trim().isEmpty || currentPayer.trim() == 'Bạn')) {
+                    if (matchedIds.isEmpty &&
+                        (currentPayer.trim().isEmpty ||
+                            currentPayer.trim() == 'Bạn')) {
                       final ownerMember = list.firstWhere(
-                        (m) => m['role'] == 'OWNER' || (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString()),
+                        (m) =>
+                            m['role'] == 'OWNER' ||
+                            (m['userId'] != null &&
+                                _itineraryData['userId'] != null &&
+                                m['userId'].toString() ==
+                                    _itineraryData['userId'].toString()),
                         orElse: () => list.first,
                       );
-                      final ownerUserObj = (ownerMember['user'] as Map<String, dynamic>?) ?? ownerMember;
-                      final String ownerId = (ownerUserObj['id'] ?? ownerMember['userId'] ?? ownerMember['id'] ?? '').toString();
+                      final ownerUserObj =
+                          (ownerMember['user'] as Map<String, dynamic>?) ??
+                          ownerMember;
+                      final String ownerId =
+                          (ownerUserObj['id'] ??
+                                  ownerMember['userId'] ??
+                                  ownerMember['id'] ??
+                                  '')
+                              .toString();
                       matchedIds.add(ownerId);
                     }
 
@@ -12761,7 +14317,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
             return SafeArea(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -12770,7 +14329,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       children: [
                         GestureDetector(
                           onTap: () => Navigator.pop(context),
-                          child: Icon(Icons.arrow_back, color: AppTheme.darkText),
+                          child: Icon(
+                            Icons.arrow_back,
+                            color: AppTheme.darkText,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -12804,7 +14366,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         leading: CircleAvatar(
                           radius: 18,
                           backgroundColor: AppTheme.primary,
-                          child: const Icon(Icons.person, color: Colors.white, size: 20),
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                         title: Text(
                           'Bạn (${currentUserName ?? "Dừng Nguyễn"})',
@@ -12822,19 +14388,44 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       ),
                     ] else ...[
                       ...membersList.map((m) {
-                        final userObj = (m['user'] as Map<String, dynamic>?) ?? m;
-                        final String uId = (userObj['id'] ?? m['userId'] ?? m['id'] ?? '').toString();
-                        final String nameCandidate = (userObj['fullName'] ?? userObj['name'] ?? userObj['username'] ?? m['fullName'] ?? m['name'] ?? (userObj['email'] is String ? userObj['email'].split('@')[0] : null) ?? 'Thành viên').toString().trim();
-                        final String rawName = nameCandidate.isNotEmpty ? nameCandidate : 'Thành viên';
+                        final userObj =
+                            (m['user'] as Map<String, dynamic>?) ?? m;
+                        final String uId =
+                            (userObj['id'] ?? m['userId'] ?? m['id'] ?? '')
+                                .toString();
+                        final String nameCandidate =
+                            (userObj['fullName'] ??
+                                    userObj['name'] ??
+                                    userObj['username'] ??
+                                    m['fullName'] ??
+                                    m['name'] ??
+                                    (userObj['email'] is String
+                                        ? userObj['email'].split('@')[0]
+                                        : null) ??
+                                    'Thành viên')
+                                .toString()
+                                .trim();
+                        final String rawName = nameCandidate.isNotEmpty
+                            ? nameCandidate
+                            : 'Thành viên';
 
-                        final bool isOwner = m['role'] == 'OWNER' ||
-                            (m['userId'] != null && _itineraryData['userId'] != null && m['userId'].toString() == _itineraryData['userId'].toString());
+                        final bool isOwner =
+                            m['role'] == 'OWNER' ||
+                            (m['userId'] != null &&
+                                _itineraryData['userId'] != null &&
+                                m['userId'].toString() ==
+                                    _itineraryData['userId'].toString());
 
-                        final String displayName = isOwner ? 'Bạn ($rawName)' : rawName;
+                        final String displayName = isOwner
+                            ? 'Bạn ($rawName)'
+                            : rawName;
 
-                        final String? rawAvatar = userObj['avatarUrl'] ?? userObj['avatar'];
+                        final String? rawAvatar =
+                            userObj['avatarUrl'] ?? userObj['avatar'];
                         String? avatarUrl;
-                        if (rawAvatar != null && rawAvatar.trim().isNotEmpty && !rawAvatar.contains('default-avatar')) {
+                        if (rawAvatar != null &&
+                            rawAvatar.trim().isNotEmpty &&
+                            !rawAvatar.contains('default-avatar')) {
                           final trimmed = rawAvatar.trim();
                           if (trimmed.startsWith('http')) {
                             avatarUrl = trimmed;
@@ -12844,7 +14435,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             avatarUrl = 'http://localhost:3000/$trimmed';
                           }
                         }
-                        final Color avatarBgColor = Colors.primaries[rawName.hashCode.abs() % Colors.primaries.length];
+                        final Color avatarBgColor =
+                            Colors.primaries[rawName.hashCode.abs() %
+                                Colors.primaries.length];
                         final isSelected = selectedUserIds.contains(uId);
 
                         return ListTile(
@@ -12852,17 +14445,26 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           leading: CircleAvatar(
                             radius: 18,
                             backgroundColor: avatarBgColor,
-                            foregroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                            foregroundImage: avatarUrl != null
+                                ? NetworkImage(avatarUrl)
+                                : null,
                             child: Text(
-                              rawName.isNotEmpty ? rawName[0].toUpperCase() : '?',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              rawName.isNotEmpty
+                                  ? rawName[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           title: Text(
                             displayName,
                             style: TextStyle(
                               fontSize: 15,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
                               color: AppTheme.darkText,
                             ),
                           ),
@@ -12894,17 +14496,47 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   ) {
     final List<Map<String, String>> currencies = [
       {'flag': '🇻🇳', 'name': 'Vietnamese Dong', 'code': 'VND', 'symbol': 'đ'},
-      {'flag': '🇺🇸', 'name': 'United States Dollar', 'code': 'USD', 'symbol': r'$'},
+      {
+        'flag': '🇺🇸',
+        'name': 'United States Dollar',
+        'code': 'USD',
+        'symbol': r'$',
+      },
       {'flag': '🇪🇺', 'name': 'Euro', 'code': 'EUR', 'symbol': '€'},
       {'flag': '🇯🇵', 'name': 'Japanese Yen', 'code': 'JPY', 'symbol': '¥'},
-      {'flag': '🇰🇷', 'name': 'South Korean Won', 'code': 'KRW', 'symbol': '₩'},
+      {
+        'flag': '🇰🇷',
+        'name': 'South Korean Won',
+        'code': 'KRW',
+        'symbol': '₩',
+      },
       {'flag': '🇨🇳', 'name': 'Chinese Yuan', 'code': 'CNY', 'symbol': '¥'},
       {'flag': '🇬🇧', 'name': 'British Pound', 'code': 'GBP', 'symbol': '£'},
-      {'flag': '🇸🇬', 'name': 'Singapore Dollar', 'code': 'SGD', 'symbol': r'S$'},
+      {
+        'flag': '🇸🇬',
+        'name': 'Singapore Dollar',
+        'code': 'SGD',
+        'symbol': r'S$',
+      },
       {'flag': '🇹🇭', 'name': 'Thai Baht', 'code': 'THB', 'symbol': '฿'},
-      {'flag': '🇦🇺', 'name': 'Australian Dollar', 'code': 'AUD', 'symbol': r'A$'},
-      {'flag': '🇨🇦', 'name': 'Canadian Dollar', 'code': 'CAD', 'symbol': r'CA$'},
-      {'flag': '🇹🇼', 'name': 'New Taiwan Dollar', 'code': 'TWD', 'symbol': r'NT$'},
+      {
+        'flag': '🇦🇺',
+        'name': 'Australian Dollar',
+        'code': 'AUD',
+        'symbol': r'A$',
+      },
+      {
+        'flag': '🇨🇦',
+        'name': 'Canadian Dollar',
+        'code': 'CAD',
+        'symbol': r'CA$',
+      },
+      {
+        'flag': '🇹🇼',
+        'name': 'New Taiwan Dollar',
+        'code': 'TWD',
+        'symbol': r'NT$',
+      },
     ];
 
     showModalBottomSheet(
@@ -12931,14 +14563,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             return SafeArea(
               child: Container(
                 height: MediaQuery.of(context).size.height * 0.75,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Column(
                   children: [
                     Row(
                       children: [
                         GestureDetector(
                           onTap: () => Navigator.pop(context),
-                          child: Icon(Icons.arrow_back, color: AppTheme.darkText),
+                          child: Icon(
+                            Icons.arrow_back,
+                            color: AppTheme.darkText,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -12975,10 +14613,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               },
                               decoration: InputDecoration(
                                 hintText: 'Tìm kiếm',
-                                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+                                hintStyle: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 15,
+                                ),
                                 border: InputBorder.none,
                                 isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                               ),
                             ),
                           ),
@@ -12990,7 +14633,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   searchQuery = '';
                                 });
                               },
-                              child: Icon(Icons.cancel, color: Colors.grey[400], size: 18),
+                              child: Icon(
+                                Icons.cancel,
+                                color: Colors.grey[400],
+                                size: 18,
+                              ),
                             ),
                         ],
                       ),
@@ -13015,7 +14662,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               curr['name']!,
                               style: TextStyle(
                                 fontSize: 15,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
                                 color: AppTheme.darkText,
                               ),
                             ),
@@ -13048,7 +14697,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showAllTripItemsSheet(
-    Function({required String categoryName, required IconData categoryIcon, String? placeName}) onSelect,
+    Function({
+      required String categoryName,
+      required IconData categoryIcon,
+      String? placeName,
+    })
+    onSelect,
   ) {
     String searchQuery = '';
     showModalBottomSheet(
@@ -13061,11 +14715,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       builder: (context) {
         final List<Map<String, dynamic>> validPlaces = [];
         for (var item in [..._savedPlaces, ..._details]) {
-          final placeObj = (item['place'] as Map<String, dynamic>?) ?? (item['itemType'] == 'PLACE' ? item : null);
-          final realName = placeObj?['name'] ?? item['place_name'] ?? item['name'];
-          if (realName != null && realName.toString().trim().isNotEmpty && realName != 'Địa điểm') {
+          final placeObj =
+              (item['place'] as Map<String, dynamic>?) ??
+              (item['itemType'] == 'PLACE' ? item : null);
+          final realName =
+              placeObj?['name'] ?? item['place_name'] ?? item['name'];
+          if (realName != null &&
+              realName.toString().trim().isNotEmpty &&
+              realName != 'Địa điểm') {
             if (!validPlaces.any((existing) {
-              final eObj = (existing['place'] as Map<String, dynamic>?) ?? existing;
+              final eObj =
+                  (existing['place'] as Map<String, dynamic>?) ?? existing;
               final eName = eObj['name'] ?? existing['name'];
               return eName == realName;
             })) {
@@ -13078,14 +14738,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           builder: (context, setModalState) {
             final allItems = validPlaces.where((p) {
               final placeObj = (p['place'] as Map<String, dynamic>?) ?? p;
-              final name = (placeObj['name'] ?? p['name'] ?? p['title'] ?? '').toString().toLowerCase();
+              final name = (placeObj['name'] ?? p['name'] ?? p['title'] ?? '')
+                  .toString()
+                  .toLowerCase();
               return name.contains(searchQuery.toLowerCase());
             }).toList();
 
             return SafeArea(
               child: Container(
                 height: MediaQuery.of(context).size.height * 0.85,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -13093,7 +14758,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       children: [
                         GestureDetector(
                           onTap: () => Navigator.pop(context),
-                          child: Icon(Icons.arrow_back, color: AppTheme.darkText),
+                          child: Icon(
+                            Icons.arrow_back,
+                            color: AppTheme.darkText,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -13152,24 +14820,41 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             )
                           : ListView.separated(
                               itemCount: allItems.length,
-                              separatorBuilder: (_, _) => const Divider(height: 1),
+                              separatorBuilder: (_, _) =>
+                                  const Divider(height: 1),
                               itemBuilder: (context, idx) {
                                 final p = allItems[idx];
-                                final placeObj = (p['place'] as Map<String, dynamic>?) ?? p;
-                                final name = placeObj['name'] ?? p['name'] ?? p['title'] ?? 'Mục chuyến đi';
+                                final placeObj =
+                                    (p['place'] as Map<String, dynamic>?) ?? p;
+                                final name =
+                                    placeObj['name'] ??
+                                    p['name'] ??
+                                    p['title'] ??
+                                    'Mục chuyến đi';
 
                                 IconData itemIcon = Icons.location_on_outlined;
-                                final catObj = (placeObj['category'] as Map<String, dynamic>?) ?? (p['category'] as Map<String, dynamic>?);
+                                final catObj =
+                                    (placeObj['category']
+                                        as Map<String, dynamic>?) ??
+                                    (p['category'] as Map<String, dynamic>?);
                                 if (catObj != null) {
-                                  final code = int.tryParse(catObj['iconCode']?.toString() ?? '');
+                                  final code = int.tryParse(
+                                    catObj['iconCode']?.toString() ?? '',
+                                  );
                                   if (code != null) {
-                                    itemIcon = IconData(code, fontFamily: 'MaterialIcons');
+                                    itemIcon = IconData(
+                                      code,
+                                      fontFamily: 'MaterialIcons',
+                                    );
                                   } else if (catObj['name'] != null) {
-                                    itemIcon = _getCategoryIconData(catObj['name'].toString());
+                                    itemIcon = _getCategoryIconData(
+                                      catObj['name'].toString(),
+                                    );
                                   }
                                 }
 
-                                final catName = catObj?['name']?.toString() ?? 'Tham quan';
+                                final catName =
+                                    catObj?['name']?.toString() ?? 'Tham quan';
                                 final section = p['section_name'] ?? catName;
 
                                 return ListTile(
@@ -13180,7 +14865,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       color: AppTheme.surfaceVariant,
                                       shape: BoxShape.circle,
                                     ),
-                                    child: Icon(itemIcon, size: 20, color: AppTheme.darkText),
+                                    child: Icon(
+                                      itemIcon,
+                                      size: 20,
+                                      color: AppTheme.darkText,
+                                    ),
                                   ),
                                   title: Text(
                                     name,
@@ -13197,7 +14886,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     ),
                                   ),
                                   onTap: () {
-                                    onSelect(categoryName: catName, categoryIcon: itemIcon, placeName: name);
+                                    onSelect(
+                                      categoryName: catName,
+                                      categoryIcon: itemIcon,
+                                      placeName: name,
+                                    );
                                     Navigator.pop(context);
                                   },
                                 );
@@ -13215,7 +14908,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showCategoryPickerSheet(
-    Function({required String categoryName, required IconData categoryIcon, String? placeName}) onSelect,
+    Function({
+      required String categoryName,
+      required IconData categoryIcon,
+      String? placeName,
+    })
+    onSelect,
   ) {
     showModalBottomSheet(
       context: context,
@@ -13227,11 +14925,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       builder: (context) {
         final List<Map<String, dynamic>> validPlaces = [];
         for (var item in [..._savedPlaces, ..._details]) {
-          final placeObj = (item['place'] as Map<String, dynamic>?) ?? (item['itemType'] == 'PLACE' ? item : null);
-          final realName = placeObj?['name'] ?? item['place_name'] ?? item['name'];
-          if (realName != null && realName.toString().trim().isNotEmpty && realName != 'Địa điểm') {
+          final placeObj =
+              (item['place'] as Map<String, dynamic>?) ??
+              (item['itemType'] == 'PLACE' ? item : null);
+          final realName =
+              placeObj?['name'] ?? item['place_name'] ?? item['name'];
+          if (realName != null &&
+              realName.toString().trim().isNotEmpty &&
+              realName != 'Địa điểm') {
             if (!validPlaces.any((existing) {
-              final eObj = (existing['place'] as Map<String, dynamic>?) ?? existing;
+              final eObj =
+                  (existing['place'] as Map<String, dynamic>?) ?? existing;
               final eName = eObj['name'] ?? existing['name'];
               return eName == realName;
             })) {
@@ -13251,10 +14955,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             } else if (c['name'] != null) {
               iconData = _getCategoryIconData(c['name'].toString());
             }
-            return {
-              'name': c['name']?.toString() ?? 'Khác',
-              'icon': iconData,
-            };
+            return {'name': c['name']?.toString() ?? 'Khác', 'icon': iconData};
           }).toList();
         }
 
@@ -13263,7 +14964,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             {'name': 'Chuyến bay', 'icon': Icons.flight_takeoff_rounded},
             {'name': 'Chỗ ở', 'icon': Icons.hotel_rounded},
             {'name': 'Xe thuê', 'icon': Icons.directions_car_rounded},
-            {'name': 'Phương tiện công cộng', 'icon': Icons.directions_bus_rounded},
+            {
+              'name': 'Phương tiện công cộng',
+              'icon': Icons.directions_bus_rounded,
+            },
             {'name': 'Ẩm thực', 'icon': Icons.restaurant_rounded},
             {'name': 'Đồ uống', 'icon': Icons.local_bar_rounded},
             {'name': 'Tham quan', 'icon': Icons.account_balance_rounded},
@@ -13314,16 +15018,23 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 const SizedBox(height: 6),
                 ...itineraryPlaces.map((p) {
                   final placeObj = (p['place'] as Map<String, dynamic>?) ?? p;
-                  final placeName = placeObj['name'] ?? p['name'] ?? p['title'] ?? 'Địa điểm';
+                  final placeName =
+                      placeObj['name'] ?? p['name'] ?? p['title'] ?? 'Địa điểm';
 
                   IconData placeIcon = Icons.location_on_outlined;
-                  final catObj = (placeObj['category'] as Map<String, dynamic>?) ?? (p['category'] as Map<String, dynamic>?);
+                  final catObj =
+                      (placeObj['category'] as Map<String, dynamic>?) ??
+                      (p['category'] as Map<String, dynamic>?);
                   if (catObj != null) {
-                    final code = int.tryParse(catObj['iconCode']?.toString() ?? '');
+                    final code = int.tryParse(
+                      catObj['iconCode']?.toString() ?? '',
+                    );
                     if (code != null) {
                       placeIcon = IconData(code, fontFamily: 'MaterialIcons');
                     } else if (catObj['name'] != null) {
-                      placeIcon = _getCategoryIconData(catObj['name'].toString());
+                      placeIcon = _getCategoryIconData(
+                        catObj['name'].toString(),
+                      );
                     }
                   }
                   final catName = catObj?['name']?.toString() ?? 'Tham quan';
@@ -13338,7 +15049,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         color: AppTheme.surfaceVariant,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(placeIcon, size: 18, color: AppTheme.darkText),
+                      child: Icon(
+                        placeIcon,
+                        size: 18,
+                        color: AppTheme.darkText,
+                      ),
                     ),
                     title: Text(
                       placeName,
@@ -13350,7 +15065,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                     onTap: () {
-                      onSelect(categoryName: catName, categoryIcon: placeIcon, placeName: placeName);
+                      onSelect(
+                        categoryName: catName,
+                        categoryIcon: placeIcon,
+                        placeName: placeName,
+                      );
                       Navigator.pop(context);
                     },
                   );
@@ -13411,16 +15130,25 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
                     return GestureDetector(
                       onTap: () {
-                        onSelect(categoryName: catName, categoryIcon: catIcon, placeName: null);
+                        onSelect(
+                          categoryName: catName,
+                          categoryIcon: catIcon,
+                          placeName: null,
+                        );
                         Navigator.pop(context);
                       },
                       child: Container(
                         decoration: BoxDecoration(
                           color: catColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: catColor.withValues(alpha: 0.2)),
+                          border: Border.all(
+                            color: catColor.withValues(alpha: 0.2),
+                          ),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
                         child: Row(
                           children: [
                             Container(
@@ -13450,7 +15178,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     );
                   },
                 ),
-
               ],
             ),
           ),
@@ -13460,24 +15187,65 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   String _detectCategoryFromPlace(Map<String, dynamic> detail) {
-    final placeMap = detail['place'] is Map<String, dynamic> ? (detail['place'] as Map<String, dynamic>) : <String, dynamic>{};
-    final name = (placeMap['name'] ?? placeMap['title'] ?? detail['name'] ?? detail['title'] ?? '').toString().toLowerCase();
-    final cat = (placeMap['category'] ?? placeMap['type'] ?? detail['category'] ?? detail['type'] ?? '').toString().toLowerCase();
+    final placeMap = detail['place'] is Map<String, dynamic>
+        ? (detail['place'] as Map<String, dynamic>)
+        : <String, dynamic>{};
+    final name =
+        (placeMap['name'] ??
+                placeMap['title'] ??
+                detail['name'] ??
+                detail['title'] ??
+                '')
+            .toString()
+            .toLowerCase();
+    final cat =
+        (placeMap['category'] ??
+                placeMap['type'] ??
+                detail['category'] ??
+                detail['type'] ??
+                '')
+            .toString()
+            .toLowerCase();
 
     final combined = '$name $cat';
-    if (combined.contains('ăn') || combined.contains('uống') || combined.contains('quán') || combined.contains('nhà hàng') || combined.contains('cà phê') || combined.contains('bún') || combined.contains('phở') || combined.contains('cơm')) {
+    if (combined.contains('ăn') ||
+        combined.contains('uống') ||
+        combined.contains('quán') ||
+        combined.contains('nhà hàng') ||
+        combined.contains('cà phê') ||
+        combined.contains('bún') ||
+        combined.contains('phở') ||
+        combined.contains('cơm')) {
       return 'Ẩm thực';
     }
-    if (combined.contains('khách sạn') || combined.contains('hotel') || combined.contains('chỗ ở') || combined.contains('homestay') || combined.contains('resort')) {
+    if (combined.contains('khách sạn') ||
+        combined.contains('hotel') ||
+        combined.contains('chỗ ở') ||
+        combined.contains('homestay') ||
+        combined.contains('resort')) {
       return 'Chỗ ở';
     }
-    if (combined.contains('xe') || combined.contains('bay') || combined.contains('tàu') || combined.contains('di chuyển') || combined.contains('taxi') || combined.contains('grab')) {
+    if (combined.contains('xe') ||
+        combined.contains('bay') ||
+        combined.contains('tàu') ||
+        combined.contains('di chuyển') ||
+        combined.contains('taxi') ||
+        combined.contains('grab')) {
       return 'Di chuyển';
     }
-    if (combined.contains('chợ') || combined.contains('mua sắm') || combined.contains('siêu thị') || combined.contains('mall')) {
+    if (combined.contains('chợ') ||
+        combined.contains('mua sắm') ||
+        combined.contains('siêu thị') ||
+        combined.contains('mall')) {
       return 'Mua sắm';
     }
-    if (combined.contains('chùa') || combined.contains('viện') || combined.contains('bảo tàng') || combined.contains('hoạt động') || combined.contains('chơi') || combined.contains('park') || combined.contains('công viên')) {
+    if (combined.contains('chùa') ||
+        combined.contains('viện') ||
+        combined.contains('bảo tàng') ||
+        combined.contains('hoạt động') ||
+        combined.contains('chơi') ||
+        combined.contains('park') ||
+        combined.contains('công viên')) {
       return 'Hoạt động';
     }
     return 'Tham quan';
@@ -13494,7 +15262,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   /// Cập nhật trường expense.amount trong _savedPlaces/_details local state
   void _syncExpenseAmountToPlace(dynamic spId, dynamic dId, num amount) {
     if (spId != null) {
-      final idx = _savedPlaces.indexWhere((sp) => sp['id']?.toString() == spId.toString());
+      final idx = _savedPlaces.indexWhere(
+        (sp) => sp['id']?.toString() == spId.toString(),
+      );
       if (idx != -1) {
         _savedPlaces[idx]['expense'] = {
           ...(_savedPlaces[idx]['expense'] as Map<String, dynamic>? ?? {}),
@@ -13504,7 +15274,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
     if (dId != null) {
-      final idx = _details.indexWhere((d) => d['id']?.toString() == dId.toString());
+      final idx = _details.indexWhere(
+        (d) => d['id']?.toString() == dId.toString(),
+      );
       if (idx != -1) {
         _details[idx]['expense'] = {
           ...(_details[idx]['expense'] as Map<String, dynamic>? ?? {}),
@@ -13515,12 +15287,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     }
   }
 
-  void _openPlaceExpenseSheet(Map<String, dynamic> detail, {required bool isItineraryDetail, int dayIndex = 0}) {
+  void _openPlaceExpenseSheet(
+    Map<String, dynamic> detail, {
+    required bool isItineraryDetail,
+    int dayIndex = 0,
+  }) {
     if (!_checkCanEdit()) return;
 
     final placeId = detail['id'];
-    final placeMap = detail['place'] is Map<String, dynamic> ? (detail['place'] as Map<String, dynamic>) : <String, dynamic>{};
-    final placeName = (placeMap['name'] ?? placeMap['title'] ?? detail['name'] ?? detail['title'] ?? detail['customName'] ?? detail['placeName'] ?? 'Địa điểm').toString().trim();
+    final placeMap = detail['place'] is Map<String, dynamic>
+        ? (detail['place'] as Map<String, dynamic>)
+        : <String, dynamic>{};
+    final placeName =
+        (placeMap['name'] ??
+                placeMap['title'] ??
+                detail['name'] ??
+                detail['title'] ??
+                detail['customName'] ??
+                detail['placeName'] ??
+                'Địa điểm')
+            .toString()
+            .trim();
     final detectedCategory = _detectCategoryFromPlace(detail);
 
     // First check if the place already has an expense linked via expense relation (from server)
@@ -13593,11 +15380,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ? expenseToEdit['category']?.toString()
         : defaultCategory;
     IconData selectedIcon = selectedCategory != null
-        ? _getCategoryIconData(selectedCategory, iconCode: (expenseToEdit?['iconCode'] as num?)?.toInt())
+        ? _getCategoryIconData(
+            selectedCategory,
+            iconCode: (expenseToEdit?['iconCode'] as num?)?.toInt(),
+          )
         : Icons.receipt_long_rounded;
 
     final ownerObj = (_itineraryData['user'] as Map<String, dynamic>?);
-    final String ownerRawName = (ownerObj?['fullName'] ?? ownerObj?['name'] ?? _itineraryData['userName'] ?? AuthService().currentUser.value?.fullName ?? 'Dừng Nguyễn').toString().trim();
+    final String ownerRawName =
+        (ownerObj?['fullName'] ??
+                ownerObj?['name'] ??
+                _itineraryData['userName'] ??
+                AuthService().currentUser.value?.fullName ??
+                'Dừng Nguyễn')
+            .toString()
+            .trim();
     String currentPayer = expenseToEdit != null
         ? (expenseToEdit['payer']?.toString() ?? 'Bạn ($ownerRawName)')
         : 'Bạn ($ownerRawName)';
@@ -13605,19 +15402,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ? (expenseToEdit['share']?.toString() ?? 'Không chia sẻ')
         : 'Không chia sẻ';
     String selectedCurrencySymbol = expenseToEdit != null
-        ? (expenseToEdit['currencySymbol']?.toString() ?? 'đ')
-        : 'đ';
+        ? (expenseToEdit['currencySymbol']?.toString() ??
+              _itineraryData['currencySymbol']?.toString() ??
+              'đ')
+        : (_itineraryData['currencySymbol']?.toString() ?? 'đ');
     String selectedCurrencyCode = expenseToEdit != null
-        ? (expenseToEdit['currencyCode']?.toString() ?? 'VND')
-        : 'VND';
+        ? (expenseToEdit['currencyCode']?.toString() ??
+              _itineraryData['currencyCode']?.toString() ??
+              'VND')
+        : (_itineraryData['currencyCode']?.toString() ?? 'VND');
 
     final String? defaultNoteText = expenseToEdit != null
-        ? (expenseToEdit['title'] != expenseToEdit['category'] ? (expenseToEdit['title']?.toString() ?? '') : '')
+        ? (expenseToEdit['title'] != expenseToEdit['category']
+              ? (expenseToEdit['title']?.toString() ?? '')
+              : '')
         : (defaultTitle ?? '');
     final noteController = TextEditingController(text: defaultNoteText);
 
     DateTime? selectedDate = expenseToEdit != null
-        ? (expenseToEdit['date'] != null ? DateTime.tryParse(expenseToEdit['date']) : null)
+        ? (expenseToEdit['date'] != null
+              ? DateTime.tryParse(expenseToEdit['date'])
+              : null)
         : defaultDate;
 
     showModalBottomSheet(
@@ -13630,7 +15435,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final int parsedAmount = int.tryParse(amountController.text.trim()) ?? 0;
+            final int parsedAmount =
+                int.tryParse(amountController.text.trim()) ?? 0;
 
             return Padding(
               padding: EdgeInsets.only(
@@ -13638,7 +15444,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               ),
               child: SafeArea(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -13660,12 +15469,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               onTap: () => Navigator.pop(context),
                               child: const Padding(
                                 padding: EdgeInsets.all(4.0),
-                                child: Icon(Icons.close, color: Colors.grey, size: 22),
+                                child: Icon(
+                                  Icons.close,
+                                  color: Colors.grey,
+                                  size: 22,
+                                ),
                               ),
                             ),
                             Expanded(
                               child: Text(
-                                expenseToEdit != null ? 'Chỉnh sửa chi phí' : 'Thêm chi phí',
+                                expenseToEdit != null
+                                    ? 'Chỉnh sửa chi phí'
+                                    : 'Thêm chi phí',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 18,
@@ -13676,22 +15491,32 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             ),
                             GestureDetector(
                               onTap: () {
-                                final int parsedAmt = int.tryParse(amountController.text.trim()) ?? 0;
-                                final DateTime activeDate = selectedDate ?? DateTime.now();
+                                final int parsedAmt =
+                                    int.tryParse(
+                                      amountController.text.trim(),
+                                    ) ??
+                                    0;
+                                final DateTime activeDate =
+                                    selectedDate ?? DateTime.now();
                                 if (parsedAmt <= 0) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Vui lòng nhập số tiền chi phí'),
+                                      content: Text(
+                                        'Vui lòng nhập số tiền chi phí',
+                                      ),
                                       backgroundColor: Colors.redAccent,
                                       duration: Duration(seconds: 2),
                                     ),
                                   );
                                   return;
                                 }
-                                if (selectedCategory == null || selectedCategory!.isEmpty) {
+                                if (selectedCategory == null ||
+                                    selectedCategory!.isEmpty) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Vui lòng chọn mục chi phí'),
+                                      content: Text(
+                                        'Vui lòng chọn mục chi phí',
+                                      ),
                                       backgroundColor: Colors.redAccent,
                                       duration: Duration(seconds: 2),
                                     ),
@@ -13701,7 +15526,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 if (selectedDate == null) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Vui lòng chọn ngày cho chi phí'),
+                                      content: Text(
+                                        'Vui lòng chọn ngày cho chi phí',
+                                      ),
                                       backgroundColor: Colors.redAccent,
                                       duration: Duration(seconds: 2),
                                     ),
@@ -13709,29 +15536,44 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   return;
                                 }
 
-                                final dynamic effSavedPlaceId = savedPlaceId ?? expenseToEdit?['savedPlaceId'];
-                                final dynamic effDetailId = detailId ?? expenseToEdit?['detailId'];
+                                final dynamic effSavedPlaceId =
+                                    savedPlaceId ??
+                                    expenseToEdit?['savedPlaceId'];
+                                final dynamic effDetailId =
+                                    detailId ?? expenseToEdit?['detailId'];
 
                                 if (expenseToEdit != null) {
                                   final expId = expenseToEdit['id'];
                                   final updatedExp = {
                                     ...expenseToEdit,
-                                    'title': noteController.text.trim().isNotEmpty
+                                    'title':
+                                        noteController.text.trim().isNotEmpty
                                         ? noteController.text.trim()
                                         : selectedCategory!,
                                     'amount': parsedAmt,
                                     'category': selectedCategory!,
                                     'payer': currentPayer,
                                     'share': currentShare,
-                                    'date': selectedDate!.toIso8601String().substring(0, 10),
+                                    'date': selectedDate!
+                                        .toIso8601String()
+                                        .substring(0, 10),
                                     'currencySymbol': selectedCurrencySymbol,
                                     'currencyCode': selectedCurrencyCode,
-                                    if (effSavedPlaceId != null) 'savedPlaceId': effSavedPlaceId.toString(),
-                                    if (effDetailId != null) 'detailId': effDetailId.toString(),
+                                    if (effSavedPlaceId != null)
+                                      'savedPlaceId': effSavedPlaceId
+                                          .toString(),
+                                    if (effDetailId != null)
+                                      'detailId': effDetailId.toString(),
                                   };
                                   setState(() {
-                                    _syncExpenseAmountToPlace(effSavedPlaceId, effDetailId, parsedAmt);
-                                    final idx = _customExpenses.indexOf(expenseToEdit);
+                                    _syncExpenseAmountToPlace(
+                                      effSavedPlaceId,
+                                      effDetailId,
+                                      parsedAmt,
+                                    );
+                                    final idx = _customExpenses.indexOf(
+                                      expenseToEdit,
+                                    );
                                     if (idx >= 0) {
                                       _customExpenses[idx] = updatedExp;
                                     }
@@ -13739,61 +15581,98 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   _saveExpensesToPrefs();
                                   Navigator.pop(context);
                                   if (expId != null) {
-                                    DatabaseService().updateExpense(expId, updatedExp).then((savedExp) {
-                                      if (savedExp != null && mounted) {
-                                        setState(() {
-                                          final idx2 = _customExpenses.indexWhere((e) => e['id'] == expId);
-                                          if (idx2 >= 0) _customExpenses[idx2] = savedExp;
+                                    DatabaseService()
+                                        .updateExpense(expId, updatedExp)
+                                        .then((savedExp) {
+                                          if (savedExp != null && mounted) {
+                                            setState(() {
+                                              final idx2 = _customExpenses
+                                                  .indexWhere(
+                                                    (e) => e['id'] == expId,
+                                                  );
+                                              if (idx2 >= 0)
+                                                _customExpenses[idx2] =
+                                                    savedExp;
+                                            });
+                                            _saveExpensesToPrefs();
+                                            _loadData(silent: true);
+                                          }
                                         });
-                                        _saveExpensesToPrefs();
-                                        _loadData(silent: true);
-                                      }
-                                    });
                                   }
                                 } else {
                                   final newExp = {
-                                    'title': noteController.text.trim().isNotEmpty
+                                    'title':
+                                        noteController.text.trim().isNotEmpty
                                         ? noteController.text.trim()
                                         : selectedCategory!,
                                     'amount': parsedAmt,
                                     'category': selectedCategory!,
                                     'payer': currentPayer,
                                     'share': currentShare,
-                                    'date': (selectedDate ?? DateTime.now()).toIso8601String().substring(0, 10),
+                                    'date': (selectedDate ?? DateTime.now())
+                                        .toIso8601String()
+                                        .substring(0, 10),
                                     'currencySymbol': selectedCurrencySymbol,
                                     'currencyCode': selectedCurrencyCode,
-                                    if (effSavedPlaceId != null) 'savedPlaceId': effSavedPlaceId.toString(),
-                                    if (effDetailId != null) 'detailId': effDetailId.toString(),
+                                    if (effSavedPlaceId != null)
+                                      'savedPlaceId': effSavedPlaceId
+                                          .toString(),
+                                    if (effDetailId != null)
+                                      'detailId': effDetailId.toString(),
                                   };
                                   setState(() {
-                                    _syncExpenseAmountToPlace(effSavedPlaceId, effDetailId, parsedAmt);
+                                    _syncExpenseAmountToPlace(
+                                      effSavedPlaceId,
+                                      effDetailId,
+                                      parsedAmt,
+                                    );
                                     _customExpenses.insert(0, newExp);
                                   });
                                   _saveExpensesToPrefs();
                                   Navigator.pop(context);
-                                  final int currentItineraryId = (_itineraryData['id'] as num?)?.toInt() ?? 0;
+                                  final int currentItineraryId =
+                                      (_itineraryData['id'] as num?)?.toInt() ??
+                                      0;
                                   if (currentItineraryId > 0) {
-                                    DatabaseService().addExpense(currentItineraryId, newExp).then((savedExp) {
-                                      if (savedExp != null && mounted) {
-                                        setState(() {
-                                          final idx = _customExpenses.indexWhere((e) => e['title'] == newExp['title'] && e['amount'] == newExp['amount'] && e['id'] == null);
-                                          if (idx >= 0) {
-                                            _customExpenses[idx] = savedExp;
-                                          } else {
-                                            _customExpenses.insert(0, savedExp);
+                                    DatabaseService()
+                                        .addExpense(currentItineraryId, newExp)
+                                        .then((savedExp) {
+                                          if (savedExp != null && mounted) {
+                                            setState(() {
+                                              final idx = _customExpenses
+                                                  .indexWhere(
+                                                    (e) =>
+                                                        e['title'] ==
+                                                            newExp['title'] &&
+                                                        e['amount'] ==
+                                                            newExp['amount'] &&
+                                                        e['id'] == null,
+                                                  );
+                                              if (idx >= 0) {
+                                                _customExpenses[idx] = savedExp;
+                                              } else {
+                                                _customExpenses.insert(
+                                                  0,
+                                                  savedExp,
+                                                );
+                                              }
+                                            });
+                                            _saveExpensesToPrefs();
+                                            _loadData(silent: true);
                                           }
                                         });
-                                        _saveExpensesToPrefs();
-                                        _loadData(silent: true);
-                                      }
-                                    });
                                   }
                                 }
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: (parsedAmount > 0 && selectedCategory != null)
+                                  color:
+                                      (parsedAmount > 0 &&
+                                          selectedCategory != null)
                                       ? AppTheme.primary
                                       : Colors.grey[200],
                                   borderRadius: BorderRadius.circular(20),
@@ -13803,7 +15682,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: (parsedAmount > 0 && selectedCategory != null)
+                                    color:
+                                        (parsedAmount > 0 &&
+                                            selectedCategory != null)
                                         ? Colors.white
                                         : Colors.grey[500],
                                   ),
@@ -13816,7 +15697,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
                         // Compact Sleek Amount Display Box
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
@@ -13827,15 +15711,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             children: [
                               GestureDetector(
                                 onTap: () {
-                                  _showCurrencyPickerSheet(selectedCurrencyCode, (symbol, code) {
-                                    setModalState(() {
-                                      selectedCurrencySymbol = symbol;
-                                      selectedCurrencyCode = code;
-                                    });
-                                  });
+                                  _showCurrencyPickerSheet(
+                                    selectedCurrencyCode,
+                                    (symbol, code) {
+                                      setModalState(() {
+                                        selectedCurrencySymbol = symbol;
+                                        selectedCurrencyCode = code;
+                                      });
+                                    },
+                                  );
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF1F5F9),
                                     borderRadius: BorderRadius.circular(12),
@@ -13852,7 +15742,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         ),
                                       ),
                                       const SizedBox(width: 4),
-                                      const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey, size: 16),
+                                      const Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        color: Colors.grey,
+                                        size: 16,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -13892,6 +15786,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             ],
                           ),
                         ),
+                        if (selectedCurrencyCode != 'VND' &&
+                            parsedAmount > 0) ...[
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Text(
+                                '≈ ${_formatExpenseAmount((parsedAmount * (_currencyRates[selectedCurrencyCode] ?? 1.0)).round())} đ (1 $selectedCurrencyCode = ${_formatExpenseAmount((_currencyRates[selectedCurrencyCode] ?? 1.0).round())} đ)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 14),
 
                         // Detail Options Group Box
@@ -13912,9 +15824,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             children: [
                               // Category Tile
                               InkWell(
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(20),
+                                ),
                                 onTap: () {
-                                  _showCategoryPickerSheet(({required categoryName, required categoryIcon, placeName}) {
+                                  _showCategoryPickerSheet(({
+                                    required categoryName,
+                                    required categoryIcon,
+                                    placeName,
+                                  }) {
                                     setModalState(() {
                                       selectedCategory = categoryName;
                                       selectedIcon = categoryIcon;
@@ -13923,25 +15841,40 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   });
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
                                   child: Row(
                                     children: [
-                                      Builder(builder: (ctx) {
-                                        final catColor = _getCategoryColor(selectedCategory ?? '');
-                                        return Container(
-                                          width: 38,
-                                          height: 38,
-                                          decoration: BoxDecoration(
-                                            color: catColor.withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Icon(selectedIcon, color: catColor, size: 20),
-                                        );
-                                      }),
+                                      Builder(
+                                        builder: (ctx) {
+                                          final catColor = _getCategoryColor(
+                                            selectedCategory ?? '',
+                                          );
+                                          return Container(
+                                            width: 38,
+                                            height: 38,
+                                            decoration: BoxDecoration(
+                                              color: catColor.withValues(
+                                                alpha: 0.12,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Icon(
+                                              selectedIcon,
+                                              color: catColor,
+                                              size: 20,
+                                            ),
+                                          );
+                                        },
+                                      ),
                                       const SizedBox(width: 14),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               'Danh mục',
@@ -13953,26 +15886,42 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              selectedCategory ?? 'Chọn danh mục',
+                                              selectedCategory ??
+                                                  'Chọn danh mục',
                                               style: TextStyle(
                                                 fontSize: 15,
-                                                fontWeight: selectedCategory != null ? FontWeight.bold : FontWeight.w500,
-                                                color: selectedCategory != null ? AppTheme.darkText : Colors.grey[400],
+                                                fontWeight:
+                                                    selectedCategory != null
+                                                    ? FontWeight.bold
+                                                    : FontWeight.w500,
+                                                color: selectedCategory != null
+                                                    ? AppTheme.darkText
+                                                    : Colors.grey[400],
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Colors.grey,
+                                      ),
                                     ],
                                   ),
                                 ),
                               ),
-                              const Divider(height: 1, indent: 68, endIndent: 16),
+                              const Divider(
+                                height: 1,
+                                indent: 68,
+                                endIndent: 16,
+                              ),
 
                               // Description Tile
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
                                 child: Row(
                                   children: [
                                     Container(
@@ -13982,7 +15931,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         color: const Color(0xFFF1F5F9),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: Icon(Icons.edit_note_rounded, color: Colors.grey[700], size: 22),
+                                      child: Icon(
+                                        Icons.edit_note_rounded,
+                                        color: Colors.grey[700],
+                                        size: 22,
+                                      ),
                                     ),
                                     const SizedBox(width: 14),
                                     Expanded(
@@ -14014,20 +15967,28 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   ],
                                 ),
                               ),
-                              const Divider(height: 1, indent: 68, endIndent: 16),
-
+                              const Divider(
+                                height: 1,
+                                indent: 68,
+                                endIndent: 16,
+                              ),
 
                               // Payer Tile
                               InkWell(
                                 onTap: () {
-                                  _showPayerPickerSheet(currentPayer, (newPayer) {
+                                  _showPayerPickerSheet(currentPayer, (
+                                    newPayer,
+                                  ) {
                                     setModalState(() {
                                       currentPayer = newPayer;
                                     });
                                   });
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
                                   child: Row(
                                     children: [
                                       Container(
@@ -14035,14 +15996,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         height: 38,
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
-                                        child: Icon(Icons.account_balance_wallet_outlined, color: Colors.grey[700], size: 20),
+                                        child: Icon(
+                                          Icons.account_balance_wallet_outlined,
+                                          color: Colors.grey[700],
+                                          size: 20,
+                                        ),
                                       ),
                                       const SizedBox(width: 14),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               'Người trả',
@@ -14064,24 +16032,40 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           ],
                                         ),
                                       ),
-                                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Colors.grey,
+                                      ),
                                     ],
                                   ),
                                 ),
                               ),
-                              const Divider(height: 1, indent: 68, endIndent: 16),
+                              const Divider(
+                                height: 1,
+                                indent: 68,
+                                endIndent: 16,
+                              ),
 
                               // Sharing Option Tile
                               InkWell(
                                 onTap: () {
-                                  _showSharingOptionSheet(currentShare, (newShare) {
-                                    setModalState(() {
-                                      currentShare = newShare;
-                                    });
-                                  }, amount: parsedAmount);
+                                  _showSharingOptionSheet(
+                                    currentShare,
+                                    (newShare) {
+                                      setModalState(() {
+                                        currentShare = newShare;
+                                      });
+                                    },
+                                    amount: parsedAmount,
+                                    currencySymbol: selectedCurrencySymbol,
+                                    currencyCode: selectedCurrencyCode,
+                                  );
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
                                   child: Row(
                                     children: [
                                       Container(
@@ -14089,14 +16073,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         height: 38,
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
-                                        child: Icon(Icons.group_outlined, color: Colors.grey[700], size: 20),
+                                        child: Icon(
+                                          Icons.group_outlined,
+                                          color: Colors.grey[700],
+                                          size: 20,
+                                        ),
                                       ),
                                       const SizedBox(width: 14),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               'Chia sẻ nhóm',
@@ -14108,7 +16099,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              currentShare,
+                                              _formatShareDisplay(currentShare),
                                               style: TextStyle(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.bold,
@@ -14118,16 +16109,25 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           ],
                                         ),
                                       ),
-                                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Colors.grey,
+                                      ),
                                     ],
                                   ),
                                 ),
                               ),
-                              const Divider(height: 1, indent: 68, endIndent: 16),
+                              const Divider(
+                                height: 1,
+                                indent: 68,
+                                endIndent: 16,
+                              ),
 
                               // Date Picker Tile
                               InkWell(
-                                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                                borderRadius: const BorderRadius.vertical(
+                                  bottom: Radius.circular(20),
+                                ),
                                 onTap: () async {
                                   final picked = await showDatePicker(
                                     context: context,
@@ -14142,7 +16142,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   }
                                 },
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 12,
+                                  ),
                                   child: Row(
                                     children: [
                                       Container(
@@ -14150,14 +16153,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         height: 38,
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
-                                        child: Icon(Icons.calendar_today_rounded, color: Colors.grey[700], size: 18),
+                                        child: Icon(
+                                          Icons.calendar_today_rounded,
+                                          color: Colors.grey[700],
+                                          size: 18,
+                                        ),
                                       ),
                                       const SizedBox(width: 14),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               'Ngày thanh toán',
@@ -14181,7 +16191,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           ],
                                         ),
                                       ),
-                                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: Colors.grey,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -14196,23 +16209,48 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             child: GestureDetector(
                               onTap: () async {
                                 final expId = expenseToEdit['id'];
-                                final effSavedPlaceId = expenseToEdit['savedPlaceId'];
+                                final effSavedPlaceId =
+                                    expenseToEdit['savedPlaceId'];
                                 final effDetailId = expenseToEdit['detailId'];
 
                                 // Update local state immediately
                                 setState(() {
                                   // Clear expense from place in local state
-                                  _syncExpenseAmountToPlace(effSavedPlaceId, effDetailId, 0);
+                                  _syncExpenseAmountToPlace(
+                                    effSavedPlaceId,
+                                    effDetailId,
+                                    0,
+                                  );
                                   // Also clear the expense object
                                   if (effSavedPlaceId != null) {
-                                    final idx = _savedPlaces.indexWhere((sp) => sp['id']?.toString() == effSavedPlaceId.toString());
-                                    if (idx != -1) _savedPlaces[idx]['expense'] = null;
+                                    final idx = _savedPlaces.indexWhere(
+                                      (sp) =>
+                                          sp['id']?.toString() ==
+                                          effSavedPlaceId.toString(),
+                                    );
+                                    if (idx != -1)
+                                      _savedPlaces[idx]['expense'] = null;
                                   }
                                   if (effDetailId != null) {
-                                    final idx = _details.indexWhere((d) => d['id']?.toString() == effDetailId.toString());
-                                    if (idx != -1) _details[idx]['expense'] = null;
+                                    final idx = _details.indexWhere(
+                                      (d) =>
+                                          d['id']?.toString() ==
+                                          effDetailId.toString(),
+                                    );
+                                    if (idx != -1)
+                                      _details[idx]['expense'] = null;
                                   }
-                                  _customExpenses.removeWhere((e) => e['id'] == expId || e == expenseToEdit);
+                                  _customExpenses.removeWhere(
+                                    (e) =>
+                                        e['id'] == expId || e == expenseToEdit,
+                                  );
+                                  if (_customExpenses.isEmpty) {
+                                    _settlements.clear();
+                                    _saveSettlementsToPrefs();
+                                  } else if (expId != null) {
+                                    _settlements.removeWhere((st) => st['expenseId']?.toString() == expId.toString());
+                                    _saveSettlementsToPrefs();
+                                  }
                                 });
                                 _saveExpensesToPrefs();
                                 Navigator.pop(context);
@@ -14222,11 +16260,37 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   await DatabaseService().deleteExpense(expId);
                                 }
                                 if (mounted) {
-                                  _loadData(); // reload full để tổng quan + hành trình cập nhật
+                                  final itinId =
+                                      (_itineraryData['id'] as num?)?.toInt() ??
+                                      0;
+                                  if (itinId > 0) {
+                                    // Chỉ reload expenses + settlements, tránh reset state toàn trang
+                                    DatabaseService().getExpenses(itinId).then((
+                                      serverExp,
+                                    ) {
+                                      if (mounted)
+                                        setState(
+                                          () => _customExpenses = serverExp,
+                                        );
+                                      _saveExpensesToPrefs();
+                                    });
+                                    DatabaseService()
+                                        .getSettlements(itinId)
+                                        .then((serverSt) {
+                                          if (mounted)
+                                            setState(
+                                              () => _settlements = serverSt,
+                                            );
+                                          _saveSettlementsToPrefs();
+                                        });
+                                  }
                                 }
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF1F5F9),
                                   borderRadius: BorderRadius.circular(20),
@@ -14234,7 +16298,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.delete_outline, color: Colors.grey[700], size: 18),
+                                    Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.grey[700],
+                                      size: 18,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       'Xóa',
@@ -14266,7 +16334,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   Widget _buildExpensesTab() {
     int totalSpent = 0;
     for (var exp in _customExpenses) {
-      totalSpent += (exp['amount'] as num?)?.toInt() ?? 0;
+      totalSpent += _convertExpenseToItineraryCurrency(exp).round();
     }
 
     List<Map<String, dynamic>> sortedExpenses = List.from(_customExpenses);
@@ -14275,9 +16343,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     } else if (_sortExpensesOption == 'OLDEST') {
       // original order
     } else if (_sortExpensesOption == 'PRICE_HIGH') {
-      sortedExpenses.sort((a, b) => ((b['amount'] as num?) ?? 0).compareTo((a['amount'] as num?) ?? 0));
+      sortedExpenses.sort(
+        (a, b) =>
+            ((b['amount'] as num?) ?? 0).compareTo((a['amount'] as num?) ?? 0),
+      );
     } else if (_sortExpensesOption == 'PRICE_LOW') {
-      sortedExpenses.sort((a, b) => ((a['amount'] as num?) ?? 0).compareTo((b['amount'] as num?) ?? 0));
+      sortedExpenses.sort(
+        (a, b) =>
+            ((a['amount'] as num?) ?? 0).compareTo((b['amount'] as num?) ?? 0),
+      );
     }
 
     return Container(
@@ -14320,10 +16394,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primary.withValues(alpha: 0.12),
+                                  color: AppTheme.primary.withValues(
+                                    alpha: 0.12,
+                                  ),
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(Icons.account_balance_wallet_rounded, color: AppTheme.primary, size: 20),
+                                child: Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  color: AppTheme.primary,
+                                  size: 20,
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Text(
@@ -14342,16 +16422,25 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             GestureDetector(
                               onTap: _showSetBudgetSheet,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  border: Border.all(
+                                    color: const Color(0xFFCBD5E1),
+                                  ),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.add_circle_outline_rounded, color: AppTheme.primary, size: 15),
+                                    Icon(
+                                      Icons.add_circle_outline_rounded,
+                                      color: AppTheme.primary,
+                                      size: 15,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       'Đặt ngân sách',
@@ -14375,7 +16464,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               ),
                               child: FractionallySizedBox(
                                 alignment: Alignment.centerLeft,
-                                widthFactor: (totalSpent / _tripBudget).clamp(0.0, 1.0),
+                                widthFactor: (totalSpent / _tripBudget).clamp(
+                                  0.0,
+                                  1.0,
+                                ),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: AppTheme.primary,
@@ -14422,7 +16514,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: Colors.white,
-                                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                                      border: Border.all(
+                                        color: const Color(0xFFCBD5E1),
+                                      ),
                                     ),
                                     child: Icon(
                                       Icons.person_add_outlined,
@@ -14442,7 +16536,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                                      border: Border.all(
+                                        color: const Color(0xFFCBD5E1),
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
@@ -14475,7 +16571,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                                      border: Border.all(
+                                        color: const Color(0xFFCBD5E1),
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
@@ -14525,7 +16623,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               });
                             },
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(16),
@@ -14576,7 +16677,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
               if (sortedExpenses.isEmpty) {
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 16,
+                  ),
                   child: Text(
                     'Bạn chưa thêm chi phí nào. Theo dõi chi phí của bạn và chia sẻ chi phí bằng cách thêm một chi phí.',
                     style: TextStyle(
@@ -14597,8 +16701,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               final categoryName = item['category'] ?? 'Khác';
 
               final firstPayer = payer.split(',').first.trim();
-              final payerInitial = firstPayer.isNotEmpty ? firstPayer[0].toUpperCase() : '?';
-              final Color payerColor = Colors.primaries[firstPayer.hashCode.abs() % Colors.primaries.length];
+              final payerInitial = firstPayer.isNotEmpty
+                  ? firstPayer[0].toUpperCase()
+                  : '?';
+              final Color payerColor =
+                  Colors.primaries[firstPayer.hashCode.abs() %
+                      Colors.primaries.length];
               final String? payerAvatarUrl = _getPayerAvatarUrl(payer);
               final Color catColor = _getCategoryColor(categoryName);
 
@@ -14621,7 +16729,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
-                      _getCategoryIconData(categoryName, iconCode: (item['iconCode'] as num?)?.toInt()),
+                      _getCategoryIconData(
+                        categoryName,
+                        iconCode: (item['iconCode'] as num?)?.toInt(),
+                      ),
                       color: catColor,
                       size: 22,
                     ),
@@ -14637,17 +16748,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   ),
                   subtitle: Text(
                     '$date • $categoryName',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   trailing: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        _formatExpenseAmount(amt),
+                        _formatExpenseAmount(
+                          amt,
+                          currencySymbol: item['currencySymbol']?.toString(),
+                          currencyCode: item['currencyCode']?.toString(),
+                        ),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -14658,7 +16770,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       CircleAvatar(
                         radius: 11,
                         backgroundColor: payerColor,
-                        foregroundImage: payerAvatarUrl != null ? NetworkImage(payerAvatarUrl) : null,
+                        foregroundImage: payerAvatarUrl != null
+                            ? NetworkImage(payerAvatarUrl)
+                            : null,
                         child: Text(
                           payerInitial,
                           style: const TextStyle(
@@ -14688,16 +16802,34 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         final effDetailId = item['detailId'];
 
                         setState(() {
-                          _syncExpenseAmountToPlace(effSavedPlaceId, effDetailId, 0);
+                          _syncExpenseAmountToPlace(
+                            effSavedPlaceId,
+                            effDetailId,
+                            0,
+                          );
                           if (effSavedPlaceId != null) {
-                            final idx = _savedPlaces.indexWhere((sp) => sp['id']?.toString() == effSavedPlaceId.toString());
+                            final idx = _savedPlaces.indexWhere(
+                              (sp) =>
+                                  sp['id']?.toString() ==
+                                  effSavedPlaceId.toString(),
+                            );
                             if (idx != -1) _savedPlaces[idx]['expense'] = null;
                           }
                           if (effDetailId != null) {
-                            final idx = _details.indexWhere((d) => d['id']?.toString() == effDetailId.toString());
+                            final idx = _details.indexWhere(
+                              (d) =>
+                                  d['id']?.toString() == effDetailId.toString(),
+                            );
                             if (idx != -1) _details[idx]['expense'] = null;
                           }
                           _customExpenses.remove(item);
+                          if (_customExpenses.isEmpty) {
+                            _settlements.clear();
+                            _saveSettlementsToPrefs();
+                          } else if (expId != null) {
+                            _settlements.removeWhere((st) => st['expenseId']?.toString() == expId.toString());
+                            _saveSettlementsToPrefs();
+                          }
                         });
                         _saveExpensesToPrefs();
 
@@ -14705,7 +16837,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           await DatabaseService().deleteExpense(expId);
                         }
                         if (mounted) {
-                          _loadData();
+                          final itinId =
+                              (_itineraryData['id'] as num?)?.toInt() ?? 0;
+                          if (itinId > 0) {
+                            DatabaseService().getExpenses(itinId).then((
+                              serverExp,
+                            ) {
+                              if (mounted)
+                                setState(() => _customExpenses = serverExp);
+                              _saveExpensesToPrefs();
+                            });
+                            DatabaseService().getSettlements(itinId).then((
+                              serverSt,
+                            ) {
+                              if (mounted)
+                                setState(() => _settlements = serverSt);
+                              _saveSettlementsToPrefs();
+                            });
+                          }
                         }
                       },
                       backgroundColor: const Color(0xFFFF5252),
@@ -14755,10 +16904,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   icon: const Icon(Icons.add, size: 20),
                   label: const Text(
                     'Thêm chi phí',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                   onPressed: _showAddExpenseBottomSheet,
                 ),
@@ -14767,7 +16913,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ],
       ),
     );
-
   }
 }
 
