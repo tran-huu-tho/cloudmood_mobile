@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
 
 class MapPickerScreen extends StatefulWidget {
@@ -14,9 +17,24 @@ class MapPickerScreen extends StatefulWidget {
 
 class _MapPickerScreenState extends State<MapPickerScreen> {
   final MapController _mapController = MapController();
+  final TextEditingController _searchController = TextEditingController();
   LatLng _currentCenter = const LatLng(10.03022, 105.78753); // Default to Can Tho
   bool _isLoadingLocation = false;
   double _currentZoom = 16.0;
+
+  List<dynamic> _searchResults = [];
+  bool _isSearching = false;
+  bool _showSearchResults = false;
+  Timer? _debounceTimer;
+
+  String _cleanLocationName(String rawName) {
+    if (rawName.isEmpty) return '';
+    return rawName
+        .replaceAll(RegExp(r'\s*\(?\b\d{4,6}\b\)?\s*,?'), '')
+        .replaceAll(RegExp(r',\s*,'), ',')
+        .replaceAll(RegExp(r'^,\s*|\s*,$'), '')
+        .trim();
+  }
 
   @override
   void initState() {
@@ -28,6 +46,13 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     } else {
       _determinePosition();
     }
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _determinePosition() async {
@@ -66,6 +91,66 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       setState(() {
         _isLoadingLocation = false;
       });
+    }
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 400), () {
+      if (query.trim().length >= 2) {
+        _searchLocation(query);
+      } else {
+        setState(() {
+          _searchResults = [];
+          _showSearchResults = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _searchLocation(String query) async {
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&limit=5&accept-language=vi',
+      );
+      final response = await http.get(uri, headers: {
+        'User-Agent': 'CloudMoodMobile/1.0',
+      });
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _searchResults = data is List ? data : [];
+          _showSearchResults = _searchResults.isNotEmpty;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error searching location: $e');
+    } finally {
+      setState(() {
+        _isSearching = false;
+      });
+    }
+  }
+
+  void _selectSearchResult(dynamic item) {
+    final double? lat = double.tryParse(item['lat']?.toString() ?? '');
+    final double? lon = double.tryParse(item['lon']?.toString() ?? '');
+
+    if (lat != null && lon != null) {
+      final newPos = LatLng(lat, lon);
+      final cleanedName = _cleanLocationName(item['display_name']?.toString() ?? '');
+      setState(() {
+        _currentCenter = newPos;
+        _showSearchResults = false;
+        _searchController.text = cleanedName.split(',')[0];
+      });
+      _mapController.move(newPos, 16.0);
+      FocusScope.of(context).unfocus();
     }
   }
 
@@ -122,6 +207,121 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 size: 44,
                 color: AppTheme.red,
               ),
+            ),
+          ),
+
+          // Top Floating Search Bar
+          Positioned(
+            top: 12,
+            left: 16,
+            right: 16,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 12),
+                      Icon(Icons.search_rounded, color: AppTheme.subtitleText, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: _onSearchChanged,
+                          style: TextStyle(fontSize: 13, color: AppTheme.darkText),
+                          decoration: InputDecoration(
+                            hintText: 'Tìm tên đường, địa điểm gần ghim...',
+                            hintStyle: TextStyle(fontSize: 13, color: AppTheme.subtitleText.withOpacity(0.7)),
+                            filled: false,
+                            fillColor: Colors.transparent,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            focusedErrorBorder: InputBorder.none,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      if (_isSearching)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10.0),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else if (_searchController.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 18),
+                          color: AppTheme.subtitleText,
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchResults = [];
+                              _showSearchResults = false;
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Search Results Dropdown List
+                if (_showSearchResults && _searchResults.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      shrinkWrap: true,
+                      itemCount: _searchResults.length,
+                      separatorBuilder: (ctx, idx) => Divider(height: 1, color: Colors.grey.withOpacity(0.15)),
+                      itemBuilder: (context, index) {
+                        final item = _searchResults[index];
+                        final rawName = item['display_name']?.toString() ?? '';
+                        final displayName = _cleanLocationName(rawName);
+                        return ListTile(
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          leading: Icon(Icons.location_on_outlined, color: AppTheme.primary, size: 18),
+                          title: Text(
+                            displayName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: AppTheme.darkText),
+                          ),
+                          onTap: () => _selectSearchResult(item),
+                        );
+                      },
+                    ),
+                  ),
+              ],
             ),
           ),
 
