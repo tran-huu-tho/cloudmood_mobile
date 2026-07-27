@@ -317,7 +317,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
 
           if (itineraryId != null) {
             String privacyVal = 'public';
-            if (_privacyLevel == 'Bạn bè' || _privacyLevel == 'FRIENDS') privacyVal = 'friends';
+            if (_privacyLevel == 'Thành viên' || _privacyLevel == 'MEMBERS') privacyVal = 'members';
             if (_privacyLevel == 'Riêng tư' || _privacyLevel == 'PRIVATE') privacyVal = 'private';
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('privacy_$itineraryId', privacyVal);
@@ -1317,9 +1317,9 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
   // STEP 2: Companions & Privacy Level
   Widget _buildStep2PrivacyCompanions() {
     final privacyOptions = [
-      {'title': 'Công khai', 'desc': 'Mọi người đều có thể đọc bài hướng dẫn', 'icon': Icons.public_rounded},
-      {'title': 'Bạn bè', 'desc': 'Chỉ bạn bè trong hệ thống được xem', 'icon': Icons.group_rounded},
-      {'title': 'Riêng tư', 'desc': 'Chỉ mình bạn và người cùng biên soạn', 'icon': Icons.lock_rounded},
+      {'title': 'Công khai', 'desc': 'Mọi người đều có thể đọc bài hướng dẫn trên Khám phá', 'icon': Icons.public_rounded},
+      {'title': 'Thành viên', 'desc': 'Chỉ bạn và người cùng biên soạn/đồng tác giả mới có thể xem', 'icon': Icons.group_rounded},
+      {'title': 'Riêng tư', 'desc': 'Lưu nháp, chỉ mình bạn có quyền xem', 'icon': Icons.lock_rounded},
     ];
 
     return SingleChildScrollView(

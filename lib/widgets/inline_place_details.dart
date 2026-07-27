@@ -200,6 +200,10 @@ class _InlinePlaceWhiteCardExtensionState
 
   void _onNoteChanged(String val) {
     if (!_checkCanEdit()) return;
+    // Optimistically update local map memory instantly (0ms latency)
+    widget.detail['noteText'] = val;
+    widget.detail['notetext'] = val;
+
     final itinId = widget.detail['itineraryId'] as int?;
     final detailId = widget.detail['id'] as int?;
     if (itinId != null && detailId != null) {
@@ -212,12 +216,10 @@ class _InlinePlaceWhiteCardExtensionState
       );
     }
     if (_noteDebounce?.isActive ?? false) _noteDebounce!.cancel();
-    _noteDebounce = Timer(const Duration(milliseconds: 800), () {
+    _noteDebounce = Timer(const Duration(milliseconds: 300), () {
       _updateField({'noteText': val});
     });
   }
-
-
 
   Future<void> _pickTime() async {
     if (!_checkCanEdit()) return;
@@ -260,16 +262,18 @@ class _InlinePlaceWhiteCardExtensionState
 
   Future<void> _updateField(Map<String, dynamic> data) async {
     if (widget.isReadOnly) return;
+    // Optimistically update local widget.detail map
+    data.forEach((key, value) {
+      widget.detail[key] = value;
+    });
+
     final id = widget.detail['id'] as int;
-    await DatabaseService().updateNoteOrDetail(
+    // Fire and forget async background database update without blocking UI or reloading screen
+    DatabaseService().updateNoteOrDetail(
       id,
       data,
       widget.isItineraryDetail,
     );
-    // Don't call onUpdate immediately if user is typing to prevent focus loss
-    if (!_noteFocus.hasFocus && !_costFocus.hasFocus) {
-      widget.onUpdate();
-    }
   }
 
   @override
@@ -312,37 +316,6 @@ class _InlinePlaceWhiteCardExtensionState
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             GestureDetector(
-              onTap: () {
-                if (!_checkCanEdit()) return;
-                setState(() {
-                  isVisited = !isVisited;
-                });
-                _updateField({'isVisited': isVisited});
-                widget.onUpdate();
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check,
-                    color: isVisited ? AppTheme.primary : AppTheme.subtitleText,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Đánh dấu ghé thăm',
-                    style: TextStyle(
-                      color: isVisited
-                          ? AppTheme.primary
-                          : AppTheme.subtitleText,
-                      fontWeight: isVisited ? FontWeight.bold : FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            GestureDetector(
               onTap: _pickTime,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -357,30 +330,6 @@ class _InlinePlaceWhiteCardExtensionState
                     startTime != null && endTime != null
                         ? '$startTime - $endTime'
                         : 'Thêm giờ',
-                    style: TextStyle(
-                      color: AppTheme.subtitleText,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: _pickFile,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.attach_file_rounded,
-                    color: AppTheme.subtitleText,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    attachments.isNotEmpty
-                        ? '${attachments.length} tệp đính kèm'
-                        : 'Đính kèm',
                     style: TextStyle(
                       color: AppTheme.subtitleText,
                       fontWeight: FontWeight.bold,
@@ -638,11 +587,22 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                   '',
                   false,
                   context,
+                  onTap: () async {
+                    final lat = place['latitude'] ?? place['lat'];
+                    final lng = place['longitude'] ?? place['lng'];
+                    final dest = (lat != null && lng != null)
+                        ? '$lat,$lng'
+                        : (place['address'] ?? place['name'] ?? '');
+                    final url = Uri.parse(
+                      'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(dest.toString())}',
+                    );
+                    try {
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      }
+                    } catch (_) {}
+                  },
                 ),
-                const SizedBox(width: 8),
-                _buildActionButton(null, 'Giới thiệu', false, context),
-                const SizedBox(width: 8),
-                _buildActionButton(Icons.build, 'Hướng dẫn', false, context),
               ],
             ),
           ),

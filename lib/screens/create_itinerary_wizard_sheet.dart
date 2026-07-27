@@ -97,7 +97,7 @@ class _CreateItineraryWizardSheetState
   final List<InvitedCompanion> _invitedCompanionsList = [];
   final TextEditingController _companionInputController = TextEditingController();
   String _dialogSelectedRole = 'EDITOR'; // 'EDITOR' or 'VIEWER'
-  String _privacyLevel = 'Bạn bè'; // 'Bạn bè', 'Riêng tư', 'Công khai'
+  String _privacyLevel = 'Riêng tư'; // 'Riêng tư', 'Thành viên'
 
   // Step 4: Trip Preferences (DB Categories, Top Rated Attractions, UI)
   List<Map<String, dynamic>> _dbCategories = [];
@@ -490,7 +490,7 @@ class _CreateItineraryWizardSheetState
         destination: _selectedDestination,
         startDate: _selectedDateRange?.start ?? DateTime.now(),
         days: _days,
-        budget: 3000000,
+        budget: 0,
         companion: _privacyLevel,
         pace: 'Balanced',
         categories: combinedCategories,
@@ -505,21 +505,10 @@ class _CreateItineraryWizardSheetState
 
           if (itineraryId > 0) {
             final prefs = await SharedPreferences.getInstance();
-            String privacyVal = 'friends';
-            if (_privacyLevel == 'Công khai' || _privacyLevel == 'PUBLIC') privacyVal = 'public';
-            if (_privacyLevel == 'Riêng tư' || _privacyLevel == 'PRIVATE') privacyVal = 'private';
+            String privacyVal = 'private';
+            if (_privacyLevel == 'Thành viên' || _privacyLevel == 'MEMBERS') privacyVal = 'members';
             await prefs.setString('privacy_$itineraryId', privacyVal);
             result['companion'] = _privacyLevel;
-
-            if (privacyVal == 'public') {
-              try {
-                await ApiClient.post('/explore/publish-itinerary/$itineraryId');
-              } catch (_) {}
-            } else {
-              try {
-                await ApiClient.post('/explore/unpublish-itinerary/$itineraryId');
-              } catch (_) {}
-            }
 
             if (_invitedCompanionsList.isNotEmpty) {
               for (final comp in _invitedCompanionsList) {
@@ -1905,9 +1894,8 @@ class _CreateItineraryWizardSheetState
   // STEP 3: Companions & Privacy Level — Premium Modern Cards
   Widget _buildStep3Companions() {
     final privacyOptions = [
-      {'title': 'Bạn bè', 'desc': 'Chỉ bạn bè trong hệ thống thấy', 'icon': Icons.group_rounded},
-      {'title': 'Riêng tư', 'desc': 'Chỉ mình bạn và người được mời', 'icon': Icons.lock_rounded},
-      {'title': 'Công khai', 'desc': 'Mọi người đều có thể khám phá', 'icon': Icons.public_rounded},
+      {'title': 'Riêng tư', 'desc': 'Chỉ mình bạn có thể xem hành trình này', 'icon': Icons.lock_rounded},
+      {'title': 'Thành viên', 'desc': 'Chỉ bạn và những người được mời tham gia', 'icon': Icons.group_rounded},
     ];
 
     return SingleChildScrollView(

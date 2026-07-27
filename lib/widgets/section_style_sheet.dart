@@ -129,20 +129,24 @@ class _SectionStyleSheetState extends State<SectionStyleSheet> {
       List<String> newSections = [];
       List<Map<String, dynamic>> newPlaces = [];
       String? currentSection;
+      int currentSortOrder = 0;
 
       for (var item in _flattenedItems) {
         if (item['type'] == 'header') {
           currentSection = item['data'] as String;
-          newSections.add(currentSection);
+          if (!newSections.contains(currentSection)) {
+            newSections.add(currentSection);
+          }
+          currentSortOrder = 0;
         } else if (item['type'] == 'place') {
-          final placeData = item['data'] as Map<String, dynamic>;
+          final placeData = Map<String, dynamic>.from(item['data'] as Map<String, dynamic>);
           if (currentSection != null) {
             placeData['section'] = currentSection;
-            newPlaces.add(placeData);
           } else if (_sections.isNotEmpty) {
             placeData['section'] = _sections.first;
-            newPlaces.add(placeData);
           }
+          placeData['sortOrder'] = currentSortOrder++;
+          newPlaces.add(placeData);
         }
       }
 

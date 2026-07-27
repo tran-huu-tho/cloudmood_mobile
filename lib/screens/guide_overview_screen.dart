@@ -132,7 +132,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   // AI Dialog state
   final bool _isGeneratingAI = false;
   bool _isPublic = false;
-  String _privacySetting = 'friends';
+  String _privacySetting = 'public';
   OverlayEntry? _currentNotification;
   int? _editingNoteId;
   String? _focusedTodoItemKey;
@@ -142,7 +142,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   void initState() {
     super.initState();
     _itineraryData = widget.itinerary;
-    _privacySetting = 'friends';
+    _privacySetting = 'public';
 
     SharedPreferences.getInstance().then((prefs) {
       final saved = prefs.getString('privacy_${_itineraryData['id']}');
@@ -1975,19 +1975,19 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                   const SizedBox(height: 16),
                   buildPrivacyOption(
                     'Công khai',
-                    'Bất kỳ ai cũng có thể xem',
+                    'Bất kỳ ai cũng có thể xem trên Khám phá',
                     Icons.public,
                     'public',
                   ),
                   buildPrivacyOption(
-                    'Bạn bè',
-                    'Chỉ những người theo dõi chung của bạn mới có thể xem',
+                    'Thành viên',
+                    'Chỉ bạn và các đồng tác giả mới có thể xem',
                     Icons.group,
-                    'friends',
+                    'members',
                   ),
                   buildPrivacyOption(
                     'Riêng tư',
-                    'Chỉ bạn và những người có liên kết mới có thể xem',
+                    'Lưu nháp, chỉ mình bạn có quyền xem',
                     Icons.lock,
                     'private',
                   ),
@@ -2003,13 +2003,13 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
 
   IconData _getPrivacyIcon() {
     switch (_privacySetting) {
-      case 'public':
-        return Icons.public;
+      case 'members':
+        return Icons.group;
       case 'private':
         return Icons.lock;
-      case 'friends':
+      case 'public':
       default:
-        return Icons.group;
+        return Icons.public;
     }
   }
 
@@ -9652,7 +9652,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   // ================= TAB 4: CHI PHÍ ($) =================
   Widget _buildExpensesTab() {
     // Determine target budget
-    final budgetLimit = (_itineraryData['budget'] as num?)?.toInt() ?? 3000000;
+    final budgetLimit = (_itineraryData['budget'] as num?)?.toInt() ?? 0;
 
     // Calculate sum of place costs if they have prices (mocked/parsed)
     int placeCosts = 0;
@@ -9672,7 +9672,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
     }
 
     final totalSpent = placeCosts + customSpent;
-    final progress = totalSpent / budgetLimit;
+    final progress = budgetLimit > 0 ? (totalSpent / budgetLimit) : 0.0;
     final percent = (progress * 100).clamp(0.0, 100.0).toStringAsFixed(0);
 
     String formatDong(int amount) {

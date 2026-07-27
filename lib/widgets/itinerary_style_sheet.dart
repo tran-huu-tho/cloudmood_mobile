@@ -53,25 +53,24 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
   final List<ItineraryFlatItem> _flattenedItems = [];
 
   final List<Color> _colors = [
-    Colors.green,
-    Colors.tealAccent,
-    Colors.lightBlue,
-    Colors.blue,
-    Colors.deepPurple,
-    Colors.pinkAccent,
-    Colors.orange,
-    Colors.orangeAccent,
-    Colors.green[800]!,
-    Colors.teal[800]!,
-    Colors.blue[800]!,
-    Colors.indigo[800]!,
-    Colors.purple[800]!,
-    Colors.pink[800]!,
-    Colors.brown,
-    Colors.brown[700]!,
+    const Color(0xFF2563EB), // Blue
+    const Color(0xFF059669), // Emerald Green
+    const Color(0xFFD97706), // Amber
+    const Color(0xFF7C3AED), // Purple
+    const Color(0xFFDB2777), // Pink
+    const Color(0xFF0891B2), // Cyan
+    const Color(0xFFEA580C), // Orange
+    const Color(0xFF4F46E5), // Indigo
+    const Color(0xFF16A34A), // Green
+    const Color(0xFF9333EA), // Violet
+    const Color(0xFFE11D48), // Rose
+    const Color(0xFF0284C7), // Sky Blue
+    const Color(0xFFCA8A04), // Yellow
+    const Color(0xFF65A30D), // Lime
+    const Color(0xFF8D5B4C), // Brown
   ];
 
-  Color _selectedColor = Colors.indigoAccent;
+  Color _selectedColor = const Color(0xFF2563EB);
 
   @override
   void initState() {
@@ -81,6 +80,12 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
     _details = List.from(widget.details);
     _dayColors = Map.from(widget.dayColors);
 
+    for (int i = 0; i < widget.daysCount; i++) {
+      if (!_dayColors.containsKey(i)) {
+        _dayColors[i] = _colors[i % _colors.length];
+      }
+    }
+
     if (widget.initialDayIndex >= 0 &&
         widget.initialDayIndex < _daysList.length) {
       _activeDayLabel = _daysList[widget.initialDayIndex];
@@ -89,7 +94,7 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
     }
 
     final activeDayIdx = _daysList.indexOf(_activeDayLabel);
-    _selectedColor = _dayColors[activeDayIdx] ?? AppTheme.primary;
+    _selectedColor = _dayColors[activeDayIdx] ?? _colors[activeDayIdx % _colors.length];
 
     _buildFlattenedItems();
   }
