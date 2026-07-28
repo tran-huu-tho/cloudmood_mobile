@@ -11,9 +11,13 @@ class ApiClient {
     return 'http://localhost:3000';
   }
 
-  static Future<Map<String, String>> _getHeaders() async {
+  static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('jwt_token');
+    return prefs.getString('jwt_token');
+  }
+
+  static Future<Map<String, String>> _getHeaders() async {
+    final token = await getToken();
     return {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',

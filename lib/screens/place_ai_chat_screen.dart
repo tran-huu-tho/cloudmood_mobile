@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../services/api_client.dart';
@@ -33,20 +35,17 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
   bool _isLoading = false;
   bool _isChatHidden = false;
   int _savedCount = 0;
+  String _streamingText = '';
+  bool _isStreaming = false;
 
   bool _isFullScreen = true;
   bool _isDragging = false;
   double? _dragHeight;
   LatLng? _mapCenter;
 
-  late final _suggestions = [
-    'Có phí vào cửa không?',
-    'Giờ mở cửa là gì?',
-    'Địa điểm này có thể tiếp cận bằng xe lăn không?',
-    'Có các tour du lịch có hướng dẫn không?',
-    'Tôi nên lên kế hoạch thăm bao lâu?',
-    'Có gì gần đây để xem hoặc làm?',
-  ];
+  // Dynamic suggestions from API
+  List<String> _suggestions = [];
+  bool _suggestionsLoading = true;
 
   @override
   void initState() {
@@ -54,6 +53,20 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
     _fetchMapData();
     _loadChatSessions();
     _fetchSavedCount();
+    _loadSuggestions();
+  }
+
+  Future<void> _loadSuggestions() async {
+    final suggestions = await AiService.getSuggestions(
+      placeName: widget.placeName,
+      type: 'place',
+    );
+    if (mounted) {
+      setState(() {
+        _suggestions = suggestions;
+        _suggestionsLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchSavedCount() async {
@@ -292,55 +305,145 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
         ),
       );
       _isLoading = true;
+      _streamingText = '';
+      _isStreaming = true;
     });
 
     _scrollToBottom();
 
     try {
-      final result = await AiService.sendChatMessage(
+      // Try streaming first
+      StreamSubscription? subscription;
+      bool gotSession = false;
+
+      subscription = AiService.streamChat(
         sessionId: _sessionId,
         destination: widget.placeName,
         message: text,
-      );
+      ).listen(
+        (event) {
+          if (!mounted) return;
+          final type = event['type'];
 
-      if (mounted) {
-        setState(() {
-          _sessionId = result['sessionId'];
-          // Reload sessions silently to get the updated title
-          _loadChatSessions().then((_) {
-            if (_currentTitle == 'Cuộc trò chuyện mới' &&
-                _sessions.isNotEmpty) {
-              final currentSession = _sessions.firstWhere(
-                (s) => s.id == _sessionId,
-                orElse: () => _sessions.first,
+          if (type == 'session' && !gotSession) {
+            gotSession = true;
+            setState(() {
+              _sessionId = event['sessionId'];
+            });
+            _loadChatSessions().then((_) {
+              if (_currentTitle == 'Cuộc trò chuyện mới' && _sessions.isNotEmpty) {
+                final currentSession = _sessions.firstWhere(
+                  (s) => s.id == _sessionId,
+                  orElse: () => _sessions.first,
+                );
+                setState(() => _currentTitle = currentSession.title);
+              }
+            });
+          } else if (type == 'token') {
+            setState(() {
+              _streamingText += event['content'] ?? '';
+            });
+            _scrollToBottom();
+          } else if (type == 'done') {
+            setState(() {
+              _messages.add(
+                ChatMessage(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  sessionId: _sessionId!,
+                  role: 'AI',
+                  content: _streamingText,
+                  createdAt: DateTime.now(),
+                ),
               );
+              _streamingText = '';
+              _isStreaming = false;
+              _isLoading = false;
+            });
+            _scrollToBottom();
+          } else if (type == 'error') {
+            setState(() {
+              _streamingText = '';
+              _isStreaming = false;
+              _isLoading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Lỗi khi gửi tin nhắn')),
+            );
+          }
+        },
+        onError: (e) async {
+          // Fallback to non-streaming
+          try {
+            final result = await AiService.sendChatMessage(
+              sessionId: _sessionId,
+              destination: widget.placeName,
+              message: text,
+            );
+            if (mounted) {
               setState(() {
-                _currentTitle = currentSession.title;
+                _sessionId = result['sessionId'];
+                _messages.add(
+                  ChatMessage(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    sessionId: _sessionId!,
+                    role: 'AI',
+                    content: result['reply'],
+                    createdAt: DateTime.now(),
+                  ),
+                );
+                _streamingText = '';
+                _isStreaming = false;
+                _isLoading = false;
               });
+              _scrollToBottom();
+              _loadChatSessions();
             }
-          });
-
-          _messages.add(
-            ChatMessage(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              sessionId: _sessionId!,
-              role: 'AI',
-              content: result['reply'],
-              createdAt: DateTime.now(),
-            ),
-          );
-          _isLoading = false;
-        });
-        _scrollToBottom();
-      }
+          } catch (_) {
+            if (mounted) {
+              setState(() {
+                _streamingText = '';
+                _isStreaming = false;
+                _isLoading = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Lỗi khi gửi tin nhắn')),
+              );
+            }
+          }
+        },
+        onDone: () {
+          // Streaming finished, ensure we're in clean state
+          if (mounted && _isStreaming) {
+            setState(() {
+              if (_streamingText.isNotEmpty) {
+                _messages.add(
+                  ChatMessage(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    sessionId: _sessionId ?? '',
+                    role: 'AI',
+                    content: _streamingText,
+                    createdAt: DateTime.now(),
+                  ),
+                );
+              }
+              _streamingText = '';
+              _isStreaming = false;
+              _isLoading = false;
+            });
+            _scrollToBottom();
+          }
+        },
+      );
     } catch (e) {
       if (mounted) {
         setState(() {
+          _streamingText = '';
+          _isStreaming = false;
           _isLoading = false;
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Lỗi khi gửi tin nhắn')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lỗi khi gửi tin nhắn')),
+        );
       }
     }
   }
@@ -362,6 +465,262 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // ============================================
+  // Helper Widget Methods
+  // ============================================
+
+  Widget _buildMessageContent(String content, bool isUser) {
+    if (isUser) {
+      return Text(
+        content,
+        style: const TextStyle(color: Colors.white, fontSize: 15),
+      );
+    }
+
+    // Simple markdown-like rendering for AI messages
+    final lines = content.split('\n');
+    final widgets = <Widget>[];
+
+    for (final line in lines) {
+      if (line.trim().isEmpty) {
+        widgets.add(const SizedBox(height: 8));
+        continue;
+      }
+
+      // Headers
+      if (line.startsWith('### ')) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Text(
+            line.substring(4),
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+        ));
+      } else if (line.startsWith('## ')) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 10, bottom: 4),
+          child: Text(
+            line.substring(3),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+        ));
+      } else if (line.startsWith('# ')) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 4),
+          child: Text(
+            line.substring(2),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+        ));
+      }
+      // Bullet points
+      else if (line.trimLeft().startsWith('- ') || line.trimLeft().startsWith('* ')) {
+        final indent = line.length - line.trimLeft().length;
+        final text = line.trimLeft().substring(2);
+        widgets.add(Padding(
+          padding: EdgeInsets.only(left: indent > 0 ? 16.0 : 0, top: 2, bottom: 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 6, right: 8),
+                child: Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: AppTheme.darkText.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _buildRichText(text, false),
+              ),
+            ],
+          ),
+        ));
+      }
+      // Numbered lists
+      else if (RegExp(r'^\d+\.\s').hasMatch(line.trimLeft())) {
+        final match = RegExp(r'^(\d+)\.\s(.*)').firstMatch(line.trimLeft());
+        if (match != null) {
+          widgets.add(Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 24,
+                  child: Text(
+                    '${match.group(1)}.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.darkText,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _buildRichText(match.group(2) ?? '', false),
+                ),
+              ],
+            ),
+          ));
+        }
+      }
+      // Normal text
+      else {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 1, bottom: 1),
+          child: _buildRichText(line, false),
+        ));
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+  }
+
+  /// Renders bold text (**text**) within a line
+  Widget _buildRichText(String text, bool isUser) {
+    final spans = <TextSpan>[];
+    final boldRegex = RegExp(r'\*\*(.+?)\*\*');
+    int lastEnd = 0;
+
+    for (final match in boldRegex.allMatches(text)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
+      }
+      spans.add(TextSpan(
+        text: match.group(1),
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ));
+      lastEnd = match.end;
+    }
+
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+
+    if (spans.isEmpty) {
+      spans.add(TextSpan(text: text));
+    }
+
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          color: isUser ? Colors.white : AppTheme.darkText,
+          fontSize: 15,
+          height: 1.4,
+        ),
+        children: spans,
+      ),
+    );
+  }
+
+  Widget _buildStreamingBubble() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.8,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(16).copyWith(
+            bottomLeft: const Radius.circular(0),
+          ),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: _streamingText.isEmpty
+            ? _buildTypingDots()
+            : _buildMessageContent(_streamingText, false),
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF4F46E5), size: 18),
+            ),
+            const SizedBox(width: 8),
+            _buildTypingDots(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypingDots() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(3, (i) {
+        return TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: Duration(milliseconds: 600 + i * 200),
+          builder: (context, value, child) {
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.3 + 0.4 * (1 - (value - 0.5).abs() * 2).clamp(0.0, 1.0)),
+                shape: BoxShape.circle,
+              ),
+            );
+          },
+        );
+      }),
+    );
+  }
+
+  Widget _buildActionButton(IconData icon, String tooltip, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Tooltip(
+        message: tooltip,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 16, color: AppTheme.subtitleText),
+        ),
+      ),
+    );
   }
 
   Widget _buildChatBody() {
@@ -495,8 +854,7 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                     alignment: Alignment.centerLeft,
                                     child: InkWell(
                                       onTap: () {
-                                        _controller.text = s;
-                                        _sendMessage();
+                                        _sendMessage(s);
                                       },
                                       borderRadius: BorderRadius.circular(24),
                                       child: Container(
@@ -546,56 +904,97 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                               horizontal: 16,
                               vertical: 8,
                             ),
-                            itemCount: _messages.length + (_isLoading ? 1 : 0),
+                            itemCount: _messages.length + (_isStreaming ? 1 : 0) + (_isLoading && !_isStreaming ? 1 : 0),
                             itemBuilder: (context, index) {
-                              if (index == _messages.length) {
-                                return const Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Padding(
-                                    padding: EdgeInsets.all(8.0),
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
+                              // Streaming message (AI đang gõ)
+                              if (_isStreaming && index == _messages.length) {
+                                return _buildStreamingBubble();
+                              }
+                              // Loading indicator
+                              if (index == _messages.length + (_isStreaming ? 1 : 0)) {
+                                return _buildTypingIndicator();
                               }
                               final msg = _messages[index];
                               final isUser = msg.role == 'USER';
-                              return Align(
-                                alignment: isUser
-                                    ? Alignment.centerRight
-                                    : Alignment.centerLeft,
-                                child: Container(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isUser
-                                        ? AppTheme.primary
-                                        : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(16)
-                                        .copyWith(
-                                          bottomRight: isUser
-                                              ? const Radius.circular(0)
-                                              : const Radius.circular(16),
-                                          bottomLeft: !isUser
-                                              ? const Radius.circular(0)
-                                              : const Radius.circular(16),
-                                        ),
-                                    border: isUser
-                                        ? null
-                                        : Border.all(color: AppTheme.border),
-                                  ),
-                                  child: Text(
-                                    msg.content,
-                                    style: TextStyle(
-                                      color: isUser
-                                          ? Colors.white
-                                          : AppTheme.darkText,
-                                      fontSize: 15,
+                              return Column(
+                                crossAxisAlignment: isUser
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  Align(
+                                    alignment: isUser
+                                        ? Alignment.centerRight
+                                        : Alignment.centerLeft,
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      constraints: BoxConstraints(
+                                        maxWidth: MediaQuery.of(context).size.width * 0.8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isUser
+                                            ? AppTheme.primary
+                                            : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(16)
+                                            .copyWith(
+                                              bottomRight: isUser
+                                                  ? const Radius.circular(0)
+                                                  : const Radius.circular(16),
+                                              bottomLeft: !isUser
+                                                  ? const Radius.circular(0)
+                                                  : const Radius.circular(16),
+                                            ),
+                                        border: isUser
+                                            ? null
+                                            : Border.all(color: AppTheme.border),
+                                      ),
+                                      child: _buildMessageContent(msg.content, isUser),
                                     ),
                                   ),
-                                ),
+                                  // Action buttons for AI messages
+                                  if (!isUser)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 12, left: 4),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _buildActionButton(
+                                            Icons.copy_rounded,
+                                            'Sao chép',
+                                            () {
+                                              Clipboard.setData(ClipboardData(text: msg.content));
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Đã sao chép'),
+                                                  duration: Duration(seconds: 1),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(width: 4),
+                                          _buildActionButton(
+                                            Icons.refresh_rounded,
+                                            'Tạo lại',
+                                            () {
+                                              // Regenerate: resend the last user message
+                                              if (_messages.length >= 2) {
+                                                final lastUserMsg = _messages.lastWhere(
+                                                  (m) => m.role == 'USER',
+                                                  orElse: () => _messages.last,
+                                                );
+                                                _sendMessage(lastUserMsg.content);
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    const SizedBox(height: 12),
+                                ],
                               );
                             },
                           ),
