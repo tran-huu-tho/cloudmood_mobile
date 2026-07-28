@@ -43,6 +43,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
   final _titleController = TextEditingController();
   final _searchController = TextEditingController();
   String _selectedDestination = '';
+  bool _userEditedTitle = false;
 
   Timer? _debounce;
   List<dynamic> _searchResults = [];
@@ -119,12 +120,30 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
     setState(() => _isLoadingSearch = true);
     try {
       final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&addressdetails=1&limit=5',
+        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent('$query, Vietnam')}&format=json&addressdetails=1&limit=10',
       );
       final response = await http.get(url, headers: {'User-Agent': 'CloudMoodApp/1.0'});
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() => _searchResults = data is List ? data : []);
+        final List<dynamic> data = json.decode(response.body);
+        final filteredAreas = data.where((item) {
+          final placeClass = (item['class'] ?? '').toString().toLowerCase();
+          final type = (item['type'] ?? '').toString().toLowerCase();
+
+          if (placeClass == 'amenity' ||
+              placeClass == 'shop' ||
+              placeClass == 'tourism' ||
+              placeClass == 'building' ||
+              placeClass == 'leisure' ||
+              placeClass == 'craft' ||
+              type == 'restaurant' ||
+              type == 'hotel' ||
+              type == 'cafe') {
+            return false;
+          }
+          return true;
+        }).toList();
+
+        setState(() => _searchResults = filteredAreas.isNotEmpty ? filteredAreas : data);
       }
     } catch (e) {
       debugPrint('Error searching: $e');
@@ -143,6 +162,9 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
         _selectedDestination = destinationName;
         _searchResults = [];
         _searchController.clear();
+        if (!_userEditedTitle || _titleController.text.trim().isEmpty) {
+          _titleController.text = 'Hướng dẫn du lịch $destinationName';
+        }
       });
     } else {
       if (mounted) {
@@ -191,16 +213,6 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
 
   void _nextStep() {
     if (_currentStep == 0) {
-      if (_titleController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Vui lòng nhập tên bài hướng dẫn'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-        return;
-      }
-    } else if (_currentStep == 1) {
       if (_selectedDestination.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -210,9 +222,12 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
         );
         return;
       }
+      if (_titleController.text.trim().isEmpty) {
+        _titleController.text = 'Hướng dẫn du lịch $_selectedDestination';
+      }
     }
 
-    if (_currentStep < 3) {
+    if (_currentStep < 2) {
       setState(() {
         _currentStep++;
       });
@@ -842,7 +857,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                               ),
                             ),
                             Text(
-                              '${_currentStep + 1}/4',
+                              '${_currentStep + 1}/3',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -853,12 +868,12 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                         ),
                         const SizedBox(height: 6),
                         Row(
-                          children: List.generate(4, (index) {
+                          children: List.generate(3, (index) {
                             final isActive = index <= _currentStep;
                             return Expanded(
                               child: Container(
                                 height: 5,
-                                margin: EdgeInsets.only(right: index == 3 ? 0 : 4),
+                                margin: EdgeInsets.only(right: index == 2 ? 0 : 4),
                                 decoration: BoxDecoration(
                                   color: isActive ? guidePrimary : Colors.grey[200],
                                   borderRadius: BorderRadius.circular(10),
@@ -891,13 +906,12 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
               ),
             ),
 
-            // Step Content Pages (4 Steps, No Date Picker)
+            // Step Content Pages (3 Steps)
             Expanded(
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _buildStep0Title(),
                   _buildStep1Destination(),
                   _buildStep2PrivacyCompanions(),
                   _buildStep3Categories(),
@@ -1070,7 +1084,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
     );
   }
 
-  // STEP 1: Destination Selection
+  // STEP 1: Destination Selection & Guide Title
   Widget _buildStep1Destination() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1081,15 +1095,69 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
           ShaderMask(
             shaderCallback: (bounds) => guideGradient.createShader(bounds),
             child: const Text(
-              'Hướng dẫn này dành cho đâu?',
+              'Bài viết hướng dẫn của bạn\nbắt đầu từ đây',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
+                height: 1.25,
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          Text(
+            'Đặt một cái tên thật ý nghĩa và chọn điểm đến bạn viết hướng dẫn.',
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+          ),
+          const SizedBox(height: 20),
+
+          // Guide Title Input Field (Black Text Color, Auto-filled & Editable)
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: guidePrimary.withOpacity(0.06),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _titleController,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkText,
+              ),
+              onChanged: (val) {
+                _userEditedTitle = true;
+              },
+              decoration: InputDecoration(
+                hintText: _selectedDestination.isNotEmpty
+                    ? 'Hướng dẫn du lịch $_selectedDestination'
+                    : 'Nhập tên bài hướng dẫn...',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                prefixIcon: const Icon(Icons.auto_stories_rounded, color: guidePrimary),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: const BorderSide(color: guidePrimary, width: 1.5),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
 
           // Search Field
           Container(
@@ -1221,16 +1289,13 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
               itemBuilder: (context, index) {
                 final dest = _popularDestinations[index];
                 final String name = dest['name']!;
-                final String flag = dest['flag']!;
                 final String desc = dest['desc'] ?? '';
                 final isSelected = _selectedDestination == name;
 
                 return GestureDetector(
                   onTap: () {
-                    setState(() {
-                      _selectedDestination = name;
-                      _searchController.text = name;
-                    });
+                    _searchController.clear();
+                    _selectDestination(name);
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -1264,10 +1329,10 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: isSelected ? guidePrimary.withOpacity(0.12) : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(12),
+                            color: isSelected ? guidePrimary.withOpacity(0.12) : guidePrimary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(flag, style: const TextStyle(fontSize: 22)),
+                          child: const Icon(Icons.location_on_rounded, color: guidePrimary, size: 20),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -1959,12 +2024,10 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
   String _getStepTitleLabel(int step) {
     switch (step) {
       case 0:
-        return 'Tên hướng dẫn';
+        return 'Điểm đến & Tên bài viết';
       case 1:
-        return 'Điểm đến';
-      case 2:
         return 'Quyền xem';
-      case 3:
+      case 2:
         return 'Chủ đề';
       default:
         return '';
@@ -1974,11 +2037,10 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
   String _getPrimaryButtonText() {
     switch (_currentStep) {
       case 0:
-      case 1:
         return 'Tiếp tục';
-      case 2:
+      case 1:
         return 'Mời đồng tác giả';
-      case 3:
+      case 2:
         return 'Hoàn tất & Tạo hướng dẫn';
       default:
         return 'Tiếp tục';

@@ -36,8 +36,13 @@ import '../services/itinerary_socket_service.dart';
 
 class TripOverviewScreen extends StatefulWidget {
   final Map<String, dynamic> itinerary;
+  final int initialTabIndex;
 
-  const TripOverviewScreen({super.key, required this.itinerary});
+  const TripOverviewScreen({
+    super.key,
+    required this.itinerary,
+    this.initialTabIndex = 0,
+  });
 
   @override
   State<TripOverviewScreen> createState() => _TripOverviewScreenState();
@@ -227,7 +232,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final int numDays = (_itineraryData['days'] as int?) ?? 1;
     _checkedDays = Set.from(Iterable.generate(numDays, (i) => i + 1));
     final bool isGuide = _itineraryData['isGuide'] == true;
-    _tabController = TabController(length: isGuide ? 2 : 4, vsync: this);
+    final int targetInitialIndex = widget.initialTabIndex.clamp(0, isGuide ? 1 : 3);
+    _tabController = TabController(
+      length: isGuide ? 2 : 4,
+      vsync: this,
+      initialIndex: targetInitialIndex,
+    );
     _loadData();
 
     // Kết nối Socket Real-time cho Chuyến đi
@@ -659,7 +669,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     try {
       final response = await http.get(
         Uri.parse(
-          'http://localhost:3000/explore?destination=${Uri.encodeComponent(dest)}',
+          '${ApiClient.baseUrl}/explore?destination=${Uri.encodeComponent(dest)}',
         ),
       );
       if (response.statusCode == 200) {
@@ -6230,7 +6240,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       editController = TextEditingController(
         text: isTodo
             ? displayTitle
-            : ((text == 'Thêm ghi chú tại đây' || text == 'Ghi chú mới') ? '' : text),
+            : ((text == 'Thêm ghi chú tại đây' || text == 'Ghi chú mới')
+                  ? ''
+                  : text),
       );
       editController.selection = TextSelection.fromPosition(
         TextPosition(offset: editController.text.length),
@@ -6362,7 +6374,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 onSubmitted: (val) async {
                                   final cleanVal = val.trim();
                                   String finalVal = cleanVal;
-                                  if (isTodo && cleanVal.isEmpty) finalVal = 'Danh sách công việc';
+                                  if (isTodo && cleanVal.isEmpty)
+                                    finalVal = 'Danh sách công việc';
                                   if (isTodo) finalVal = '[TODO] $finalVal';
                                   setState(() {
                                     if (isItineraryDetail) {
@@ -6398,9 +6411,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   ? (displayTitle.isEmpty
                                         ? 'Danh sách công việc'
                                         : displayTitle)
-                                  : (text.isEmpty
-                                        ? 'Nhập ghi chú...'
-                                        : text),
+                                  : (text.isEmpty ? 'Nhập ghi chú...' : text),
                               style: TextStyle(
                                 fontSize: 13,
                                 color: (!isTodo && text.isEmpty)
@@ -6419,7 +6430,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     onTap: () {
                       final cleanVal = editController?.text.trim() ?? '';
                       String finalVal = cleanVal;
-                      if (isTodo && cleanVal.isEmpty) finalVal = 'Danh sách công việc';
+                      if (isTodo && cleanVal.isEmpty)
+                        finalVal = 'Danh sách công việc';
                       if (isTodo) finalVal = '[TODO] $finalVal';
                       setState(() {
                         if (isItineraryDetail) {
@@ -6846,8 +6858,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           _showItineraryStyleSheet(
                             context,
                             initialTabIndex: 1,
-                            initialDayIndex:
-                                ((detail['day'] as int?) ?? 1) - 1,
+                            initialDayIndex: ((detail['day'] as int?) ?? 1) - 1,
                           );
                         } else {
                           _showSectionStyleSheet(
@@ -7898,7 +7909,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   width: 32,
                                   height: 32,
                                   decoration: BoxDecoration(
-                                    color: _sectionColors[detail['section']] ??
+                                    color:
+                                        _sectionColors[detail['section']] ??
                                         (isItineraryMode
                                             ? const Color(0xFF4CAF50)
                                             : const Color(0xFF2563EB)),
@@ -8818,11 +8830,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   });
 
                                   for (int i = 0; i < items.length; i++) {
-                                    await DatabaseService()
-                                        .updateSavedPlace(
-                                          items[i]['id'] as int,
-                                          {'sortOrder': i},
-                                        );
+                                    await DatabaseService().updateSavedPlace(
+                                      items[i]['id'] as int,
+                                      {'sortOrder': i},
+                                    );
                                   }
                                   await _loadData(silent: true);
                                 },
@@ -8870,12 +8881,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       }
                                     }
 
-                                    final currentPlace =
-                                        detail['place'] != null
-                                            ? Map<String, dynamic>.from(
-                                              detail['place'] as Map,
-                                            )
-                                            : null;
+                                    final currentPlace = detail['place'] != null
+                                        ? Map<String, dynamic>.from(
+                                            detail['place'] as Map,
+                                          )
+                                        : null;
 
                                     bool hasPrevPlace = false;
                                     for (int j = sIdx - 1; j >= 0; j--) {
@@ -8990,37 +9000,38 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               Row(
                                 children: [
                                   Expanded(
-                                     child: GestureDetector(
-                                       onTap: () =>
-                                           _showAddPlaceBottomSheet(section),
-                                       child: Container(
-                                         height: 48,
-                                         decoration: BoxDecoration(
-                                           color: AppTheme.surfaceVariant,
-                                           borderRadius:
-                                               BorderRadius.circular(12),
-                                         ),
-                                         child: Row(
-                                           children: [
-                                             const SizedBox(width: 12),
-                                             Icon(
-                                               Icons.location_on_outlined,
-                                               color: AppTheme.subtitleText,
-                                               size: 20,
-                                             ),
-                                             const SizedBox(width: 8),
-                                             Text(
-                                               'Thêm địa điểm',
-                                               style: TextStyle(
-                                                 color: AppTheme.hintText,
-                                                 fontSize: 13,
-                                               ),
-                                             ),
-                                           ],
-                                         ),
-                                       ),
-                                     ),
-                                   ),
+                                    child: GestureDetector(
+                                      onTap: () =>
+                                          _showAddPlaceBottomSheet(section),
+                                      child: Container(
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.surfaceVariant,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const SizedBox(width: 12),
+                                            Icon(
+                                              Icons.location_on_outlined,
+                                              color: AppTheme.subtitleText,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Thêm địa điểm',
+                                              style: TextStyle(
+                                                color: AppTheme.hintText,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                   GestureDetector(
                                     onTap: () => _addNoteInline(section),
                                     child: Container(
@@ -9356,7 +9367,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   ]) {
     if (!_checkCanEdit()) return;
     final searchController = TextEditingController();
-    final bool isItinerary = sectionOrDay.startsWith('Ngày') ||
+    final bool isItinerary =
+        sectionOrDay.startsWith('Ngày') ||
         (savedPlaces != null && savedPlaces.isNotEmpty);
 
     showModalBottomSheet(
@@ -9410,7 +9422,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               } else {
                 final Set<int> existingIds = {};
                 final int? dayNum = int.tryParse(
-                    sectionOrDay.replaceAll(RegExp(r'[^0-9]'), ''));
+                  sectionOrDay.replaceAll(RegExp(r'[^0-9]'), ''),
+                );
                 if (dayNum != null) {
                   for (var d in _details) {
                     if (d['day'] == dayNum && d['placeId'] != null) {
@@ -9439,8 +9452,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 ),
                 child: Container(
                   height: MediaQuery.of(context).size.height * 0.75,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   child: Column(
                     children: [
                       // Top Handle Bar
@@ -9519,235 +9534,249 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       Expanded(
                         child: query.isEmpty
                             ? (isItinerary
-                                ? (quickPlacesList.isEmpty
-                                    ? Center(
-                                        child: Text(
-                                          'Chưa có địa điểm nào trong danh sách Tổng quan',
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      )
-                                    : Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                                bottom: 12),
+                                  ? (quickPlacesList.isEmpty
+                                        ? Center(
                                             child: Text(
-                                              'Chọn nhanh từ các danh sách của bạn',
+                                              'Chưa có địa điểm nào trong danh sách Tổng quan',
                                               style: TextStyle(
+                                                color: Colors.grey[600],
                                                 fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppTheme.darkText,
                                               ),
                                             ),
-                                          ),
-                                          Expanded(
-                                            child: ListView.separated(
-                                              itemCount: quickPlacesList.length,
-                                              separatorBuilder: (_, __) =>
-                                                  const Divider(height: 1),
-                                              itemBuilder: (context, idx) {
-                                                final place =
-                                                    quickPlacesList[idx];
-                                                final name = place['name'] ??
-                                                    'Địa điểm';
-                                                final section =
-                                                    place['section_name'] ??
+                                          )
+                                        : Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  bottom: 12,
+                                                ),
+                                                child: Text(
+                                                  'Chọn nhanh từ các danh sách của bạn',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppTheme.darkText,
+                                                  ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: ListView.separated(
+                                                  itemCount:
+                                                      quickPlacesList.length,
+                                                  separatorBuilder: (_, __) =>
+                                                      const Divider(height: 1),
+                                                  itemBuilder: (context, idx) {
+                                                    final place =
+                                                        quickPlacesList[idx];
+                                                    final name =
+                                                        place['name'] ??
+                                                        'Địa điểm';
+                                                    final section =
+                                                        place['section_name'] ??
                                                         place['section'] ??
                                                         '';
 
-                                                return ListTile(
-                                                  contentPadding:
-                                                      const EdgeInsets.symmetric(
-                                                    vertical: 6,
-                                                    horizontal: 4,
-                                                  ),
-                                                  leading: const Icon(
-                                                    Icons.location_on_rounded,
-                                                    color: Color(0xFF334155),
-                                                    size: 24,
-                                                  ),
-                                                  title: Text(
-                                                    name,
-                                                    style: TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      color: AppTheme.darkText,
-                                                    ),
-                                                  ),
-                                                  subtitle: section.isNotEmpty
-                                                      ? Text(
-                                                          section,
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            color: Colors.grey[600],
+                                                    return ListTile(
+                                                      contentPadding:
+                                                          const EdgeInsets.symmetric(
+                                                            vertical: 6,
+                                                            horizontal: 4,
                                                           ),
-                                                        )
-                                                      : null,
-                                                  onTap: () {
-                                                    Navigator.pop(context);
-                                                    _addPlace(
-                                                        place, sectionOrDay);
+                                                      leading: const Icon(
+                                                        Icons
+                                                            .location_on_rounded,
+                                                        color: Color(
+                                                          0xFF334155,
+                                                        ),
+                                                        size: 24,
+                                                      ),
+                                                      title: Text(
+                                                        name,
+                                                        style: TextStyle(
+                                                          fontSize: 15,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color:
+                                                              AppTheme.darkText,
+                                                        ),
+                                                      ),
+                                                      subtitle:
+                                                          section.isNotEmpty
+                                                          ? Text(
+                                                              section,
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color: Colors
+                                                                    .grey[600],
+                                                              ),
+                                                            )
+                                                          : null,
+                                                      onTap: () {
+                                                        Navigator.pop(context);
+                                                        _addPlace(
+                                                          place,
+                                                          sectionOrDay,
+                                                        );
+                                                      },
+                                                    );
                                                   },
-                                                );
-                                              },
+                                                ),
+                                              ),
+                                            ],
+                                          ))
+                                  : Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Cần thêm ý tưởng?',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[600],
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              Navigator.pop(context);
+                                              _tabController.animateTo(
+                                                _itineraryData['isGuide'] ==
+                                                        true
+                                                    ? 1
+                                                    : 3,
+                                              );
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(
+                                                0xFFFF5A5F,
+                                              ),
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 24,
+                                                    vertical: 14,
+                                                  ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(30),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'Khám phá hướng dẫn và blog',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ),
                                         ],
-                                      ))
-                                : Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          'Cần thêm ý tưởng?',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                            _tabController.animateTo(
-                                              _itineraryData['isGuide'] == true
-                                                  ? 1
-                                                  : 3,
-                                            );
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                const Color(0xFFFF5A5F),
-                                            foregroundColor: Colors.white,
-                                            elevation: 0,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 24,
-                                              vertical: 14,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(30),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Khám phá hướng dẫn và blog',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ))
+                                      ),
+                                    ))
                             : matchingPlaces.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.search_off_rounded,
-                                          size: 48,
-                                          color: Colors.grey[400],
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Text(
-                                          'Không tìm thấy địa điểm phù hợp',
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                            _tabController.animateTo(
-                                              _itineraryData['isGuide'] == true
-                                                  ? 1
-                                                  : 3,
-                                            );
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                const Color(0xFFFF5A5F),
-                                            foregroundColor: Colors.white,
-                                            elevation: 0,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 20,
-                                              vertical: 12,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(24),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Khám phá thêm',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.search_off_rounded,
+                                      size: 48,
+                                      color: Colors.grey[400],
                                     ),
-                                  )
-                                : ListView.separated(
-                                    itemCount: matchingPlaces.length,
-                                    separatorBuilder: (_, __) =>
-                                        const Divider(height: 1),
-                                    itemBuilder: (context, idx) {
-                                      final place = matchingPlaces[idx];
-                                      final name = place['name'] ?? 'Địa điểm';
-                                      final address = place['address'] ?? '';
-
-                                      return ListTile(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                          vertical: 6,
-                                          horizontal: 4,
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Không tìm thấy địa điểm phù hợp',
+                                      style: TextStyle(
+                                        color: Colors.grey[600],
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        _tabController.animateTo(
+                                          _itineraryData['isGuide'] == true
+                                              ? 1
+                                              : 3,
+                                        );
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFFFF5A5F,
                                         ),
-                                        leading: const Icon(
-                                          Icons.location_on_rounded,
-                                          color: Color(0xFF334155),
-                                          size: 24,
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 20,
+                                          vertical: 12,
                                         ),
-                                        title: Text(
-                                          name,
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppTheme.darkText,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            24,
                                           ),
                                         ),
-                                        subtitle: address.isNotEmpty
-                                            ? Text(
-                                                address,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey[600],
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              )
-                                            : null,
-                                        onTap: () {
-                                          Navigator.pop(context);
-                                          _addPlace(place, sectionOrDay);
-                                        },
-                                      );
+                                      ),
+                                      child: const Text(
+                                        'Khám phá thêm',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: matchingPlaces.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, idx) {
+                                  final place = matchingPlaces[idx];
+                                  final name = place['name'] ?? 'Địa điểm';
+                                  final address = place['address'] ?? '';
+
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 6,
+                                      horizontal: 4,
+                                    ),
+                                    leading: const Icon(
+                                      Icons.location_on_rounded,
+                                      color: Color(0xFF334155),
+                                      size: 24,
+                                    ),
+                                    title: Text(
+                                      name,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.darkText,
+                                      ),
+                                    ),
+                                    subtitle: address.isNotEmpty
+                                        ? Text(
+                                            address,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          )
+                                        : null,
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _addPlace(place, sectionOrDay);
                                     },
-                                  ),
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   ),
@@ -10432,8 +10461,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                               ],
                             ),
-                             if (isCollapsed &&
-                                 detail['noteText'] != null &&
+                            if (isCollapsed &&
+                                detail['noteText'] != null &&
                                 detail['noteText'].toString().trim().isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 12),
@@ -10808,14 +10837,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               Expanded(
                                 child: _editingDaySubtitleIndex == index
                                     ? TextField(
-                                        controller: _daySubtitleControllers.putIfAbsent(
-                                          index,
-                                          () => TextEditingController(text: subtitle),
-                                        ),
-                                        focusNode: _daySubtitleFocusNodes.putIfAbsent(
-                                          index,
-                                          () => FocusNode(),
-                                        ),
+                                        controller: _daySubtitleControllers
+                                            .putIfAbsent(
+                                              index,
+                                              () => TextEditingController(
+                                                text: subtitle,
+                                              ),
+                                            ),
+                                        focusNode: _daySubtitleFocusNodes
+                                            .putIfAbsent(
+                                              index,
+                                              () => FocusNode(),
+                                            ),
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: AppTheme.darkText,
@@ -10838,17 +10871,26 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           ),
                                         ),
                                         onSubmitted: (newValue) =>
-                                            _saveDaySubtitleInline(index, newValue),
-                                        onTapOutside: (_) => _saveDaySubtitleInline(
-                                          index,
-                                          _daySubtitleControllers[index]?.text ?? '',
-                                        ),
+                                            _saveDaySubtitleInline(
+                                              index,
+                                              newValue,
+                                            ),
+                                        onTapOutside: (_) =>
+                                            _saveDaySubtitleInline(
+                                              index,
+                                              _daySubtitleControllers[index]
+                                                      ?.text ??
+                                                  '',
+                                            ),
                                       )
                                     : GestureDetector(
                                         behavior: HitTestBehavior.opaque,
-                                        onTap: () => _startEditingDaySubtitle(index),
+                                        onTap: () =>
+                                            _startEditingDaySubtitle(index),
                                         child: Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8.0,
+                                          ),
                                           child: Text(
                                             subtitle.isNotEmpty
                                                 ? subtitle

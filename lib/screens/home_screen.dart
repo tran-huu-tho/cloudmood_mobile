@@ -8,6 +8,7 @@ import '../services/database_service.dart';
 import '../services/api_client.dart';
 import '../widgets/avatar_image.dart';
 import '../widgets/place_detail_bottom_sheet.dart';
+import 'explore_post_detail_screen.dart';
 
 class CloudmoodHomeScreen extends StatefulWidget {
   final VoidCallback onProfileTap;
@@ -43,7 +44,8 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
           if (permission == LocationPermission.denied) {
             permission = await Geolocator.requestPermission();
           }
-          if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+          if (permission == LocationPermission.whileInUse ||
+              permission == LocationPermission.always) {
             try {
               position = await Geolocator.getCurrentPosition(
                 desiredAccuracy: LocationAccuracy.high,
@@ -58,11 +60,17 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
         debugPrint('Geolocator error: $e');
       }
 
-      final queryParams = position != null 
-          ? {'lat': position.latitude.toString(), 'lon': position.longitude.toString()}
+      final queryParams = position != null
+          ? {
+              'lat': position.latitude.toString(),
+              'lon': position.longitude.toString(),
+            }
           : {'cityName': 'Da Nang'};
 
-      final response = await ApiClient.get('/weather/current', query: queryParams);
+      final response = await ApiClient.get(
+        '/weather/current',
+        query: queryParams,
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (mounted) {
@@ -85,12 +93,14 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
 
   String _getQuoteForCondition(String condition) {
     final cond = condition.toLowerCase();
-    if (cond.contains('rain') || cond.contains('drizzle') || cond.contains('thunderstorm')) {
+    if (cond.contains('rain') ||
+        cond.contains('drizzle') ||
+        cond.contains('thunderstorm')) {
       final quotes = [
         "Những ngày mưa là cái cớ hoàn hảo để trốn vào góc quán quen, thưởng thức ly latte ấm và lắng nghe giai điệu Acoustic dịu dàng.",
         "Mưa không làm ta buồn, mưa chỉ làm ta muốn ghé một quán trà nhỏ, ngắm dòng người qua và nghĩ về những hành trình đã qua.",
         "Có những ngày mưa rơi mang theo hương vị của sự bình yên. Một ngày tuyệt vời để tìm cho mình một góc trú chân ấm cúng.",
-        "Tiếng mưa tí tách bên hiên nhà là nhạc nền hoàn hảo cho một ngày lười biếng, tận hưởng tách cacao nóng thơm lừng."
+        "Tiếng mưa tí tách bên hiên nhà là nhạc nền hoàn hảo cho một ngày lười biếng, tận hưởng tách cacao nóng thơm lừng.",
       ];
       return (quotes..shuffle()).first;
     } else if (cond.contains('cloud')) {
@@ -98,7 +108,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
         "Tiết trời dịu mát như chiều lòng người, thích hợp cho một buổi dạo bộ thong dung qua những con hẻm nhỏ bình yên.",
         "Hôm nay trời không nắng gắt, mây nhẹ che đầu, là thời điểm lý tưởng nhất để cùng nhóm bạn thân lên lịch đi trốn.",
         "Bầu trời mang sắc xám nhẹ nhàng, thổi làn gió mát lành gọi mời bước chân ta bước ra ngoài khám phá.",
-        "Thời tiết râm mát thế này, một tách trà chiều bên hiên nhà là đủ cho một ngày cuối tuần thảnh thơi."
+        "Thời tiết râm mát thế này, một tách trà chiều bên hiên nhà là đủ cho một ngày cuối tuần thảnh thơi.",
       ];
       return (quotes..shuffle()).first;
     } else if (cond.contains('clear') || cond.contains('sunny')) {
@@ -106,14 +116,14 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
         "Nắng vàng lấp lánh như đang viết nên bài thơ của mùa hè. Hãy xách ba lô lên và đi để không bỏ lỡ ngày xanh!",
         "Bầu trời hôm nay thật trong lành, những tia nắng ấm áp chính là chiếc vé mời gọi ta đến với những vùng đất mới.",
         "Nắng chiếu lung linh qua từng tán lá, một ngày ngập tràn năng lượng thích hợp cho những chuyến đi dã ngoại ngoài trời.",
-        "Cuộc đời là những chuyến đi, và nắng hôm nay chính là người bạn đồng hành tuyệt vời nhất của bạn."
+        "Cuộc đời là những chuyến đi, và nắng hôm nay chính là người bạn đồng hành tuyệt vời nhất của bạn.",
       ];
       return (quotes..shuffle()).first;
     } else {
       final quotes = [
         "Dù ngoài trời nắng hay mưa, chỉ cần lòng bạn bình yên thì ngày nào cũng là một ngày đẹp để đi.",
         "Mỗi ngày mới là một chương sách mới. Hãy để thời tiết viết nên những kỷ niệm đáng nhớ trong hành trình của bạn.",
-        "Thời tiết đẹp nhất là khi lòng ta sẵn sàng đón nhận những trải nghiệm mới. Khám phá ngay nhé!"
+        "Thời tiết đẹp nhất là khi lòng ta sẵn sàng đón nhận những trải nghiệm mới. Khám phá ngay nhé!",
       ];
       return (quotes..shuffle()).first;
     }
@@ -143,15 +153,17 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       return const SizedBox.shrink();
     }
 
-    final temp = _weatherData!['temp'] != null ? (_weatherData!['temp'] as num).round() : 25;
+    final temp = _weatherData!['temp'] != null
+        ? (_weatherData!['temp'] as num).round()
+        : 25;
     final cityName = _weatherData!['cityName'] ?? 'Đà Nẵng';
     final desc = _weatherData!['description'] ?? 'Trời mát';
     final iconCode = _weatherData!['icon'] ?? '01d';
     final iconUrl = 'https://openweathermap.org/img/wn/$iconCode@2x.png';
-    
+
     final humidity = _weatherData!['humidity'] ?? 0;
     final windSpeed = _weatherData!['windSpeed'] ?? 0.0;
-    
+
     final suggestions = _weatherData!['suggestions'] ?? {};
     final rainProb = suggestions['rainProbability'] ?? 0;
     final rainfall = suggestions['estimatedRainfall'] ?? 0.0;
@@ -162,204 +174,218 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
         onTap: _fetchWeatherAndQuote,
         child: Container(
           decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppTheme.primary.withOpacity(0.08),
-              AppTheme.primary.withOpacity(0.02),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.primary.withOpacity(0.08),
+                AppTheme.primary.withOpacity(0.02),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: AppTheme.primary.withOpacity(0.12),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withOpacity(0.04),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
             ],
           ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppTheme.primary.withOpacity(0.12), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primary.withOpacity(0.04),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            Positioned(
-              right: -30,
-              top: -30,
-              child: Container(
-                width: 130,
-                height: 130,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.primary.withOpacity(0.06),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            children: [
+              Positioned(
+                right: -30,
+                top: -30,
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.primary.withOpacity(0.06),
+                  ),
                 ),
               ),
-            ),
-            Positioned(
-              left: -40,
-              bottom: -40,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.primary.withOpacity(0.03),
+              Positioned(
+                left: -40,
+                bottom: -40,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.primary.withOpacity(0.03),
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.location_on_rounded, size: 14, color: AppTheme.primary),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    cityName,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppTheme.darkText,
-                                      letterSpacing: -0.2,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(
-                                  '$temp',
-                                  style: TextStyle(
-                                    fontSize: 44,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppTheme.darkText,
-                                    height: 1.0,
-                                    letterSpacing: -1,
-                                  ),
-                                ),
-                                Text(
-                                  '°C',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on_rounded,
+                                    size: 14,
                                     color: AppTheme.primary,
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  desc,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppTheme.subtitleText,
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      cityName,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppTheme.darkText,
+                                        letterSpacing: -0.2,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                children: [
+                                  Text(
+                                    '$temp',
+                                    style: TextStyle(
+                                      fontSize: 44,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.darkText,
+                                      height: 1.0,
+                                      letterSpacing: -1,
+                                    ),
+                                  ),
+                                  Text(
+                                    '°C',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    desc,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.subtitleText,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Image.network(
+                          iconUrl,
+                          width: 72,
+                          height: 72,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(
+                            Icons.wb_sunny_rounded,
+                            color: AppTheme.primary,
+                            size: 48,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildMetricItem(
+                          icon: Icons.umbrella_rounded,
+                          label: 'Tỷ lệ mưa',
+                          value: '$rainProb%',
+                        ),
+                        _buildMetricItem(
+                          icon: Icons.water_drop_rounded,
+                          label: 'Lượng mưa',
+                          value: rainfall > 0
+                              ? '${rainfall.toStringAsFixed(1)} mm'
+                              : '0 mm',
+                        ),
+                        _buildMetricItem(
+                          icon: Icons.opacity_rounded,
+                          label: 'Độ ẩm',
+                          value: '$humidity%',
+                        ),
+                        _buildMetricItem(
+                          icon: Icons.air_rounded,
+                          label: 'Gió',
+                          value: '${windSpeed.toStringAsFixed(1)} m/s',
+                        ),
+                      ],
+                    ),
+
+                    if (_weatherQuote.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppTheme.border.withOpacity(0.5),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.format_quote_rounded,
+                              size: 20,
+                              color: AppTheme.primary.withOpacity(0.5),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _weatherQuote,
+                                style: TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  fontSize: 12.5,
+                                  color: AppTheme.darkText.withOpacity(0.85),
+                                  height: 1.4,
                                 ),
-                              ],
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      Image.network(
-                        iconUrl,
-                        width: 72,
-                        height: 72,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Icon(
-                          Icons.wb_sunny_rounded,
-                          color: AppTheme.primary,
-                          size: 48,
-                        ),
-                      ),
                     ],
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildMetricItem(
-                        icon: Icons.umbrella_rounded,
-                        label: 'Tỷ lệ mưa',
-                        value: '$rainProb%',
-                      ),
-                      _buildMetricItem(
-                        icon: Icons.water_drop_rounded,
-                        label: 'Lượng mưa',
-                        value: rainfall > 0 ? '${rainfall.toStringAsFixed(1)} mm' : '0 mm',
-                      ),
-                      _buildMetricItem(
-                        icon: Icons.opacity_rounded,
-                        label: 'Độ ẩm',
-                        value: '$humidity%',
-                      ),
-                      _buildMetricItem(
-                        icon: Icons.air_rounded,
-                        label: 'Gió',
-                        value: '${windSpeed.toStringAsFixed(1)} m/s',
-                      ),
-                    ],
-                  ),
-
-                  if (_weatherQuote.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.border.withOpacity(0.5)),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.format_quote_rounded,
-                            size: 20,
-                            color: AppTheme.primary.withOpacity(0.5),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _weatherQuote,
-                              style: TextStyle(
-                                fontStyle: FontStyle.italic,
-                                fontSize: 12.5,
-                                color: AppTheme.darkText.withOpacity(0.85),
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildMetricItem({
     required IconData icon,
@@ -421,17 +447,6 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                 // Weather Widget
                 _buildWeatherWidget(),
                 const SizedBox(height: 24),
-
-                // 2. Mood Selector
-                MoodSelectorWidget(
-                  selectedMood: _selectedMood,
-                  onMoodSelected: (mood) {
-                    setState(() {
-                      _selectedMood = mood;
-                    });
-                  },
-                ),
-                const SizedBox(height: 28),
 
                 // Featured Places Section
                 const FeaturedPlacesSection(),
@@ -744,301 +759,304 @@ class FeaturedGuidesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, String>> guides = [
-      {
-        'image':
-            'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=600&auto=format&fit=crop&q=80',
-        'title': 'Where You Go on Wednesday in Bali',
-        'desc':
-            'Having spent the past six years exploring Bali, I\'ve developed a deep appreciation for its hidden gems and vibrant culture...',
-        'author': 'Bali',
-        'views': '76 lượt xem',
-        'rating': '4.9',
-        'category': 'Cẩm nang',
-        'avatar':
-            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
-      },
-      {
-        'image':
-            'https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=600&auto=format&fit=crop&q=80',
-        'title': 'What Happens in Bali on Wednesday: Best Places to Be',
-        'desc':
-            'Lived in Bali for the past decade, capturing the finest sunset viewpoints and local hotspots...',
-        'author': 'Bali',
-        'views': '71 lượt xem',
-        'rating': '4.7',
-        'category': 'Gợi ý',
-        'avatar':
-            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-      },
-      {
-        'image':
-            'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=600&auto=format&fit=crop&q=80',
-        'title': 'Ultimate 3-Day Itinerary for First-Timers in Singapore',
-        'desc':
-            'From Marina Bay Sands to hidden food stalls, discover how to spend your weekend in the lion city...',
-        'author': 'Singapore Guide',
-        'views': '124 lượt xem',
-        'rating': '4.8',
-        'category': 'Hành trình',
-        'avatar':
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      },
-    ];
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: DatabaseService().fetchExplorePosts(),
+      builder: (context, snapshot) {
+        List<Map<String, dynamic>> posts = List.from(snapshot.data ?? []);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Hướng dẫn nổi bật', style: AppTheme.sectionTitleStyle),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Xem thêm →',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.primary,
-                  ),
-                ),
+        // Sắp xếp bài đăng dựa vào lượt xem và thả tim (Score = Likes * 10 + Views)
+        posts.sort((a, b) {
+          final int likesA = (a['likes'] is List)
+              ? (a['likes'] as List).length
+              : (int.tryParse(a['likes']?.toString() ?? '0') ?? 0);
+          final int likesB = (b['likes'] is List)
+              ? (b['likes'] as List).length
+              : (int.tryParse(b['likes']?.toString() ?? '0') ?? 0);
+          final int viewsA =
+              int.tryParse(a['views']?.toString() ?? a['viewCount']?.toString() ?? '0') ?? 0;
+          final int viewsB =
+              int.tryParse(b['views']?.toString() ?? b['viewCount']?.toString() ?? '0') ?? 0;
+          final int scoreA = likesA * 10 + viewsA;
+          final int scoreB = likesB * 10 + viewsB;
+          return scoreB.compareTo(scoreA);
+        });
+
+        if (snapshot.connectionState == ConnectionState.waiting && posts.isEmpty) {
+          return const SizedBox(
+            height: 320,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: AppTheme.primary,
+                strokeWidth: 2.5,
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        SizedBox(
-          height: 320,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            itemCount: guides.length,
-            itemBuilder: (context, index) {
-              final guide = guides[index];
-              return Container(
-                width: 265,
-                margin: const EdgeInsets.only(right: 16.0),
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.primary.withAlpha(15),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
+            ),
+          );
+        }
+
+        if (posts.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Hướng dẫn nổi bật', style: AppTheme.sectionTitleStyle),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
                     ),
-                  ],
-                  border: Border.all(color: AppTheme.border, width: 1),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Image with overlay badges
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(22),
-                          ),
-                          child: Image.network(
-                            guide['image']!,
-                            height: 155,
-                            width: 265,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 155,
-                                color: AppTheme.surfaceVariant,
-                                child: Icon(
-                                  Icons.image_rounded,
-                                  color: AppTheme.hintText,
-                                  size: 40,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        // Gradient overlay
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          height: 60,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(0),
-                              ),
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withAlpha(80),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Category badge
-                        Positioned(
-                          top: 12,
-                          left: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: AppTheme.primaryGradient,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              guide['category']!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Rating
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withAlpha(130),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  color: AppTheme.amber,
-                                  size: 12,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  guide['rating']!,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    // Content
-                    Padding(
-                      padding: const EdgeInsets.all(14.0),
+                    child: const Text(
+                      'Xem thêm →',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 320,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                itemCount: posts.length,
+                itemBuilder: (context, index) {
+                  final post = posts[index];
+                  final String title = (post['title'] ?? 'Cẩm nang du lịch').toString();
+                  final String desc = (post['description'] ?? post['content'] ?? post['summary'] ?? '').toString();
+                  final String image = (post['coverImage'] ?? post['image'] ?? post['imageUrl'] ?? '').toString().isNotEmpty
+                      ? (post['coverImage'] ?? post['image'] ?? post['imageUrl']).toString()
+                      : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80';
+                  final String authorName = (post['author']?['fullName'] ?? 'Cloudmood Guide').toString();
+                  final String? avatar = post['author']?['avatar']?.toString();
+                  final int likesCount = (post['likes'] is List) ? (post['likes'] as List).length : 0;
+                  final int viewsCount = int.tryParse(post['views']?.toString() ?? post['viewCount']?.toString() ?? '0') ?? 0;
+                  final String category = (post['destination'] ?? post['categoryName'] ?? 'Cẩm nang').toString();
+
+                  return GestureDetector(
+                    onTap: () {
+                      final int? postId = (post['id'] is int)
+                          ? post['id']
+                          : int.tryParse(post['id'].toString());
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ExplorePostDetailScreen(
+                            postId: postId,
+                            title: title,
+                            post: post,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 265,
+                      margin: const EdgeInsets.only(right: 16.0),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primary.withAlpha(15),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                        border: Border.all(color: AppTheme.border, width: 1),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            guide['title']!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.darkText,
-                              height: 1.3,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            guide['desc']!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.subtitleText,
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
+                          // Image with overlay badges
+                          Stack(
                             children: [
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(22),
+                                ),
                                 child: Image.network(
-                                  guide['avatar']!,
-                                  width: 24,
-                                  height: 24,
+                                  image,
+                                  height: 155,
+                                  width: 265,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (c, e, s) => Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.primaryContainer,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Icon(
-                                      Icons.person,
-                                      size: 14,
-                                      color: AppTheme.primary,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      height: 155,
+                                      color: AppTheme.surfaceVariant,
+                                      child: Icon(
+                                        Icons.image_rounded,
+                                        color: AppTheme.hintText,
+                                        size: 40,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              // Gradient overlay
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                height: 60,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.black.withAlpha(80),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '${guide['author']} · ${guide['views']}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppTheme.subtitleText,
-                                    fontWeight: FontWeight.w500,
+                              // Category badge
+                              Positioned(
+                                top: 12,
+                                left: 12,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: AppTheme.primaryGradient,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    category,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.bookmark_border_rounded,
-                                  color: AppTheme.primary,
-                                  size: 14,
+                              // Likes badge
+                              Positioned(
+                                top: 12,
+                                right: 12,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withAlpha(130),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.favorite_rounded,
+                                        color: Colors.redAccent,
+                                        size: 12,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '$likesCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
                           ),
+                          // Content
+                          Padding(
+                            padding: const EdgeInsets.all(14.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.darkText,
+                                    height: 1.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  desc,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.subtitleText,
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 12,
+                                      backgroundColor: AppTheme.primaryContainer,
+                                      backgroundImage: (avatar != null && avatar.isNotEmpty)
+                                          ? NetworkImage(avatar)
+                                          : null,
+                                      child: (avatar == null || avatar.isEmpty)
+                                          ? const Icon(
+                                              Icons.person,
+                                              size: 14,
+                                              color: AppTheme.primary,
+                                            )
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '$authorName · $viewsCount xem',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.subtitleText,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1494,7 +1512,10 @@ class CreateMenuOverlay extends StatelessWidget {
                                 context: context,
                                 icon: Icons.auto_awesome_rounded,
                                 gradient: const LinearGradient(
-                                  colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+                                  colors: [
+                                    Color(0xFF8E2DE2),
+                                    Color(0xFF4A00E0),
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
@@ -1512,7 +1533,10 @@ class CreateMenuOverlay extends StatelessWidget {
                                 context: context,
                                 icon: Icons.explore_rounded,
                                 gradient: const LinearGradient(
-                                  colors: [Color(0xFF92400E), Color(0xFFD97706)],
+                                  colors: [
+                                    Color(0xFF92400E),
+                                    Color(0xFFD97706),
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
@@ -1644,7 +1668,8 @@ class FeaturedPlacesSection extends StatelessWidget {
       future: DatabaseService().fetchPlaces(categoryName: 'Nổi bật', limit: 8),
       builder: (context, snapshot) {
         final List<Map<String, dynamic>> places = snapshot.data ?? [];
-        if (snapshot.connectionState == ConnectionState.waiting && places.isEmpty) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            places.isEmpty) {
           return const SizedBox(
             height: 320,
             child: Center(
@@ -1668,10 +1693,7 @@ class FeaturedPlacesSection extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Địa điểm nổi bật',
-                    style: AppTheme.sectionTitleStyle,
-                  ),
+                  Text('Địa điểm nổi bật', style: AppTheme.sectionTitleStyle),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -1704,22 +1726,20 @@ class FeaturedPlacesSection extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final place = places[index];
                   final name = place['name'] ?? 'Địa điểm';
-                  final image = place['image'] != null && place['image'].isNotEmpty
+                  final image =
+                      place['image'] != null && place['image'].isNotEmpty
                       ? place['image']
                       : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&auto=format&fit=crop&q=80';
                   final category = place['category']?['name'] ?? 'Địa điểm';
                   final rating = place['rating'] ?? 4.5;
                   final address = place['address'] ?? '';
-                  final desc = place['description'] ?? 'Khám phá địa điểm du lịch tuyệt vời này cùng Cloudmood.';
+                  final desc =
+                      place['description'] ??
+                      'Khám phá địa điểm du lịch tuyệt vời này cùng Cloudmood.';
 
                   return GestureDetector(
                     onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) => PlaceDetailBottomSheet(place: place),
-                      );
+                      PlaceDetailBottomSheet.show(context, place);
                     },
                     child: Container(
                       width: 265,
@@ -1742,7 +1762,9 @@ class FeaturedPlacesSection extends StatelessWidget {
                           Stack(
                             children: [
                               ClipRRect(
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(22),
+                                ),
                                 child: Image.network(
                                   image,
                                   height: 155,
@@ -1752,7 +1774,11 @@ class FeaturedPlacesSection extends StatelessWidget {
                                     height: 155,
                                     width: 265,
                                     color: AppTheme.surfaceVariant,
-                                    child: Icon(Icons.image_not_supported_rounded, color: AppTheme.subtitleText, size: 36),
+                                    child: Icon(
+                                      Icons.image_not_supported_rounded,
+                                      color: AppTheme.subtitleText,
+                                      size: 36,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1799,7 +1825,9 @@ class FeaturedPlacesSection extends StatelessWidget {
                                       ),
                                       const SizedBox(width: 3),
                                       Text(
-                                        rating is num ? rating.toStringAsFixed(1) : '4.5',
+                                        rating is num
+                                            ? rating.toStringAsFixed(1)
+                                            : '4.5',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 10,
@@ -1842,7 +1870,11 @@ class FeaturedPlacesSection extends StatelessWidget {
                                 const SizedBox(height: 12),
                                 Row(
                                   children: [
-                                    Icon(Icons.location_on_rounded, size: 14, color: AppTheme.primary),
+                                    Icon(
+                                      Icons.location_on_rounded,
+                                      size: 14,
+                                      color: AppTheme.primary,
+                                    ),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(

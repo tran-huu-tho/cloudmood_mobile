@@ -191,7 +191,12 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
       }
     }
 
-    return Column(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
       children: [
         // Drag Handle
         Center(
@@ -312,7 +317,8 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
           ),
         ),
       ],
-    );
+    ),
+  );
   }
 
   Widget _buildIntroTab() {

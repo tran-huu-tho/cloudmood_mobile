@@ -61,6 +61,35 @@ class ChatSession {
   }
 }
 
+class AITripConfig {
+  final String destination;
+  final int days;
+  final String companions;
+  final List<String> categories;
+  final String pace;
+  final String budget;
+  final String currency;
+
+  AITripConfig({
+    required this.destination,
+    required this.days,
+    required this.companions,
+    required this.categories,
+    required this.pace,
+    required this.budget,
+    this.currency = 'VND',
+  });
+
+  Map<String, dynamic> toJson() => {
+        'days': days,
+        'companions': companions,
+        'categories': categories,
+        'pace': pace,
+        'budget': budget,
+        'currency': currency,
+      };
+}
+
 class AiService {
   static Future<List<ChatSession>> getChatSessions() async {
     try {
@@ -104,6 +133,7 @@ class AiService {
     String? sessionId,
     required String destination,
     required String message,
+    AITripConfig? tripConfig,
   }) async {
     try {
       final response = await ApiClient.post(
@@ -112,6 +142,7 @@ class AiService {
           if (sessionId != null) 'sessionId': sessionId,
           'destination': destination,
           'message': message,
+          if (tripConfig != null) 'tripConfig': tripConfig.toJson(),
         },
       );
 
@@ -171,6 +202,7 @@ class AiService {
     String? sessionId,
     required String destination,
     required String message,
+    AITripConfig? tripConfig,
   }) async* {
     try {
       final baseUrl = ApiClient.baseUrl;
@@ -188,6 +220,7 @@ class AiService {
         if (sessionId != null) 'sessionId': sessionId,
         'destination': destination,
         'message': message,
+        if (tripConfig != null) 'tripConfig': tripConfig.toJson(),
       });
 
       final client = http.Client();

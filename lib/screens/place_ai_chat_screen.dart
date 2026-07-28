@@ -316,124 +316,126 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
       StreamSubscription? subscription;
       bool gotSession = false;
 
-      subscription = AiService.streamChat(
-        sessionId: _sessionId,
-        destination: widget.placeName,
-        message: text,
-      ).listen(
-        (event) {
-          if (!mounted) return;
-          final type = event['type'];
+      subscription =
+          AiService.streamChat(
+            sessionId: _sessionId,
+            destination: widget.placeName,
+            message: text,
+          ).listen(
+            (event) {
+              if (!mounted) return;
+              final type = event['type'];
 
-          if (type == 'session' && !gotSession) {
-            gotSession = true;
-            setState(() {
-              _sessionId = event['sessionId'];
-            });
-            _loadChatSessions().then((_) {
-              if (_currentTitle == 'Cuộc trò chuyện mới' && _sessions.isNotEmpty) {
-                final currentSession = _sessions.firstWhere(
-                  (s) => s.id == _sessionId,
-                  orElse: () => _sessions.first,
-                );
-                setState(() => _currentTitle = currentSession.title);
-              }
-            });
-          } else if (type == 'token') {
-            setState(() {
-              _streamingText += event['content'] ?? '';
-            });
-            _scrollToBottom();
-          } else if (type == 'done') {
-            setState(() {
-              _messages.add(
-                ChatMessage(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  sessionId: _sessionId!,
-                  role: 'AI',
-                  content: _streamingText,
-                  createdAt: DateTime.now(),
-                ),
-              );
-              _streamingText = '';
-              _isStreaming = false;
-              _isLoading = false;
-            });
-            _scrollToBottom();
-          } else if (type == 'error') {
-            setState(() {
-              _streamingText = '';
-              _isStreaming = false;
-              _isLoading = false;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Lỗi khi gửi tin nhắn')),
-            );
-          }
-        },
-        onError: (e) async {
-          // Fallback to non-streaming
-          try {
-            final result = await AiService.sendChatMessage(
-              sessionId: _sessionId,
-              destination: widget.placeName,
-              message: text,
-            );
-            if (mounted) {
-              setState(() {
-                _sessionId = result['sessionId'];
-                _messages.add(
-                  ChatMessage(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    sessionId: _sessionId!,
-                    role: 'AI',
-                    content: result['reply'],
-                    createdAt: DateTime.now(),
-                  ),
-                );
-                _streamingText = '';
-                _isStreaming = false;
-                _isLoading = false;
-              });
-              _scrollToBottom();
-              _loadChatSessions();
-            }
-          } catch (_) {
-            if (mounted) {
-              setState(() {
-                _streamingText = '';
-                _isStreaming = false;
-                _isLoading = false;
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Lỗi khi gửi tin nhắn')),
-              );
-            }
-          }
-        },
-        onDone: () {
-          // Streaming finished, ensure we're in clean state
-          if (mounted && _isStreaming) {
-            setState(() {
-              if (_streamingText.isNotEmpty) {
-                _messages.add(
-                  ChatMessage(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    sessionId: _sessionId ?? '',
-                    role: 'AI',
-                    content: _streamingText,
-                    createdAt: DateTime.now(),
-                  ),
+              if (type == 'session' && !gotSession) {
+                gotSession = true;
+                setState(() {
+                  _sessionId = event['sessionId'];
+                });
+                _loadChatSessions().then((_) {
+                  if (_currentTitle == 'Cuộc trò chuyện mới' &&
+                      _sessions.isNotEmpty) {
+                    final currentSession = _sessions.firstWhere(
+                      (s) => s.id == _sessionId,
+                      orElse: () => _sessions.first,
+                    );
+                    setState(() => _currentTitle = currentSession.title);
+                  }
+                });
+              } else if (type == 'token') {
+                setState(() {
+                  _streamingText += event['content'] ?? '';
+                });
+                _scrollToBottom();
+              } else if (type == 'done') {
+                setState(() {
+                  _messages.add(
+                    ChatMessage(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      sessionId: _sessionId!,
+                      role: 'AI',
+                      content: _streamingText,
+                      createdAt: DateTime.now(),
+                    ),
+                  );
+                  _streamingText = '';
+                  _isStreaming = false;
+                  _isLoading = false;
+                });
+                _scrollToBottom();
+              } else if (type == 'error') {
+                setState(() {
+                  _streamingText = '';
+                  _isStreaming = false;
+                  _isLoading = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Lỗi khi gửi tin nhắn')),
                 );
               }
-              _streamingText = '';
-              _isStreaming = false;
-              _isLoading = false;
-            });
-            _scrollToBottom();
-          }
-        },
-      );
+            },
+            onError: (e) async {
+              // Fallback to non-streaming
+              try {
+                final result = await AiService.sendChatMessage(
+                  sessionId: _sessionId,
+                  destination: widget.placeName,
+                  message: text,
+                );
+                if (mounted) {
+                  setState(() {
+                    _sessionId = result['sessionId'];
+                    _messages.add(
+                      ChatMessage(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        sessionId: _sessionId!,
+                        role: 'AI',
+                        content: result['reply'],
+                        createdAt: DateTime.now(),
+                      ),
+                    );
+                    _streamingText = '';
+                    _isStreaming = false;
+                    _isLoading = false;
+                  });
+                  _scrollToBottom();
+                  _loadChatSessions();
+                }
+              } catch (_) {
+                if (mounted) {
+                  setState(() {
+                    _streamingText = '';
+                    _isStreaming = false;
+                    _isLoading = false;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Lỗi khi gửi tin nhắn')),
+                  );
+                }
+              }
+            },
+            onDone: () {
+              // Streaming finished, ensure we're in clean state
+              if (mounted && _isStreaming) {
+                setState(() {
+                  if (_streamingText.isNotEmpty) {
+                    _messages.add(
+                      ChatMessage(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        sessionId: _sessionId ?? '',
+                        role: 'AI',
+                        content: _streamingText,
+                        createdAt: DateTime.now(),
+                      ),
+                    );
+                  }
+                  _streamingText = '';
+                  _isStreaming = false;
+                  _isLoading = false;
+                });
+                _scrollToBottom();
+              }
+            },
+          );
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -441,9 +443,9 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
           _isStreaming = false;
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lỗi khi gửi tin nhắn')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Lỗi khi gửi tin nhắn')));
       }
     }
   }
@@ -491,103 +493,116 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
 
       // Headers
       if (line.startsWith('### ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
-          child: Text(
-            line.substring(4),
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkText,
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: Text(
+              line.substring(4),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkText,
+              ),
             ),
           ),
-        ));
+        );
       } else if (line.startsWith('## ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 10, bottom: 4),
-          child: Text(
-            line.substring(3),
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkText,
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Text(
+              line.substring(3),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkText,
+              ),
             ),
           ),
-        ));
+        );
       } else if (line.startsWith('# ')) {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 12, bottom: 4),
-          child: Text(
-            line.substring(2),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkText,
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            child: Text(
+              line.substring(2),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkText,
+              ),
             ),
           ),
-        ));
+        );
       }
       // Bullet points
-      else if (line.trimLeft().startsWith('- ') || line.trimLeft().startsWith('* ')) {
+      else if (line.trimLeft().startsWith('- ') ||
+          line.trimLeft().startsWith('* ')) {
         final indent = line.length - line.trimLeft().length;
         final text = line.trimLeft().substring(2);
-        widgets.add(Padding(
-          padding: EdgeInsets.only(left: indent > 0 ? 16.0 : 0, top: 2, bottom: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 6, right: 8),
-                child: Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: AppTheme.darkText.withValues(alpha: 0.6),
-                    shape: BoxShape.circle,
+        widgets.add(
+          Padding(
+            padding: EdgeInsets.only(
+              left: indent > 0 ? 16.0 : 0,
+              top: 2,
+              bottom: 2,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, right: 8),
+                  child: Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkText.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: _buildRichText(text, false),
-              ),
-            ],
+                Expanded(child: _buildRichText(text, false)),
+              ],
+            ),
           ),
-        ));
+        );
       }
       // Numbered lists
       else if (RegExp(r'^\d+\.\s').hasMatch(line.trimLeft())) {
         final match = RegExp(r'^(\d+)\.\s(.*)').firstMatch(line.trimLeft());
         if (match != null) {
-          widgets.add(Padding(
-            padding: const EdgeInsets.only(top: 2, bottom: 2),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 24,
-                  child: Text(
-                    '${match.group(1)}.',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.darkText,
+          widgets.add(
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    child: Text(
+                      '${match.group(1)}.',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.darkText,
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: _buildRichText(match.group(2) ?? '', false),
-                ),
-              ],
+                  Expanded(child: _buildRichText(match.group(2) ?? '', false)),
+                ],
+              ),
             ),
-          ));
+          );
         }
       }
       // Normal text
       else {
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 1, bottom: 1),
-          child: _buildRichText(line, false),
-        ));
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 1, bottom: 1),
+            child: _buildRichText(line, false),
+          ),
+        );
       }
     }
 
@@ -607,10 +622,12 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
       if (match.start > lastEnd) {
         spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
       }
-      spans.add(TextSpan(
-        text: match.group(1),
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ));
+      spans.add(
+        TextSpan(
+          text: match.group(1),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      );
       lastEnd = match.end;
     }
 
@@ -645,9 +662,9 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
         ),
         decoration: BoxDecoration(
           color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16).copyWith(
-            bottomLeft: const Radius.circular(0),
-          ),
+          borderRadius: BorderRadius.circular(
+            16,
+          ).copyWith(bottomLeft: const Radius.circular(0)),
           border: Border.all(color: AppTheme.border),
         ),
         child: _streamingText.isEmpty
@@ -672,7 +689,11 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                 color: const Color(0xFFEEF2FF),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF4F46E5), size: 18),
+              child: const Icon(
+                Icons.smart_toy_rounded,
+                color: Color(0xFF4F46E5),
+                size: 18,
+              ),
             ),
             const SizedBox(width: 8),
             _buildTypingDots(),
@@ -695,7 +716,10 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
               width: 8,
               height: 8,
               decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.3 + 0.4 * (1 - (value - 0.5).abs() * 2).clamp(0.0, 1.0)),
+                color: AppTheme.primary.withValues(
+                  alpha:
+                      0.3 + 0.4 * (1 - (value - 0.5).abs() * 2).clamp(0.0, 1.0),
+                ),
                 shape: BoxShape.circle,
               ),
             );
@@ -904,14 +928,18 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                               horizontal: 16,
                               vertical: 8,
                             ),
-                            itemCount: _messages.length + (_isStreaming ? 1 : 0) + (_isLoading && !_isStreaming ? 1 : 0),
+                            itemCount:
+                                _messages.length +
+                                (_isStreaming ? 1 : 0) +
+                                (_isLoading && !_isStreaming ? 1 : 0),
                             itemBuilder: (context, index) {
                               // Streaming message (AI đang gõ)
                               if (_isStreaming && index == _messages.length) {
                                 return _buildStreamingBubble();
                               }
                               // Loading indicator
-                              if (index == _messages.length + (_isStreaming ? 1 : 0)) {
+                              if (index ==
+                                  _messages.length + (_isStreaming ? 1 : 0)) {
                                 return _buildTypingIndicator();
                               }
                               final msg = _messages[index];
@@ -932,7 +960,9 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                         vertical: 12,
                                       ),
                                       constraints: BoxConstraints(
-                                        maxWidth: MediaQuery.of(context).size.width * 0.8,
+                                        maxWidth:
+                                            MediaQuery.of(context).size.width *
+                                            0.8,
                                       ),
                                       decoration: BoxDecoration(
                                         color: isUser
@@ -949,15 +979,23 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                             ),
                                         border: isUser
                                             ? null
-                                            : Border.all(color: AppTheme.border),
+                                            : Border.all(
+                                                color: AppTheme.border,
+                                              ),
                                       ),
-                                      child: _buildMessageContent(msg.content, isUser),
+                                      child: _buildMessageContent(
+                                        msg.content,
+                                        isUser,
+                                      ),
                                     ),
                                   ),
                                   // Action buttons for AI messages
                                   if (!isUser)
                                     Padding(
-                                      padding: const EdgeInsets.only(bottom: 12, left: 4),
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12,
+                                        left: 4,
+                                      ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
@@ -965,11 +1003,19 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                             Icons.copy_rounded,
                                             'Sao chép',
                                             () {
-                                              Clipboard.setData(ClipboardData(text: msg.content));
-                                              ScaffoldMessenger.of(context).showSnackBar(
+                                              Clipboard.setData(
+                                                ClipboardData(
+                                                  text: msg.content,
+                                                ),
+                                              );
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
                                                 const SnackBar(
                                                   content: Text('Đã sao chép'),
-                                                  duration: Duration(seconds: 1),
+                                                  duration: Duration(
+                                                    seconds: 1,
+                                                  ),
                                                 ),
                                               );
                                             },
@@ -981,11 +1027,15 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                             () {
                                               // Regenerate: resend the last user message
                                               if (_messages.length >= 2) {
-                                                final lastUserMsg = _messages.lastWhere(
-                                                  (m) => m.role == 'USER',
-                                                  orElse: () => _messages.last,
+                                                final lastUserMsg = _messages
+                                                    .lastWhere(
+                                                      (m) => m.role == 'USER',
+                                                      orElse: () =>
+                                                          _messages.last,
+                                                    );
+                                                _sendMessage(
+                                                  lastUserMsg.content,
                                                 );
-                                                _sendMessage(lastUserMsg.content);
                                               }
                                             },
                                           ),

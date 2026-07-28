@@ -10,8 +10,13 @@ import '../services/ai_service.dart';
 
 class TripAIChatScreen extends StatefulWidget {
   final String destination;
+  final AITripConfig? tripConfig;
 
-  const TripAIChatScreen({super.key, required this.destination});
+  const TripAIChatScreen({
+    super.key,
+    required this.destination,
+    this.tripConfig,
+  });
 
   @override
   State<TripAIChatScreen> createState() => _TripAIChatScreenState();
@@ -44,6 +49,19 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
     _fetchMapData();
     _loadChatSessions();
     _loadSuggestions();
+
+    if (widget.tripConfig != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _sendInitialConfigMessage();
+      });
+    }
+  }
+
+  Future<void> _sendInitialConfigMessage() async {
+    final cfg = widget.tripConfig!;
+    final initialPrompt =
+        'Hãy giúp tôi thiết kế lịch trình du lịch ${cfg.destination} trong ${cfg.days} ngày cho đối tượng ${cfg.companions}. Thể loại yêu thích: ${cfg.categories.join(", ")}, nhịp độ di chuyển ${cfg.pace}, ngân sách dự kiến: ${cfg.budget}.';
+    await _sendMessage(initialPrompt, cfg);
   }
 
   Future<void> _loadSuggestions() async {
@@ -243,7 +261,8 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
     super.dispose();
   }
 
-  Future<void> _sendMessage([String? optionalText]) async {
+  Future<void> _sendMessage(
+      [String? optionalText, AITripConfig? tripConfigOverride]) async {
     final text = (optionalText ?? _controller.text).trim();
     if (text.isEmpty || _isLoading) return;
 
@@ -273,6 +292,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
         sessionId: _sessionId,
         destination: widget.destination,
         message: text,
+        tripConfig: tripConfigOverride ?? widget.tripConfig,
       ).listen(
         (event) {
           if (!mounted) return;

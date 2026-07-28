@@ -10,6 +10,7 @@ import 'screens/deals_screen.dart';
 import 'screens/forum_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/create_itinerary_wizard_sheet.dart';
+import 'screens/create_ai_trip_wizard_sheet.dart';
 import 'screens/create_guide_wizard_sheet.dart';
 import 'screens/trip_overview_screen.dart';
 import 'screens/trip_ai_chat_screen.dart';
@@ -131,15 +132,20 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
           if (result == 'create_itinerary') {
             _openCreateItinerarySheet();
           } else if (result == 'ai_chat') {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => const TripAIChatScreen(destination: 'Đà Nẵng'),
-              ),
-            );
+            _openCreateAITripSheet();
           } else if (result == 'create_guide') {
             _openCreateGuideSheet();
           }
         });
+  }
+
+  void _openCreateAITripSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const CreateAITripWizardSheet(),
+    );
   }
 
   void _openCreateItinerarySheet() {

@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/database_service.dart';
+import '../services/api_client.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_utils.dart';
 import '../widgets/section_style_sheet.dart';
@@ -465,7 +466,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
     try {
       final response = await http.get(
         Uri.parse(
-          'http://localhost:3000/explore?destination=${Uri.encodeComponent(dest)}',
+          '${ApiClient.baseUrl}/explore?destination=${Uri.encodeComponent(dest)}',
         ),
       );
       if (response.statusCode == 200) {

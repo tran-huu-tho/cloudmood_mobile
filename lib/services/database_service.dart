@@ -191,6 +191,7 @@ class DatabaseService {
     required List<String> categories,
     required List<String> amenities,
     bool isGuide = false,
+    bool isAi = false,
   }) async {
     try {
       final data = {
@@ -204,6 +205,7 @@ class DatabaseService {
         'categories': categories,
         'amenities': amenities,
         'isGuide': isGuide,
+        'isAi': isAi,
       };
 
       final response = await ApiClient.post('/itineraries', body: data);
@@ -247,6 +249,57 @@ class DatabaseService {
       return false;
     }
   }
+
+  /// Calls the Hybrid RAG + Gemini AI Agent to generate a full itinerary plan.
+  /// Returns the structured day/place plan from Gemini AI.
+  /// Throws an exception with a user-friendly message on error.
+  Future<Map<String, dynamic>> generateAIItinerary({
+    required String destination,
+    required int days,
+    required String pace,
+    required String companion,
+    required String budget,
+    required List<String> categories,
+    required DateTime startDate,
+    String? customRequest,
+  }) async {
+    final body = {
+      'destination': destination,
+      'days': days,
+      'pace': pace,
+      'companion': companion,
+      'budget': budget,
+      'categories': categories,
+      'startDate': startDate.toIso8601String(),
+      if (customRequest != null && customRequest.trim().isNotEmpty)
+        'customRequest': customRequest.trim(),
+    };
+
+    final response = await ApiClient.post(
+      '/mobile/ai/generate-itinerary',
+      body: body,
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = jsonDecode(response.body);
+      if (decoded['success'] == true && decoded['data'] != null) {
+        return Map<String, dynamic>.from(decoded['data']);
+      }
+      throw Exception('Trợ lý AI không trả về dữ liệu hợp lệ.');
+    }
+
+    // Parse backend error message for user-friendly display
+    try {
+      final errBody = jsonDecode(response.body);
+      final msg = errBody['message'] ?? errBody['error'] ?? 'Lỗi không xác định';
+      throw Exception(msg.toString());
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Trợ lý AI gặp lỗi (${response.statusCode}). Vui lòng thử lại.');
+    }
+  }
+
+
 
   /// Shifts day numbers for itinerary details greater than targetDay by offset
   Future<bool> shiftItineraryDetailsDays({
@@ -408,6 +461,8 @@ class DatabaseService {
     required int day,
     int sortOrder = 0,
     String? noteText,
+    String? startTime,
+    String? endTime,
   }) async {
     try {
       final response = await ApiClient.post(
@@ -418,9 +473,11 @@ class DatabaseService {
           'day': day,
           'sortOrder': sortOrder,
           'noteText': noteText,
+          'startTime': startTime,
+          'endTime': endTime,
         },
       );
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         refreshTrigger.value++;
         return jsonDecode(response.body);
       }
@@ -655,6 +712,24 @@ class DatabaseService {
     // Assuming backend will handle it or we fetch then post.
     // This is a simplified version.
     return true;
+  }
+
+  /// Fetches published explore posts (User Guides / Posts)
+  Future<List<Map<String, dynamic>>> fetchExplorePosts({String? destination}) async {
+    try {
+      final String endpoint = (destination != null && destination.trim().isNotEmpty)
+          ? '/explore?destination=${Uri.encodeComponent(destination.trim())}'
+          : '/explore';
+      final response = await ApiClient.get(endpoint);
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error fetching explore posts: $e');
+      return [];
+    }
   }
 
   /// Creates a new ExplorePost (e.g. for User Guides)

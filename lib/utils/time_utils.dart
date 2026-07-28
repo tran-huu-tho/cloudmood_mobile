@@ -50,6 +50,73 @@ class TimeUtils {
     return data.toString();
   }
 
+  static bool isPlaceOpenOnDate(dynamic hoursData, DateTime targetDate) {
+    if (hoursData == null) return true;
+
+    dynamic data = hoursData;
+    if (data is String) {
+      if (data.isEmpty) return false;
+      try {
+        if (data.startsWith('{') || data.startsWith('[')) {
+          data = jsonDecode(data);
+        } else {
+          final lower = data.toLowerCase();
+          if (lower.contains('tạm đóng cửa') || lower.contains('closed')) return false;
+          return true;
+        }
+      } catch (_) {
+        final lower = data.toLowerCase();
+        if (lower.contains('tạm đóng cửa') || lower.contains('closed')) return false;
+        return true;
+      }
+    }
+
+    if (data is Map) {
+      if (data.isEmpty) return true;
+
+      final dayNamesEn = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      final weekdayIndex = targetDate.weekday - 1; // 0 = Mon, 6 = Sun
+      final dayKey = dayNamesEn[weekdayIndex.clamp(0, 6)];
+
+      if (data.containsKey('weekday_text') && data['weekday_text'] is List) {
+        final list = data['weekday_text'] as List;
+        if (weekdayIndex < list.length) {
+          final text = list[weekdayIndex].toString().toLowerCase();
+          if (text.contains('closed') || text.contains('tạm đóng cửa') || text.contains('đóng cửa') || text.contains('nghỉ')) {
+            return false;
+          }
+          return true;
+        }
+      }
+
+      final bool hasAnyDayKey = dayNamesEn.any((d) => data.containsKey(d));
+      if (hasAnyDayKey) {
+        if (!data.containsKey(dayKey)) {
+          // If schedule map specifies days, but missing target dayKey -> Place is CLOSED!
+          return false;
+        }
+        final hours = data[dayKey];
+        if (hours == null) return false;
+        if (hours is List) {
+          if (hours.isEmpty) return false;
+          final str = hours.join(' ').toLowerCase().trim();
+          if (str.isEmpty || str.contains('closed') || str.contains('tạm đóng cửa') || str.contains('đóng cửa') || str.contains('nghỉ')) {
+            return false;
+          }
+          return true;
+        } else if (hours is String) {
+          final lower = hours.toLowerCase().trim();
+          if (lower.isEmpty || lower.contains('closed') || lower.contains('tạm đóng cửa') || lower.contains('đóng cửa') || lower.contains('nghỉ')) {
+            return false;
+          }
+          return true;
+        }
+      }
+    }
+
+    return true;
+  }
+
   static List<Map<String, dynamic>> getFullWeekSchedule(dynamic hoursData) {
     if (hoursData == null) return [];
     

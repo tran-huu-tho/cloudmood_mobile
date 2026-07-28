@@ -46,6 +46,7 @@ class _CreateItineraryWizardSheetState
   Timer? _debounce;
   List<dynamic> _searchResults = [];
   bool _isLoadingSearch = false;
+  bool _userEditedTitle = false;
 
   // Only Vietnam Destinations - Cần Thơ pinned first
   final List<Map<String, String>> _popularDestinations = [
@@ -273,16 +274,34 @@ class _CreateItineraryWizardSheetState
     setState(() => _isLoadingSearch = true);
     try {
       final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent('$query, Vietnam')}&format=json&addressdetails=1&limit=5',
+        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent('$query, Vietnam')}&format=json&addressdetails=1&limit=10',
       );
       final response = await http.get(
         url,
         headers: {'User-Agent': 'CloudMoodApp/1.0'},
       );
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final List<dynamic> data = json.decode(response.body);
+        final filteredAreas = data.where((item) {
+          final placeClass = (item['class'] ?? '').toString().toLowerCase();
+          final type = (item['type'] ?? '').toString().toLowerCase();
+
+          if (placeClass == 'amenity' ||
+              placeClass == 'shop' ||
+              placeClass == 'tourism' ||
+              placeClass == 'building' ||
+              placeClass == 'leisure' ||
+              placeClass == 'craft' ||
+              type == 'restaurant' ||
+              type == 'hotel' ||
+              type == 'cafe') {
+            return false;
+          }
+          return true;
+        }).toList();
+
         setState(() {
-          _searchResults = data is List ? data : [];
+          _searchResults = filteredAreas.isNotEmpty ? filteredAreas : data;
         });
       }
     } catch (e) {
@@ -346,12 +365,11 @@ class _CreateItineraryWizardSheetState
         _selectedDestination = destinationName;
         _searchController.text = destinationName;
         _searchResults = [];
-        if (_tripTitleController.text.trim().isEmpty) {
-          _tripTitleController.text = 'Khám phá $destinationName';
+        if (!_userEditedTitle || _tripTitleController.text.trim().isEmpty) {
+          _tripTitleController.text = 'Chuyến đi $destinationName';
         }
       });
       _fetchTopRatedPlaces(destinationName);
-      _nextStep();
     } else {
       if (mounted) {
         _showUnsupportedDestinationDialog(destinationName);
@@ -361,12 +379,7 @@ class _CreateItineraryWizardSheetState
 
   Future<void> _nextStep() async {
     if (_currentStep == 0) {
-      // Step 0: Trip Name
-      if (_tripTitleController.text.trim().isEmpty) {
-        _tripTitleController.text = 'Hành trình của tôi';
-      }
-    } else if (_currentStep == 1) {
-      // Step 1: Destination
+      // Step 0: Destination & Trip Name
       final targetDest = _selectedDestination.isNotEmpty
           ? _selectedDestination
           : _searchController.text.trim();
@@ -376,6 +389,10 @@ class _CreateItineraryWizardSheetState
           const SnackBar(content: Text('Vui lòng chọn điểm đến chuyến đi!')),
         );
         return;
+      }
+
+      if (_tripTitleController.text.trim().isEmpty) {
+        _tripTitleController.text = 'Chuyến đi $targetDest';
       }
 
       setState(() => _isSaving = true);
@@ -391,20 +408,17 @@ class _CreateItineraryWizardSheetState
 
       setState(() {
         _selectedDestination = targetDest;
-        if (_tripTitleController.text.trim().isEmpty) {
-          _tripTitleController.text = 'Khám phá $targetDest';
-        }
       });
       _fetchTopRatedPlaces(_selectedDestination);
     }
 
-    if (_currentStep < 4) {
+    if (_currentStep < 3) {
       setState(() => _currentStep++);
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
-      if (_currentStep == 2) {
+      if (_currentStep == 1) {
         _scrollToSelectedDate();
       }
     } else {
@@ -424,45 +438,42 @@ class _CreateItineraryWizardSheetState
 
   // Date selection logic: Shift Day 1 -> Day 3 -> Day 9 & Reverse Selection Support (27 -> 25 -> 23 = 23-25) & Max 30 days limit
   void _onDateCellTapped(DateTime cellDate) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final cleanCellDate = DateTime(cellDate.year, cellDate.month, cellDate.day);
+
+    if (cleanCellDate.isBefore(today)) return;
+
     setState(() {
       if (_selectedDateRange == null || _lastTappedDate == null) {
-        _selectedDateRange = DateTimeRange(start: cellDate, end: cellDate);
-        _lastTappedDate = cellDate;
+        _selectedDateRange = DateTimeRange(start: cleanCellDate, end: cleanCellDate);
+        _lastTappedDate = cleanCellDate;
       } else {
-        final anchor = _lastTappedDate!;
-        DateTime newStart;
-        DateTime newEnd;
-
-        if (cellDate.isBefore(anchor)) {
-          newStart = cellDate;
-          newEnd = anchor;
+        if (cleanCellDate.isBefore(_selectedDateRange!.start)) {
+          _selectedDateRange = DateTimeRange(start: cleanCellDate, end: cleanCellDate);
+          _lastTappedDate = cleanCellDate;
         } else {
-          newStart = anchor;
-          newEnd = cellDate;
-        }
+          final start = _selectedDateRange!.start;
+          DateTime newEnd = cleanCellDate;
 
-        // Enforce 30 days maximum trip duration
-        int diffDays = newEnd.difference(newStart).inDays + 1;
-        if (diffDays > 30) {
-          if (cellDate.isBefore(anchor)) {
-            newStart = anchor.subtract(const Duration(days: 29));
-          } else {
-            newEnd = anchor.add(const Duration(days: 29));
+          int diffDays = newEnd.difference(start).inDays + 1;
+          if (diffDays > 30) {
+            newEnd = start.add(const Duration(days: 29));
+            if (mounted) {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('CloudMood hỗ trợ tạo chuyến đi tối đa 30 ngày.'),
+                  backgroundColor: AppTheme.amber,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
           }
-          if (mounted) {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('CloudMood hỗ trợ tạo chuyến đi tối đa 30 ngày.'),
-                backgroundColor: AppTheme.amber,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-        }
 
-        _selectedDateRange = DateTimeRange(start: newStart, end: newEnd);
-        _lastTappedDate = cellDate;
+          _selectedDateRange = DateTimeRange(start: start, end: newEnd);
+          _lastTappedDate = cleanCellDate;
+        }
       }
       _days = _selectedDateRange!.end.difference(_selectedDateRange!.start).inDays + 1;
     });
@@ -1080,7 +1091,7 @@ class _CreateItineraryWizardSheetState
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                '${_currentStep + 1}/5',
+                                '${_currentStep + 1}/4',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
@@ -1092,7 +1103,7 @@ class _CreateItineraryWizardSheetState
                         ),
                         const SizedBox(height: 8),
                         Row(
-                          children: List.generate(5, (index) {
+                          children: List.generate(4, (index) {
                             final isActive = index <= _currentStep;
                             final isCurrent = index == _currentStep;
                             return Expanded(
@@ -1100,7 +1111,7 @@ class _CreateItineraryWizardSheetState
                                 duration: const Duration(milliseconds: 400),
                                 curve: Curves.easeOutCubic,
                                 height: isCurrent ? 6 : 4,
-                                margin: EdgeInsets.only(right: index == 4 ? 0 : 4),
+                                margin: EdgeInsets.only(right: index == 3 ? 0 : 4),
                                 decoration: BoxDecoration(
                                   gradient: isActive
                                       ? const LinearGradient(
@@ -1149,7 +1160,6 @@ class _CreateItineraryWizardSheetState
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _buildStep0TripName(),
                   _buildStep1Destination(),
                   _buildStep2Dates(),
                   _buildStep3Companions(),
@@ -1328,7 +1338,7 @@ class _CreateItineraryWizardSheetState
     );
   }
 
-  // STEP 1: Destination Selection (Vietnam Only, Can Tho Pinned First)
+  // STEP 1: Destination Selection & Trip Title
   Widget _buildStep1Destination() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -1341,17 +1351,71 @@ class _CreateItineraryWizardSheetState
               colors: [Color(0xFF1A56DB), Color(0xFF0EA5E9)],
             ).createShader(bounds),
             child: const Text(
-              'Bạn đang đi đâu?',
+              'Hành trình của bạn\nbắt đầu từ đây',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
+                height: 1.25,
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 6),
+          Text(
+            'Đặt một cái tên thật ý nghĩa và chọn điểm đến bạn dự định ghé thăm.',
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+          ),
+          const SizedBox(height: 20),
 
-          // Search Field
+          // Trip Title Input Field (Black Text Color, Auto-filled & Editable)
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primary.withOpacity(0.06),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: _tripTitleController,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.darkText,
+              ),
+              onChanged: (val) {
+                _userEditedTitle = true;
+              },
+              decoration: InputDecoration(
+                hintText: _selectedDestination.isNotEmpty
+                    ? 'Chuyến đi $_selectedDestination'
+                    : 'Nhập tên chuyến đi...',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                prefixIcon: const Icon(Icons.card_travel_rounded, color: AppTheme.primary),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: Colors.grey[200]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Destination Search Field
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
@@ -1482,16 +1546,13 @@ class _CreateItineraryWizardSheetState
               itemBuilder: (context, index) {
                 final dest = _popularDestinations[index];
                 final String name = dest['name']!;
-                final String flag = dest['flag']!;
                 final String desc = dest['desc'] ?? '';
                 final isSelected = _selectedDestination == name;
 
                 return GestureDetector(
                   onTap: () {
-                    setState(() {
-                      _selectedDestination = name;
-                      _searchController.text = name;
-                    });
+                    _searchController.clear();
+                    _selectDestination(name);
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -1534,12 +1595,13 @@ class _CreateItineraryWizardSheetState
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? AppTheme.primary.withOpacity(0.12)
-                                : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(12),
+                                : AppTheme.primary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Text(
-                            flag,
-                            style: const TextStyle(fontSize: 22),
+                          child: const Icon(
+                            Icons.location_on_rounded,
+                            color: AppTheme.primary,
+                            size: 20,
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -1602,9 +1664,8 @@ class _CreateItineraryWizardSheetState
   Widget _buildStep2Dates() {
     final now = DateTime.now();
 
-    final monthsList = List.generate(25, (index) {
-      final monthOffset = index - 12;
-      return DateTime(now.year, now.month + monthOffset, 1);
+    final monthsList = List.generate(24, (index) {
+      return DateTime(now.year, now.month + index, 1);
     });
 
     return Column(
@@ -1700,24 +1761,7 @@ class _CreateItineraryWizardSheetState
                     ],
                   ),
                 ),
-              const SizedBox(height: 12),
-
-              // Quick Duration Preset Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildQuickPresetChip('⚡ Cuối tuần (2N)', 2),
-                    const SizedBox(width: 8),
-                    _buildQuickPresetChip('⛵ 3 Ngày 2 Đêm', 3),
-                    const SizedBox(width: 8),
-                    _buildQuickPresetChip('🌴 5 Ngày', 5),
-                    const SizedBox(width: 8),
-                    _buildQuickPresetChip('🎒 1 Tuần (7N)', 7),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -1813,6 +1857,9 @@ class _CreateItineraryWizardSheetState
             final dayNumber = index - firstWeekday + 1;
             final cellDate =
                 DateTime(monthDate.year, monthDate.month, dayNumber);
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            final isPast = cellDate.isBefore(today);
 
             bool isStart = _selectedDateRange != null &&
                 DateUtils.isSameDay(_selectedDateRange!.start, cellDate);
@@ -1822,11 +1869,11 @@ class _CreateItineraryWizardSheetState
                 cellDate.isAfter(_selectedDateRange!.start) &&
                 cellDate.isBefore(_selectedDateRange!.end);
 
-            final isToday = DateUtils.isSameDay(DateTime.now(), cellDate);
+            final isToday = DateUtils.isSameDay(today, cellDate);
 
             return GestureDetector(
               key: isStart ? _selectedDateKey : null,
-              onTap: () => _onDateCellTapped(cellDate),
+              onTap: isPast ? null : () => _onDateCellTapped(cellDate),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 decoration: BoxDecoration(
@@ -1867,7 +1914,9 @@ class _CreateItineraryWizardSheetState
                               ? Colors.white
                               : (isInRange
                                   ? AppTheme.primary
-                                  : (isToday ? AppTheme.primary : AppTheme.darkText)),
+                                  : (isPast
+                                      ? Colors.grey.shade300
+                                      : (isToday ? AppTheme.primary : AppTheme.darkText))),
                         ),
                       ),
                       if (isToday && !isStart && !isEnd)
@@ -2569,66 +2618,26 @@ class _CreateItineraryWizardSheetState
   String _getStepTitleLabel(int step) {
     switch (step) {
       case 0:
-        return 'Tên chuyến đi';
+        return 'Điểm đến & Tên chuyến đi';
       case 1:
-        return 'Điểm đến';
-      case 2:
         return 'Ngày khởi hành';
-      case 3:
+      case 2:
         return 'Bạn đồng hành';
-      case 4:
+      case 3:
         return 'Sở thích';
       default:
         return '';
     }
   }
 
-  Widget _buildQuickPresetChip(String label, int totalDays) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final targetEnd = today.add(Duration(days: totalDays - 1));
-
-    final isSelected = _selectedDateRange != null &&
-        DateUtils.isSameDay(_selectedDateRange!.start, today) &&
-        DateUtils.isSameDay(_selectedDateRange!.end, targetEnd);
-
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      selectedColor: AppTheme.primary.withOpacity(0.15),
-      checkmarkColor: AppTheme.primary,
-      backgroundColor: const Color(0xFFF8FAFC),
-      labelStyle: TextStyle(
-        color: isSelected ? AppTheme.primary : AppTheme.darkText,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-        fontSize: 13,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isSelected ? AppTheme.primary : Colors.grey[200]!,
-        ),
-      ),
-      onSelected: (bool selected) {
-        setState(() {
-          _selectedDateRange = DateTimeRange(start: today, end: targetEnd);
-          _lastTappedDate = targetEnd;
-          _days = totalDays;
-        });
-        _scrollToSelectedDate();
-      },
-    );
-  }
-
   String _getPrimaryButtonText() {
     switch (_currentStep) {
       case 0:
       case 1:
-      case 2:
         return 'Tiếp tục';
-      case 3:
+      case 2:
         return 'Mời bạn đồng hành';
-      case 4:
+      case 3:
         return 'Hoàn tất & Tạo lịch trình';
       default:
         return 'Tiếp tục';

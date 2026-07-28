@@ -1204,7 +1204,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         content: Text(
           isGuide
               ? 'Bạn có chắc chắn muốn xóa hướng dẫn "$title" không?\n\nBài viết chia sẻ của hướng dẫn này trong cộng đồng Khám phá cũng sẽ được gỡ bỏ.'
-              : 'Bạn có chắc chắn muốn xóa lịch trình "$title" không?\n\nBài viết chia sẻ liên quan trên cộng đồng Khám phá cũng sẽ được gỡ bỏ.',
+              : 'Bạn có chắc chắn muốn xóa lịch trình "$title" không?',
           style: const TextStyle(fontSize: 14, height: 1.4),
         ),
         actions: [
@@ -1234,20 +1234,61 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     );
 
     if (confirm == true) {
-      final success = await DatabaseService().deleteItinerary(itineraryId);
-      if (success) {
-        _loadData();
-        if (mounted) {
+      // Optimistic UI Update: Remove from screen INSTANTLY (0ms!)
+      final removedItineraries = _itineraries.where((it) {
+        final id = (it['id'] is int) ? it['id'] : int.tryParse(it['id']?.toString() ?? '');
+        return id == itineraryId;
+      }).toList();
+
+      final removedGuides = _guides.where((g) {
+        final id = (g['id'] is int) ? g['id'] : int.tryParse(g['id']?.toString() ?? '');
+        return id == itineraryId;
+      }).toList();
+
+      setState(() {
+        _itineraries.removeWhere((it) {
+          final id = (it['id'] is int)
+              ? it['id']
+              : int.tryParse(it['id']?.toString() ?? '');
+          return id == itineraryId;
+        });
+        _guides.removeWhere((g) {
+          final id = (g['id'] is int)
+              ? g['id']
+              : int.tryParse(g['id']?.toString() ?? '');
+          return id == itineraryId;
+        });
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Đã xóa ${isGuide ? 'hướng dẫn' : 'lịch trình'} thành công',
+            ),
+            backgroundColor: AppTheme.primary,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Process deletion on Server in background
+      DatabaseService().deleteItinerary(itineraryId).then((success) {
+        if (!success && mounted) {
+          // If server deletion fails, restore item and notify user
+          setState(() {
+            _itineraries.addAll(removedItineraries);
+            _guides.addAll(removedGuides);
+          });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Đã xóa ${isGuide ? 'hướng dẫn' : 'lịch trình'} thành công',
-              ),
-              backgroundColor: AppTheme.primary,
+            const SnackBar(
+              content: Text('Xóa thất bại. Đã khôi phục lại chuyến đi.'),
+              backgroundColor: Colors.redAccent,
             ),
           );
         }
-      }
+      });
     }
   }
 
@@ -1349,7 +1390,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               extentRatio: 0.25,
               children: [
                 CustomSlidableAction(
-                  onPressed: (context) => _confirmDeleteItinerary(trip, false),
+                  onPressed: (ctx) {
+                    Slidable.of(ctx)?.close();
+                    _confirmDeleteItinerary(trip, false);
+                  },
                   backgroundColor: const Color(0xFFE53935),
                   foregroundColor: Colors.white,
                   borderRadius: const BorderRadius.horizontal(
@@ -1378,7 +1422,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               extentRatio: 0.25,
               children: [
                 CustomSlidableAction(
-                  onPressed: (context) => _confirmDeleteItinerary(trip, false),
+                  onPressed: (ctx) {
+                    Slidable.of(ctx)?.close();
+                    _confirmDeleteItinerary(trip, false);
+                  },
                   backgroundColor: const Color(0xFFE53935),
                   foregroundColor: Colors.white,
                   borderRadius: const BorderRadius.horizontal(
@@ -2274,13 +2321,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                       child: GestureDetector(
                         onTap: () {
                           if (place != null) {
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) =>
-                                  PlaceDetailBottomSheet(place: place),
-                            );
+                            PlaceDetailBottomSheet.show(context, place);
                           }
                         },
                         child: Container(
@@ -2501,7 +2542,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               extentRatio: 0.25,
               children: [
                 CustomSlidableAction(
-                  onPressed: (context) => _confirmDeleteItinerary(guide, true),
+                  onPressed: (ctx) {
+                    Slidable.of(ctx)?.close();
+                    _confirmDeleteItinerary(guide, true);
+                  },
                   backgroundColor: const Color(0xFFE53935),
                   foregroundColor: Colors.white,
                   borderRadius: const BorderRadius.horizontal(
@@ -2530,7 +2574,10 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               extentRatio: 0.25,
               children: [
                 CustomSlidableAction(
-                  onPressed: (context) => _confirmDeleteItinerary(guide, true),
+                  onPressed: (ctx) {
+                    Slidable.of(ctx)?.close();
+                    _confirmDeleteItinerary(guide, true);
+                  },
                   backgroundColor: const Color(0xFFE53935),
                   foregroundColor: Colors.white,
                   borderRadius: const BorderRadius.horizontal(
