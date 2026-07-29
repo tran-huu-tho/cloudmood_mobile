@@ -181,6 +181,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
   // Step 1: Date selection (Max 7 Days Limit)
   DateTimeRange? _selectedDateRange;
   DateTime? _lastTappedDate;
+  bool _isSelectingEndDate = false;
   int _days = 3;
   late final ScrollController _calendarScrollController = ScrollController();
   final GlobalKey _selectedDateKey = GlobalKey();
@@ -359,35 +360,31 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     if (cleanDate.isBefore(today)) return;
 
     setState(() {
-      if (_selectedDateRange == null || _lastTappedDate == null) {
+      if (!_isSelectingEndDate || _selectedDateRange == null || cleanDate.isBefore(_selectedDateRange!.start)) {
         _selectedDateRange = DateTimeRange(start: cleanDate, end: cleanDate);
         _lastTappedDate = cleanDate;
         _days = 1;
+        _isSelectingEndDate = true;
       } else {
-        if (cleanDate.isBefore(_selectedDateRange!.start)) {
-          _selectedDateRange = DateTimeRange(start: cleanDate, end: cleanDate);
-          _lastTappedDate = cleanDate;
-          _days = 1;
-        } else {
-          var start = _selectedDateRange!.start;
-          int daysBetween = cleanDate.difference(start).inDays + 1;
-          var end = cleanDate;
-          if (daysBetween > 7) {
-            end = start.add(const Duration(days: 6));
-            daysBetween = 7;
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Lịch trình AI tối đa 7 ngày!'),
-                behavior: SnackBarBehavior.fixed,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-          _selectedDateRange = DateTimeRange(start: start, end: end);
-          _days = daysBetween;
-          _lastTappedDate = cleanDate;
+        var start = _selectedDateRange!.start;
+        int daysBetween = cleanDate.difference(start).inDays + 1;
+        var end = cleanDate;
+        if (daysBetween > 7) {
+          end = start.add(const Duration(days: 6));
+          daysBetween = 7;
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lịch trình AI tối đa 7 ngày!'),
+              behavior: SnackBarBehavior.fixed,
+              duration: Duration(seconds: 2),
+            ),
+          );
         }
+        _selectedDateRange = DateTimeRange(start: start, end: end);
+        _days = daysBetween;
+        _lastTappedDate = cleanDate;
+        _isSelectingEndDate = false;
       }
     });
   }
@@ -432,15 +429,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
   Future<void> _createAIItinerary() async {
     final user = AuthService().currentUser.value;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Vui lòng đăng nhập để tạo lịch trình!'),
-          backgroundColor: _aiPurple,
-        ),
-      );
-      return;
-    }
+    final int currentUserId = user?.id ?? 1;
 
     setState(() => _isCreating = true);
     _startProgressTimer();
@@ -466,7 +455,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     final String finalDestination =
         _destinationSearchController.text.trim().isNotEmpty
         ? _destinationSearchController.text.trim()
-        : _selectedDestination;
+        : (_selectedDestination.isNotEmpty ? _selectedDestination : 'Cần Thơ');
 
     final String title = _tripTitleController.text.trim().isNotEmpty
         ? _tripTitleController.text.trim()
@@ -474,10 +463,13 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
     final startDate = _selectedDateRange?.start ?? DateTime.now();
 
+    Map<String, dynamic>? result;
+    int itineraryId = 0;
+
     try {
       // ── STEP A: Create the empty itinerary shell in DB ──────────────────────
-      final result = await DatabaseService().createUserItinerary(
-        userId: user.id,
+      result = await DatabaseService().createUserItinerary(
+        userId: currentUserId,
         title: title,
         destination: finalDestination,
         startDate: startDate,
@@ -504,7 +496,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         return;
       }
 
-      final int itineraryId = (result['id'] is int)
+      itineraryId = (result['id'] is int)
           ? result['id']
           : int.tryParse(result['id'].toString()) ?? 0;
 
@@ -569,6 +561,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       }
 
       // ── STEP C: Save AI itinerary details into DB ──────────────────────────
+      int totalAdded = 0;
       final List<dynamic> aiDays = aiPlan['days'] ?? [];
       for (final dayData in aiDays) {
         final int dayNumber = (dayData['dayNumber'] ?? 1) as int;
@@ -595,8 +588,21 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
             startTime: timeSlot['startTime'],
             endTime: timeSlot['endTime'],
           );
-
+          totalAdded++;
         }
+      }
+
+      if (totalAdded == 0) {
+        await _autoPopulatePlacesForAIItinerary(
+          itineraryId,
+          finalDestination,
+          _days,
+          _selectedPace,
+          _selectedCategories,
+          true,
+          selectedBudgetLevel: _selectedBudgetLevel,
+          budgetInVND: budgetInVND,
+        );
       }
 
       if (mounted) {
@@ -641,6 +647,50 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         );
       }
     } catch (e) {
+      debugPrint('AI Generation error: $e');
+      // Fallback: Populate itinerary with RAG places if AI call fails
+      if (itineraryId > 0) {
+        try {
+          await _autoPopulatePlacesForAIItinerary(
+            itineraryId,
+            finalDestination,
+            _days,
+            _selectedPace,
+            _selectedCategories,
+            true,
+            selectedBudgetLevel: _selectedBudgetLevel,
+            budgetInVND: budgetInVND,
+          );
+
+          if (mounted) {
+            setState(() {
+              _creationProgress = 1.0;
+              _activeStepIndex = 3;
+            });
+            await Future.delayed(const Duration(milliseconds: 600));
+            _progressTimer?.cancel();
+            setState(() => _isCreating = false);
+
+            final updatedResult =
+                await DatabaseService().fetchItineraryById(itineraryId) ?? result;
+
+            Navigator.of(context).pop();
+
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => TripOverviewScreen(
+                  itinerary: updatedResult!,
+                  initialTabIndex: 1,
+                ),
+              ),
+            );
+            return;
+          }
+        } catch (fallbackErr) {
+          debugPrint('Fallback auto-populate error: $fallbackErr');
+        }
+      }
+
       if (mounted) {
         setState(() => _isCreating = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1863,7 +1913,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       case 3:
         return 'Tiếp tục';
       case 4:
-        return 'Mời bạn đồng hành';
+        return (_privacyLevel == 'Riêng tư' || _invitedCompanionsList.isEmpty) ? 'Tiếp tục' : 'Mời bạn đồng hành';
       case 5:
         return 'Tiếp tục';
       case 6:
@@ -3369,235 +3419,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           ),
           const SizedBox(height: 20),
 
-          // Add Companion Card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.grey.shade200),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: _aiPurple.withOpacity(0.08),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.person_add_alt_1_rounded,
-                        color: _aiPurple,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Thêm người đi cùng',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Thêm bạn đồng hành để hệ thống tự động gửi thư mời tham gia với phân quyền tương ứng.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                if (_invitedCompanionsList.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Column(
-                    children: _invitedCompanionsList.map((companion) {
-                      final isEditor = companion.role == 'EDITOR';
-                      return Dismissible(
-                        key: Key(companion.email),
-                        direction: DismissDirection.endToStart,
-                        onDismissed: (_) {
-                          setState(() {
-                            _invitedCompanionsList.remove(companion);
-                          });
-                        },
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(
-                            Icons.delete_outline_rounded,
-                            color: Colors.redAccent,
-                          ),
-                        ),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey[200]!),
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: _aiPurple,
-                                backgroundImage:
-                                    (companion.avatar != null &&
-                                        companion.avatar!.isNotEmpty)
-                                    ? NetworkImage(companion.avatar!)
-                                    : null,
-                                child:
-                                    (companion.avatar == null ||
-                                        companion.avatar!.isEmpty)
-                                    ? const Icon(
-                                        Icons.person_rounded,
-                                        size: 18,
-                                        color: Colors.white,
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (companion.fullName != null &&
-                                        companion.fullName!.isNotEmpty)
-                                      Text(
-                                        companion.fullName!,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                    Text(
-                                      companion.email,
-                                      style: TextStyle(
-                                        fontSize: companion.fullName != null
-                                            ? 11
-                                            : 13,
-                                        color: companion.fullName != null
-                                            ? Colors.grey[600]
-                                            : AppTheme.darkText,
-                                        fontWeight: companion.fullName != null
-                                            ? FontWeight.normal
-                                            : FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isEditor
-                                      ? _aiPurple.withOpacity(0.1)
-                                      : Colors.amber.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  isEditor ? 'Chỉnh sửa' : 'Chỉ xem',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isEditor
-                                        ? _aiPurple
-                                        : Colors.amber[800],
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.close_rounded,
-                                  size: 18,
-                                  color: Colors.grey,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _invitedCompanionsList.remove(companion);
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // + Mời button with gradient
-                GestureDetector(
-                  onTap: _showAddCompanionDialog,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _aiPurple.withOpacity(0.25),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'Thêm Email người nhận',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
           const Text(
             'Mức độ riêng tư chuyến đi',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -3669,6 +3490,238 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               );
             }).toList(),
           ),
+
+          if (_privacyLevel == 'Thành viên') ...[
+            const SizedBox(height: 16),
+            // Add Companion Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.grey.shade200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _aiPurple.withOpacity(0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.person_add_alt_1_rounded,
+                          color: _aiPurple,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Thêm người đi cùng',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Thêm bạn đồng hành để hệ thống tự động gửi thư mời tham gia với phân quyền tương ứng.',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (_invitedCompanionsList.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Column(
+                      children: _invitedCompanionsList.map((companion) {
+                        final isEditor = companion.role == 'EDITOR';
+                        return Dismissible(
+                          key: Key(companion.email),
+                          direction: DismissDirection.endToStart,
+                          onDismissed: (_) {
+                            setState(() {
+                              _invitedCompanionsList.remove(companion);
+                            });
+                          },
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: _aiPurple,
+                                  backgroundImage:
+                                      (companion.avatar != null &&
+                                          companion.avatar!.isNotEmpty)
+                                      ? NetworkImage(companion.avatar!)
+                                      : null,
+                                  child:
+                                      (companion.avatar == null ||
+                                          companion.avatar!.isEmpty)
+                                      ? const Icon(
+                                          Icons.person_rounded,
+                                          size: 18,
+                                          color: Colors.white,
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (companion.fullName != null &&
+                                          companion.fullName!.isNotEmpty)
+                                        Text(
+                                          companion.fullName!,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      Text(
+                                        companion.email,
+                                        style: TextStyle(
+                                          fontSize: companion.fullName != null
+                                              ? 11
+                                              : 13,
+                                          color: companion.fullName != null
+                                              ? Colors.grey[600]
+                                              : AppTheme.darkText,
+                                          fontWeight: companion.fullName != null
+                                              ? FontWeight.normal
+                                              : FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isEditor
+                                        ? _aiPurple.withOpacity(0.1)
+                                        : Colors.amber.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    isEditor ? 'Chỉnh sửa' : 'Chỉ xem',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: isEditor
+                                          ? _aiPurple
+                                          : Colors.amber[800],
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    size: 18,
+                                    color: Colors.grey,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _invitedCompanionsList.remove(companion);
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // + Mời button with gradient
+                  GestureDetector(
+                    onTap: _showAddCompanionDialog,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _aiPurple.withOpacity(0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Thêm Email người nhận',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

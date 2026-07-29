@@ -1164,8 +1164,9 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                     final placeId = int.tryParse(place['id'].toString()) ?? 1;
                     final addressText = StringUtils.cleanAddress(place['address'] ?? '');
                     final priceText = place['price'] ?? 'Liên hệ';
-                    final ratingVal = (place['rating'] as num?)?.toDouble() ?? 5.0;
-                    final ratingText = ratingVal.toStringAsFixed(1);
+                    final double? rawRating = (place['rating'] as num?)?.toDouble();
+                    final ratingVal = rawRating ?? 0.0;
+                    final ratingText = ratingVal > 0 ? ratingVal.toStringAsFixed(1) : 'Mới';
                     final tagText = place['category']?['name'] ?? 'Địa điểm';
 
                     return Padding(

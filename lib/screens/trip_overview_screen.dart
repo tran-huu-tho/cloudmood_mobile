@@ -16140,11 +16140,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         : (defaultTitle ?? '');
     final noteController = TextEditingController(text: defaultNoteText);
 
+    final DateTime tripStartDate = DateTime.tryParse(_itineraryData['startDate']?.toString() ?? '') ?? DateTime.now();
+    final int tripDays = (_itineraryData['days'] as num?)?.toInt() ?? 1;
+    final DateTime tripEndDate = tripStartDate.add(Duration(days: (tripDays > 0 ? tripDays : 1) - 1));
+
     DateTime? selectedDate = expenseToEdit != null
         ? (expenseToEdit['date'] != null
               ? DateTime.tryParse(expenseToEdit['date'])
               : null)
-        : defaultDate;
+        : (defaultDate ?? tripStartDate);
 
     showModalBottomSheet(
       context: context,
@@ -16218,7 +16222,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     ) ??
                                     0;
                                 final DateTime activeDate =
-                                    selectedDate ?? DateTime.now();
+                                    selectedDate ?? tripStartDate;
                                 if (parsedAmt <= 0) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
@@ -16850,11 +16854,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   bottom: Radius.circular(20),
                                 ),
                                 onTap: () async {
+                                  final DateTime initDate = (selectedDate != null &&
+                                          !selectedDate!.isBefore(tripStartDate) &&
+                                          !selectedDate!.isAfter(tripEndDate))
+                                      ? selectedDate!
+                                      : tripStartDate;
                                   final picked = await showDatePicker(
                                     context: context,
-                                    initialDate: selectedDate ?? DateTime.now(),
-                                    firstDate: DateTime(2020),
-                                    lastDate: DateTime(2030),
+                                    initialDate: initDate,
+                                    firstDate: tripStartDate,
+                                    lastDate: tripEndDate,
                                   );
                                   if (picked != null) {
                                     setModalState(() {
@@ -17079,6 +17088,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       );
     }
 
+    final bool isOverBudget = _tripBudget > 0 && totalSpent > _tripBudget;
+
     return Container(
       color: AppTheme.background,
       child: Stack(
@@ -17096,16 +17107,23 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
+                        gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFFEFF6FF), Color(0xFFE0F2FE)],
+                          colors: isOverBudget
+                              ? [const Color(0xFFFFF1F2), const Color(0xFFFFE4E6)]
+                              : [const Color(0xFFEFF6FF), const Color(0xFFE0F2FE)],
                         ),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: const Color(0xFFBAE6FD)),
+                        border: Border.all(
+                          color: isOverBudget
+                              ? const Color(0xFFFECDD3)
+                              : const Color(0xFFBAE6FD),
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppTheme.primary.withValues(alpha: 0.06),
+                            color: (isOverBudget ? Colors.redAccent : AppTheme.primary)
+                                .withValues(alpha: 0.06),
                             blurRadius: 16,
                             offset: const Offset(0, 4),
                           ),
@@ -17119,14 +17137,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primary.withValues(
-                                    alpha: 0.12,
-                                  ),
+                                  color: (isOverBudget ? Colors.redAccent : AppTheme.primary)
+                                      .withValues(alpha: 0.12),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
                                   Icons.account_balance_wallet_rounded,
-                                  color: AppTheme.primary,
+                                  color: isOverBudget ? Colors.redAccent : AppTheme.primary,
                                   size: 20,
                                 ),
                               ),
@@ -17134,7 +17151,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               Text(
                                 _formatExpenseAmount(totalSpent),
                                 style: TextStyle(
-                                  color: AppTheme.darkText,
+                                  color: isOverBudget ? Colors.red[900] : AppTheme.darkText,
                                   fontSize: 34,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: -0.5,
@@ -17184,7 +17201,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               width: 200,
                               height: 6,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFCBD5E1),
+                                color: isOverBudget
+                                    ? Colors.red.shade100
+                                    : const Color(0xFFCBD5E1),
                                 borderRadius: BorderRadius.circular(3),
                               ),
                               child: FractionallySizedBox(
@@ -17195,7 +17214,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: AppTheme.primary,
+                                    color: isOverBudget ? Colors.redAccent : AppTheme.primary,
                                     borderRadius: BorderRadius.circular(3),
                                   ),
                                 ),
@@ -17210,7 +17229,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   Text(
                                     'Ngân sách: ${_formatExpenseAmount(_tripBudget)}',
                                     style: TextStyle(
-                                      color: AppTheme.subtitleText,
+                                      color: isOverBudget ? Colors.red[700] : AppTheme.subtitleText,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -17218,12 +17237,47 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   const SizedBox(width: 4),
                                   Icon(
                                     Icons.edit_rounded,
-                                    color: AppTheme.subtitleText,
+                                    color: isOverBudget ? Colors.red[700] : AppTheme.subtitleText,
                                     size: 14,
                                   ),
                                 ],
                               ),
                             ),
+                            if (isOverBudget) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.redAccent.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Colors.redAccent,
+                                      size: 14,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Đã lố ${_formatExpenseAmount(totalSpent - _tripBudget)} so với ngân sách!',
+                                      style: const TextStyle(
+                                        color: Colors.redAccent,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                           const SizedBox(height: 18),
 

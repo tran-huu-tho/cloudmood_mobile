@@ -1345,7 +1345,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  '${place['rating'] ?? 5.0} (${place['userRatingCount'] ?? 0})',
+                                  '${(place['rating'] as num?)?.toDouble() ?? 0.0} (${place['userRatingCount'] ?? 0})',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,

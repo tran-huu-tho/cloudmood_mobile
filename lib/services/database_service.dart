@@ -402,6 +402,29 @@ class DatabaseService {
     }
   }
 
+  /// Submits a review for a specific place
+  Future<bool> addPlaceReview({
+    required int placeId,
+    required double rating,
+    required String comment,
+    required String authorName,
+    String? authorAvatar,
+  }) async {
+    try {
+      final response = await ApiClient.post('/reviews/public', body: {
+        'placeId': placeId,
+        'rating': rating,
+        'comment': comment,
+        'authorName': authorName,
+        'authorAvatar': authorAvatar,
+      });
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      debugPrint('Error submitting review: $e');
+      return false;
+    }
+  }
+
   /// Checks if a destination city is supported
   Future<bool> isDestinationSupported(String cityName) async {
     try {

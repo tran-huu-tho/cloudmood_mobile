@@ -67,6 +67,7 @@ class _CreateItineraryWizardSheetState
   // Step 2: Date selection (Smart 3-date shift & reverse selection)
   DateTimeRange? _selectedDateRange;
   DateTime? _lastTappedDate;
+  bool _isSelectingEndDate = false;
   int _days = 3;
   late final ScrollController _calendarScrollController = ScrollController(
     initialScrollOffset: 4310.0,
@@ -445,37 +446,35 @@ class _CreateItineraryWizardSheetState
     if (cleanCellDate.isBefore(today)) return;
 
     setState(() {
-      if (_selectedDateRange == null || _lastTappedDate == null) {
+      if (!_isSelectingEndDate || _selectedDateRange == null || cleanCellDate.isBefore(_selectedDateRange!.start)) {
         _selectedDateRange = DateTimeRange(start: cleanCellDate, end: cleanCellDate);
         _lastTappedDate = cleanCellDate;
+        _days = 1;
+        _isSelectingEndDate = true;
       } else {
-        if (cleanCellDate.isBefore(_selectedDateRange!.start)) {
-          _selectedDateRange = DateTimeRange(start: cleanCellDate, end: cleanCellDate);
-          _lastTappedDate = cleanCellDate;
-        } else {
-          final start = _selectedDateRange!.start;
-          DateTime newEnd = cleanCellDate;
+        final start = _selectedDateRange!.start;
+        DateTime newEnd = cleanCellDate;
 
-          int diffDays = newEnd.difference(start).inDays + 1;
-          if (diffDays > 30) {
-            newEnd = start.add(const Duration(days: 29));
-            if (mounted) {
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('CloudMood hỗ trợ tạo chuyến đi tối đa 30 ngày.'),
-                  backgroundColor: AppTheme.amber,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            }
+        int diffDays = newEnd.difference(start).inDays + 1;
+        if (diffDays > 30) {
+          newEnd = start.add(const Duration(days: 29));
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('CloudMood hỗ trợ tạo chuyến đi tối đa 30 ngày.'),
+                backgroundColor: AppTheme.amber,
+                duration: Duration(seconds: 2),
+              ),
+            );
           }
-
-          _selectedDateRange = DateTimeRange(start: start, end: newEnd);
-          _lastTappedDate = cleanCellDate;
         }
+
+        _selectedDateRange = DateTimeRange(start: start, end: newEnd);
+        _lastTappedDate = cleanCellDate;
+        _days = _selectedDateRange!.end.difference(_selectedDateRange!.start).inDays + 1;
+        _isSelectingEndDate = false;
       }
-      _days = _selectedDateRange!.end.difference(_selectedDateRange!.start).inDays + 1;
     });
   }
 
@@ -1968,195 +1967,7 @@ class _CreateItineraryWizardSheetState
           ),
           const SizedBox(height: 20),
 
-          // Card 1: Companion Card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.grey[200]!),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.08),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.person_add_alt_1_rounded, color: AppTheme.primary, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Thêm người đi cùng',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.darkText,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Thêm bạn đồng hành để hệ thống tự động gửi thư mời tham gia với phân quyền tương ứng.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Invited list chips with role badge & Dismissible
-                if (_invitedCompanionsList.isNotEmpty) ...[
-                  Column(
-                    children: _invitedCompanionsList.map((companion) {
-                      final isEditor = companion.role == 'EDITOR';
-                      return Dismissible(
-                        key: ValueKey(companion.email),
-                        direction: DismissDirection.endToStart,
-                        onDismissed: (_) {
-                          setState(() {
-                            _invitedCompanionsList.remove(companion);
-                          });
-                        },
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.red[50],
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                        ),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey[200]!),
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor: AppTheme.primary,
-                                backgroundImage: (companion.avatar != null && companion.avatar!.isNotEmpty)
-                                    ? NetworkImage(companion.avatar!)
-                                    : null,
-                                child: (companion.avatar == null || companion.avatar!.isEmpty)
-                                    ? const Icon(Icons.person_rounded, size: 18, color: Colors.white)
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (companion.fullName != null && companion.fullName!.isNotEmpty)
-                                      Text(
-                                        companion.fullName!,
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                      ),
-                                    Text(
-                                      companion.email,
-                                      style: TextStyle(
-                                        fontSize: companion.fullName != null ? 11 : 13,
-                                        color: companion.fullName != null ? Colors.grey[600] : AppTheme.darkText,
-                                        fontWeight: companion.fullName != null ? FontWeight.normal : FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isEditor
-                                      ? AppTheme.primary.withOpacity(0.1)
-                                      : Colors.amber.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  isEditor ? 'Chỉnh sửa' : 'Chỉ xem',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: isEditor ? AppTheme.primary : Colors.amber[800],
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.close_rounded, size: 18, color: Colors.grey),
-                                onPressed: () {
-                                  setState(() {
-                                    _invitedCompanionsList.remove(companion);
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // + Mời button with gradient
-                GestureDetector(
-                  onTap: _showAddCompanionDialog,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF1A56DB), Color(0xFF0EA5E9)],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primary.withOpacity(0.25),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'Thêm Email người nhận',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Card 2: Privacy Level Radio Selector Cards
+          // Privacy Level Radio Selector Cards
           Text(
             'Mức độ riêng tư chuyến đi',
             style: TextStyle(
@@ -2232,21 +2043,21 @@ class _CreateItineraryWizardSheetState
                             const SizedBox(height: 2),
                             Text(
                               desc,
-                              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      Container(
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected ? AppTheme.primary : Colors.grey[300]!,
-                            width: isSelected ? 6 : 2,
-                          ),
-                        ),
+                      Radio<String>(
+                        value: title,
+                        groupValue: _privacyLevel,
+                        activeColor: AppTheme.primary,
+                        onChanged: (val) {
+                          if (val != null) setState(() => _privacyLevel = val);
+                        },
                       ),
                     ],
                   ),
@@ -2254,6 +2065,194 @@ class _CreateItineraryWizardSheetState
               );
             }).toList(),
           ),
+
+          if (_privacyLevel == 'Thành viên') ...[
+            const SizedBox(height: 16),
+            // Companion Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.grey[200]!),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary.withOpacity(0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.person_add_alt_1_rounded, color: AppTheme.primary, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Thêm người đi cùng',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Thêm bạn đồng hành để hệ thống tự động gửi thư mời tham gia với phân quyền tương ứng.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (_invitedCompanionsList.isNotEmpty) ...[
+                    Column(
+                      children: _invitedCompanionsList.map((companion) {
+                        final isEditor = companion.role == 'EDITOR';
+                        return Dismissible(
+                          key: ValueKey(companion.email),
+                          direction: DismissDirection.endToStart,
+                          onDismissed: (_) {
+                            setState(() {
+                              _invitedCompanionsList.remove(companion);
+                            });
+                          },
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.red[50],
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                          ),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: AppTheme.primary,
+                                  backgroundImage: (companion.avatar != null && companion.avatar!.isNotEmpty)
+                                      ? NetworkImage(companion.avatar!)
+                                      : null,
+                                  child: (companion.avatar == null || companion.avatar!.isEmpty)
+                                      ? const Icon(Icons.person_rounded, size: 18, color: Colors.white)
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (companion.fullName != null && companion.fullName!.isNotEmpty)
+                                        Text(
+                                          companion.fullName!,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
+                                      Text(
+                                        companion.email,
+                                        style: TextStyle(
+                                          fontSize: companion.fullName != null ? 11 : 13,
+                                          color: companion.fullName != null ? Colors.grey[600] : AppTheme.darkText,
+                                          fontWeight: companion.fullName != null ? FontWeight.normal : FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isEditor
+                                        ? AppTheme.primary.withOpacity(0.1)
+                                        : Colors.amber.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    isEditor ? 'Chỉnh sửa' : 'Chỉ xem',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: isEditor ? AppTheme.primary : Colors.amber[800],
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 18, color: Colors.grey),
+                                  onPressed: () {
+                                    setState(() {
+                                      _invitedCompanionsList.remove(companion);
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // + Mời button with gradient
+                  GestureDetector(
+                    onTap: _showAddCompanionDialog,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1A56DB), Color(0xFF0EA5E9)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primary.withOpacity(0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Thêm Email người nhận',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
         ],
       ),
@@ -2636,7 +2635,7 @@ class _CreateItineraryWizardSheetState
       case 1:
         return 'Tiếp tục';
       case 2:
-        return 'Mời bạn đồng hành';
+        return (_privacyLevel == 'Riêng tư' || _invitedCompanionsList.isEmpty) ? 'Tiếp tục' : 'Mời bạn đồng hành';
       case 3:
         return 'Hoàn tất & Tạo lịch trình';
       default:

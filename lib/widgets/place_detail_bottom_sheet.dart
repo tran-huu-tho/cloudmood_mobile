@@ -7,6 +7,7 @@ import '../services/database_service.dart';
 import '../utils/time_utils.dart';
 import '../utils/string_utils.dart';
 import '../services/auth_service.dart';
+import '../services/api_client.dart';
 import 'save_to_trip_bottom_sheet.dart';
 import '../screens/place_ai_chat_screen.dart';
 
@@ -435,7 +436,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                                   const SizedBox.shrink(),
                             )
                           : Image.network(
-                              imageUrl,
+                              imageUrl.startsWith('/') ? '${ApiClient.baseUrl}$imageUrl' : imageUrl,
                               width: 90,
                               height: 90,
                               fit: BoxFit.cover,
@@ -827,23 +828,37 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
   }
 
   Widget _buildReviewsTab() {
-    final double rating = (widget.place['rating'] as num?)?.toDouble() ?? 4.2;
-    final int userRatingCount =
-        (widget.place['userRatingCount'] as num?)?.toInt() ?? 156;
+    double rating = 0.0;
+    int userRatingCount = 0;
 
-    // Phân bổ sao dựa trên điểm trung bình thực tế
     int count5 = 0;
     int count4 = 0;
     int count3 = 0;
     int count2 = 0;
     int count1 = 0;
 
-    if (userRatingCount > 0) {
-      if (rating >= 4.9) {
-        count5 = userRatingCount;
-      } else if (rating <= 1.1) {
-        count1 = userRatingCount;
-      } else {
+    if (_reviews.isNotEmpty) {
+      userRatingCount = _reviews.length;
+      double totalRatingSum = 0;
+      for (final r in _reviews) {
+        final double rVal = (r['rating'] as num?)?.toDouble() ?? 5.0;
+        totalRatingSum += rVal;
+        final int star = rVal.round();
+        if (star >= 5) count5++;
+        else if (star == 4) count4++;
+        else if (star == 3) count3++;
+        else if (star == 2) count2++;
+        else if (star <= 1) count1++;
+      }
+      rating = totalRatingSum / userRatingCount;
+    } else {
+      final double? dbRating = (widget.place['rating'] as num?)?.toDouble();
+      final int? dbCount = (widget.place['userRatingCount'] as num?)?.toInt();
+      
+      if (dbRating != null && dbRating > 0 && dbCount != null && dbCount > 0) {
+        rating = dbRating;
+        userRatingCount = dbCount;
+
         double w5 = rating >= 4.0 ? (rating - 3.0) : 0.1;
         double w4 = rating >= 3.0 ? (3.5 - (rating - 4.0).abs()) : 0.2;
         double w3 = 1.5 - (rating - 3.0).abs();
@@ -876,7 +891,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tripadvisor Rating Card
+          // Rating Summary Card
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -899,7 +914,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 Column(
                   children: [
                     Text(
-                      rating.toStringAsFixed(1),
+                      rating > 0 ? rating.toStringAsFixed(1) : '0.0',
                       style: const TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.bold,
@@ -920,11 +935,13 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        rating >= 4.5
-                            ? 'Tuyệt vời'
-                            : (rating >= 4.0
-                                  ? 'Rất tốt'
-                                  : (rating >= 3.0 ? 'Khá tốt' : 'Trung bình')),
+                        userRatingCount > 0
+                            ? (rating >= 4.5
+                                ? 'Tuyệt vời'
+                                : (rating >= 4.0
+                                    ? 'Rất tốt'
+                                    : (rating >= 3.0 ? 'Khá tốt' : 'Trung bình')))
+                            : 'Chưa có đánh giá',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -933,7 +950,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '$userRatingCount đánh giá',
+                        userRatingCount > 0 ? '$userRatingCount đánh giá' : '0 đánh giá',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.white70,
@@ -942,26 +959,22 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: Image.asset(
-                              'assets/images/tripadvisor.jpg',
-                              width: 16,
-                              height: 16,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => const Icon(
-                                Icons.circle,
-                                size: 16,
-                                color: Colors.green,
-                              ),
-                            ),
+                          const Icon(
+                            Icons.stars_rounded,
+                            size: 16,
+                            color: Colors.amber,
                           ),
                           const SizedBox(width: 6),
-                          const Text(
-                            'Từ Tripadvisor',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.white70,
+                          const Expanded(
+                            child: Text(
+                              'Đánh giá dựa trên CloudMood & TripAdvisor',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -1026,41 +1039,69 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
           else
             ..._reviews.map((r) => _buildReviewCard(r)),
 
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                final String? urlString = widget.place['tripadvisorUrl'];
-                if (urlString != null && urlString.isNotEmpty) {
-                  final url = Uri.parse(urlString);
-                  if (await canLaunchUrl(url)) await launchUrl(url);
-                }
-              },
-              icon: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  'assets/images/tripadvisor.jpg',
-                  width: 24,
-                  height: 24,
-                  errorBuilder: (_, _, _) =>
-                      const Icon(Icons.open_in_browser, size: 24),
+          const SizedBox(height: 20),
+          // Action Buttons: Viết đánh giá & Xem TripAdvisor
+          Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _showAddReviewSheet,
+                  icon: const Icon(Icons.rate_review_rounded, size: 20),
+                  label: const Text(
+                    'Viết đánh giá cho địa điểm',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
                 ),
               ),
-              label: const Text(
-                'Đánh giá trên Tripadvisor',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF3F4F6),
-                foregroundColor: AppTheme.darkText,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+              if (widget.place['tripadvisorUrl'] != null &&
+                  widget.place['tripadvisorUrl'].toString().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final String? urlString = widget.place['tripadvisorUrl'];
+                      if (urlString != null && urlString.isNotEmpty) {
+                        final url = Uri.parse(urlString);
+                        if (await canLaunchUrl(url)) await launchUrl(url);
+                      }
+                    },
+                    icon: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/images/tripadvisor.jpg',
+                        width: 20,
+                        height: 20,
+                        errorBuilder: (_, _, _) =>
+                            const Icon(Icons.open_in_browser, size: 20),
+                      ),
+                    ),
+                    label: const Text(
+                      'Xem thêm trên Tripadvisor',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.darkText,
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              ],
+            ],
           ),
           const SizedBox(height: 24),
         ],
@@ -1118,6 +1159,169 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
     );
   }
 
+  void _showAddReviewSheet() {
+    double selectedRating = 5.0;
+    final currentUser = AuthService().currentUser.value;
+    final nameController = TextEditingController(
+      text: currentUser?.fullName ?? 'Người dùng CloudMood',
+    );
+    final commentController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Đánh giá địa điểm: ${widget.place['name'] ?? ''}',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  const Text('Chọn số sao đánh giá:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      final starVal = index + 1.0;
+                      return IconButton(
+                        iconSize: 34,
+                        icon: Icon(
+                          starVal <= selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: starVal <= selectedRating ? Colors.amber : Colors.grey[400],
+                        ),
+                        onPressed: () {
+                          setSheetState(() => selectedRating = starVal);
+                        },
+                      );
+                    }),
+                  ),
+                  Center(
+                    child: Text(
+                      '${selectedRating.toInt()} / 5 sao (${selectedRating >= 5 ? "Tuyệt vời" : selectedRating >= 4 ? "Rất tốt" : selectedRating >= 3 ? "Khá tốt" : "Bình thường"})',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[800], fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Tên người đánh giá',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  TextField(
+                    controller: commentController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Viết nhận xét của bạn...',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final comment = commentController.text.trim();
+                        final name = nameController.text.trim();
+                        if (comment.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Vui lòng nhập nhận xét của bạn.')),
+                          );
+                          return;
+                        }
+
+                        Navigator.pop(context);
+
+                        final placeId = int.tryParse(widget.place['id'].toString());
+                        if (placeId != null) {
+                          final ok = await DatabaseService().addPlaceReview(
+                            placeId: placeId,
+                            rating: selectedRating,
+                            comment: comment,
+                            authorName: name.isNotEmpty ? name : 'Người dùng CloudMood',
+                            authorAvatar: currentUser?.avatar,
+                          );
+
+                          if (ok) {
+                            _loadReviews();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Cảm ơn bạn đã gửi đánh giá thành công!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Có lỗi khi gửi đánh giá.'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Gửi đánh giá', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildPhotosTab() {
     List<dynamic> photos = [];
     if (widget.place['photos'] != null && widget.place['photos'] is List) {
@@ -1141,6 +1345,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
           photoUrl = p['urlOriginal'] ?? p['urlThumbnail'] ?? p['url'] ?? '';
         } else {
           photoUrl = p.toString();
+        }
+        if (photoUrl.startsWith('/')) {
+          photoUrl = '${ApiClient.baseUrl}$photoUrl';
         }
 
         return ClipRRect(
