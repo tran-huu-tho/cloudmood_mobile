@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_utils.dart';
 
@@ -31,7 +32,7 @@ class _ExpandableOpeningHoursState extends State<ExpandableOpeningHours> {
         icon: Icons.access_time_rounded,
         child: Text(
           hoursText,
-          style: TextStyle(
+          style: GoogleFonts.plusJakartaSans(
             color: isClosed ? Colors.red : AppTheme.darkText,
             fontWeight: isClosed ? FontWeight.w600 : FontWeight.normal,
             height: 1.4,
@@ -57,9 +58,9 @@ class _ExpandableOpeningHoursState extends State<ExpandableOpeningHours> {
           },
           child: _buildInfoRow(
             icon: Icons.access_time_rounded,
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(
+            child: Text.rich(
+              TextSpan(
+                style: GoogleFonts.plusJakartaSans(
                   color: AppTheme.darkText,
                   height: 1.4,
                   fontSize: 13,
@@ -70,11 +71,14 @@ class _ExpandableOpeningHoursState extends State<ExpandableOpeningHours> {
                     style: TextStyle(
                       color: todaySchedule['time'].toLowerCase().contains('đóng cửa') ? Colors.red : AppTheme.darkText,
                       fontWeight: todaySchedule['time'].toLowerCase().contains('đóng cửa') ? FontWeight.w600 : FontWeight.normal,
-                    )
+                    ),
                   ),
                   TextSpan(
                     text: _isExpanded ? 'Chỉ hiển thị hôm nay' : 'Hiển thị các ngày khác',
-                    style: const TextStyle(color: Colors.blueAccent),
+                    style: const TextStyle(
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -86,48 +90,52 @@ class _ExpandableOpeningHoursState extends State<ExpandableOpeningHours> {
             onTap: () {}, // Ngăn sự kiện click nổi bọt lên parent widget
             child: Padding(
               padding: const EdgeInsets.only(top: 8, left: 28),
-            child: Column(
-              children: schedule.map((day) {
-                final isToday = day['isToday'] == true;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: isToday ? Colors.blueAccent : Colors.blueAccent.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          day['shortName'],
-                          style: TextStyle(
-                            color: isToday ? Colors.white : Colors.blueAccent,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+              child: Column(
+                children: schedule.map((day) {
+                  final isToday = day['isToday'] == true;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: isToday ? Colors.blueAccent : Colors.blueAccent.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            day['shortName'],
+                            style: GoogleFonts.plusJakartaSans(
+                              color: isToday ? Colors.white : Colors.blueAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${day['dayName']}: ${day['time']}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: day['time'].toLowerCase().contains('đóng cửa') ? Colors.red : (isToday ? Colors.black87 : Colors.black54),
-                            fontWeight: (isToday || day['time'].toLowerCase().contains('đóng cửa')) ? FontWeight.w600 : FontWeight.normal,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${day['dayName']}: ${day['time']}',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              color: day['time'].toLowerCase().contains('đóng cửa')
+                                  ? Colors.red
+                                  : (isToday ? Colors.black87 : Colors.black54),
+                              fontWeight: (isToday || day['time'].toLowerCase().contains('đóng cửa'))
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ),
-        ),
       ],
     );
   }

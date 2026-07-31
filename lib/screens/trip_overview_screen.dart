@@ -125,6 +125,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   late Map<String, dynamic> _itineraryData;
   bool _isLoading = true;
   List<Map<String, dynamic>> _allPlaces = [];
+  List<Map<String, dynamic>> _cachedProminentPlaces = [];
+  bool _isLoadingPlaces = false;
   List<Map<String, dynamic>> _details = [];
   List<Map<String, dynamic>> _savedPlaces = [];
   List<Map<String, dynamic>> _searchCategories = [];
@@ -341,8 +343,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       final int idB = b['id'] ?? 0;
       return idA.compareTo(idB);
     });
-    _savedPlaces = rawSaved;
     _parseSectionsData();
+    final dayConfigs = _itineraryData['dayConfigs'] as Map<String, dynamic>?;
+    if (dayConfigs != null) {
+      try {
+        dayConfigs.forEach((k, v) {
+          if (v is Map && v['color'] != null) {
+            _dayColors[int.parse(k)] = Color(int.parse(v['color'].toString()));
+          }
+        });
+      } catch (_) {}
+    }
+    for (int i = 0; i < numDays; i++) {
+      if (!_dayColors.containsKey(i)) {
+        _dayColors[i] = _availableColors[i % _availableColors.length];
+      }
+    }
+
+    _itineraryScrollController.addListener(_onItineraryScroll);
 
     // Skip full screen blocking loader if initial details or places are present
     _isLoading = _details.isEmpty && _savedPlaces.isEmpty;
@@ -439,6 +457,52 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     }
   }
 
+  bool _isProgrammaticScrolling = false;
+
+  void _onItineraryScroll() {
+    if (_isProgrammaticScrolling || !_itineraryScrollController.hasClients) return;
+
+    final numDays = (_itineraryData['days'] as num?)?.toInt() ?? 1;
+    if (numDays <= 1) return;
+
+    int newlyActiveDay = 0;
+    final double currentOffset = _itineraryScrollController.offset;
+
+    // 1. Calculate accumulated offset for each day
+    double accumulated = 0.0;
+    for (int k = 0; k < numDays; k++) {
+      final placesCount = _details.where((d) => d['day'] == (k + 1)).length;
+      final isCollapsed = _dayCollapsed[k] == true;
+      final dayHeight = isCollapsed ? 90.0 : (120.0 + (placesCount * 250.0));
+
+      if (currentOffset >= accumulated - 80.0) {
+        newlyActiveDay = k;
+      }
+      accumulated += dayHeight;
+    }
+
+    // 2. Fine-tune using RenderBox position if context is rendered
+    for (int k = numDays - 1; k >= 0; k--) {
+      final key = _dayKeys[k];
+      if (key?.currentContext != null) {
+        final box = key!.currentContext!.findRenderObject() as RenderBox?;
+        if (box != null && box.attached) {
+          final position = box.localToGlobal(Offset.zero);
+          if (position.dy <= 300 && position.dy >= -500) {
+            newlyActiveDay = k;
+            break;
+          }
+        }
+      }
+    }
+
+    if (newlyActiveDay != _activeDayIndex && mounted) {
+      setState(() {
+        _activeDayIndex = newlyActiveDay;
+      });
+    }
+  }
+
   @override
   void dispose() {
     final itinId = _itineraryData['id'] is int
@@ -454,6 +518,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     _currentNotification = null;
     _socketReloadTimer?.cancel();
     _tabController.dispose();
+    _itineraryScrollController.removeListener(_onItineraryScroll);
     _itineraryScrollController.dispose();
     for (var controller in _searchControllers.values) {
       controller.dispose();
@@ -798,6 +863,35 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     }
   }
 
+  void _updateProminentPlaces() {
+    final List<Map<String, dynamic>> prominent = [];
+    final Set<int> seenIds = {};
+    for (var p in _allPlaces) {
+      if (p['id'] != null && !seenIds.contains(p['id'] as int)) {
+        seenIds.add(p['id'] as int);
+        prominent.add(Map<String, dynamic>.from(p));
+      }
+    }
+    prominent.sort((a, b) {
+      final double ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
+      final double ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
+      final int countA =
+          ((a['userRatingCount'] ?? a['user_rating_count'] ?? a['reviewsCount'] ?? 0)
+                  as num)
+              .toInt();
+      final int countB =
+          ((b['userRatingCount'] ?? b['user_rating_count'] ?? b['reviewsCount'] ?? 0)
+                  as num)
+              .toInt();
+
+      if (ratingB != ratingA) {
+        return ratingB.compareTo(ratingA);
+      }
+      return countB.compareTo(countA);
+    });
+    _cachedProminentPlaces = prominent;
+  }
+
   void _parseSectionsData() {
     final savedSections = _itineraryData['sections'] as List<dynamic>?;
     _sectionNames.clear();
@@ -943,7 +1037,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         final int idB = b['id'] ?? 0;
         return idA.compareTo(idB);
       });
-      _details = rawDetails;
+      final cleanDetails = rawDetails
+          .where((d) => !_deletingDetailIds.contains(d['id']))
+          .toList();
 
       final rawSaved = List<Map<String, dynamic>>.from(
         refreshed['savedPlaces'] ?? [],
@@ -958,11 +1054,36 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         final int idB = b['id'] ?? 0;
         return idA.compareTo(idB);
       });
-      _savedPlaces = rawSaved;
+      final cleanSaved = rawSaved
+          .where((sp) => !_deletingDetailIds.contains(sp['id']))
+          .toList();
+
+      // Preserve pending optimistic temporary items (id >= 1000000000000)
+      final pendingTempSaved = _savedPlaces
+          .where((sp) => ((sp['id'] as num?)?.toInt() ?? 0) >= 1000000000000)
+          .toList();
+      final pendingTempDetails = _details
+          .where((d) => ((d['id'] as num?)?.toInt() ?? 0) >= 1000000000000)
+          .toList();
+
+      for (var ts in pendingTempSaved) {
+        if (!cleanSaved.any((s) => s['id'] == ts['id'])) {
+          cleanSaved.add(ts);
+        }
+      }
+      for (var td in pendingTempDetails) {
+        if (!cleanDetails.any((d) => d['id'] == td['id'])) {
+          cleanDetails.add(td);
+        }
+      }
+
+      _details = cleanDetails;
+      _savedPlaces = cleanSaved;
     }
 
     // Fetch places near destination for Explore and recommendations (only if not loaded)
     if (_allPlaces.isEmpty) {
+      if (mounted) setState(() => _isLoadingPlaces = true);
       final String dest = _itineraryData['destination'] ?? '';
       final places = await DatabaseService().fetchPlacesByDestination(dest);
 
@@ -1026,6 +1147,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
 
       _allPlaces = places;
+      _updateProminentPlaces();
+      if (mounted) setState(() => _isLoadingPlaces = false);
     }
 
     _parseSectionsData();
@@ -1560,6 +1683,92 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final placeId = place['id'] as int;
     dynamic result;
 
+    // Check duplicate in the SAME section or day
+    if (sectionOrDay.startsWith('Ngày') && _itineraryData['isGuide'] != true) {
+      final int day =
+          int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
+      final alreadyInDay =
+          _details.any((d) => d['day'] == day && d['placeId'] == placeId);
+      if (alreadyInDay) {
+        _showPremiumNotification(
+          title: 'Đã có trong ngày',
+          message: '"${place['name']}" đã có trong $sectionOrDay!',
+          icon: Icons.info_outline_rounded,
+          color: Colors.orangeAccent,
+        );
+        return;
+      }
+    } else {
+      final alreadyInSection = _savedPlaces.any((sp) =>
+          sp['section'] == sectionOrDay &&
+          (sp['placeId'] == placeId ||
+              (sp['place'] != null && sp['place']['id'] == placeId)));
+      if (alreadyInSection) {
+        _showPremiumNotification(
+          title: 'Đã có trong danh sách',
+          message: '"${place['name']}" đã có trong danh sách "$sectionOrDay"!',
+          icon: Icons.info_outline_rounded,
+          color: Colors.orangeAccent,
+        );
+        return;
+      }
+    }
+
+    final bool isDayItem = sectionOrDay.startsWith('Ngày') && _itineraryData['isGuide'] != true;
+    String? calculatedStartTime;
+    String? calculatedEndTime;
+
+    if (isDayItem) {
+      final int day = int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
+      final existingDayPlaces = _details.where((d) => d['day'] == day && d['place'] != null).toList();
+
+      existingDayPlaces.sort((a, b) {
+        final aStart = a['startTime']?.toString() ?? '';
+        final bStart = b['startTime']?.toString() ?? '';
+        if (aStart.isNotEmpty && bStart.isNotEmpty && aStart != bStart) {
+          return aStart.compareTo(bStart);
+        }
+        final aOrd = (a['sortOrder'] as num?)?.toInt() ?? 0;
+        final bOrd = (b['sortOrder'] as num?)?.toInt() ?? 0;
+        return aOrd.compareTo(bOrd);
+      });
+
+      if (existingDayPlaces.isNotEmpty) {
+        final lastItem = existingDayPlaces.last;
+        final String? lastEndTime = lastItem['endTime']?.toString() ?? lastItem['startTime']?.toString();
+        if (lastEndTime != null && lastEndTime.contains(':')) {
+          final parts = lastEndTime.split(':');
+          int h = int.tryParse(parts[0]) ?? 8;
+          int m = int.tryParse(parts[1]) ?? 0;
+
+          m += 30;
+          if (m >= 60) {
+            h += m ~/ 60;
+            m = m % 60;
+          }
+          h = h % 24;
+          calculatedStartTime = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+
+          int endH = h + 1;
+          int endM = m + 30;
+          if (endM >= 60) {
+            endH += endM ~/ 60;
+            endM = endM % 60;
+          }
+          endH = endH % 24;
+          calculatedEndTime = '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
+        }
+      }
+
+      if (calculatedStartTime == null) {
+        final count = existingDayPlaces.length;
+        int startH = 7 + (count * 2);
+        if (startH >= 22) startH = 21;
+        calculatedStartTime = '${startH.toString().padLeft(2, '0')}:00';
+        calculatedEndTime = '${(startH + 1).toString().padLeft(2, '0')}:30';
+      }
+    }
+
     // OPTIMISTIC UPDATE: Chèn ngay lập tức vào UI (0s)
     final tempItem = {
       'id': DateTime.now().millisecondsSinceEpoch,
@@ -1570,6 +1779,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       'day': sectionOrDay.startsWith('Ngày')
           ? (int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1)
           : null,
+      'startTime': calculatedStartTime,
+      'endTime': calculatedEndTime,
       'sortOrder': 9999,
     };
 
@@ -1596,6 +1807,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         itineraryId: itineraryId,
         placeId: placeId,
         day: day,
+        startTime: calculatedStartTime,
+        endTime: calculatedEndTime,
       );
     } else {
       result = await DatabaseService().addPlaceToSaved(
@@ -1605,18 +1818,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       );
     }
 
-    // Cập nhật id thật từ Server trả về mà không cần reload xóa mục tạm
+    // Cập nhật id thật từ Server trả về mà giữ lại object place (tránh chớp/mất địa điểm)
     if (result != null && result['id'] != null) {
+      final Map<String, dynamic> updatedItem = Map<String, dynamic>.from(
+        result is Map ? result : {},
+      );
+      if (updatedItem['place'] == null) {
+        updatedItem['place'] = place;
+      }
       setState(() {
         if (sectionOrDay.startsWith('Ngày') &&
             _itineraryData['isGuide'] != true) {
           final idx = _details.indexWhere((d) => d['id'] == tempItem['id']);
-          if (idx != -1) _details[idx] = result;
+          if (idx != -1) _details[idx] = updatedItem;
         } else {
           final idx = _savedPlaces.indexWhere(
             (sp) => sp['id'] == tempItem['id'],
           );
-          if (idx != -1) _savedPlaces[idx] = result;
+          if (idx != -1) _savedPlaces[idx] = updatedItem;
         }
       });
     }
@@ -1667,7 +1886,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         if (inDetails || (!inSaved && !isSavedPlace)) {
           await DatabaseService().deletePlaceFromItinerary(detailId);
         }
-      } catch (_) {}
+      } catch (_) {} finally {
+        Timer(const Duration(seconds: 3), () {
+          _deletingDetailIds.remove(detailId);
+        });
+      }
     });
   }
 
@@ -3528,84 +3751,43 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           ),
                           const SizedBox(height: 16),
                         ],
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  try {
-                                    final picker = ImagePicker();
-                                    final XFile? pickedFile = await picker.pickImage(
-                                      source: ImageSource.gallery,
-                                      imageQuality: 85,
-                                    );
-                                    if (pickedFile != null) {
-                                      final bytes = await pickedFile.readAsBytes();
-                                      final base64Image =
-                                          'data:image/jpeg;base64,${base64Encode(bytes)}';
-                                      setSheetState(() {
-                                        selectedCoverImage = base64Image;
-                                      });
-                                    }
-                                  } catch (e) {
-                                    debugPrint('Error picking image: $e');
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryContainer.withAlpha(120),
-                                  foregroundColor: AppTheme.primary,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  elevation: 0,
-                                ),
-                                icon: const Icon(Icons.photo_library_rounded, size: 18),
-                                label: const Text(
-                                  'Từ thư viện',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              try {
+                                final picker = ImagePicker();
+                                final XFile? pickedFile = await picker.pickImage(
+                                  source: ImageSource.gallery,
+                                  imageQuality: 85,
+                                );
+                                if (pickedFile != null) {
+                                  final bytes = await pickedFile.readAsBytes();
+                                  final base64Image =
+                                      'data:image/jpeg;base64,${base64Encode(bytes)}';
+                                  setSheetState(() {
+                                    selectedCoverImage = base64Image;
+                                  });
+                                }
+                              } catch (e) {
+                                debugPrint('Error picking image: $e');
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryContainer.withAlpha(120),
+                              foregroundColor: AppTheme.primary,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
+                              elevation: 0,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  try {
-                                    final picker = ImagePicker();
-                                    final XFile? pickedFile = await picker.pickImage(
-                                      source: ImageSource.camera,
-                                      imageQuality: 85,
-                                    );
-                                    if (pickedFile != null) {
-                                      final bytes = await pickedFile.readAsBytes();
-                                      final base64Image =
-                                          'data:image/jpeg;base64,${base64Encode(bytes)}';
-                                      setSheetState(() {
-                                        selectedCoverImage = base64Image;
-                                      });
-                                    }
-                                  } catch (e) {
-                                    debugPrint('Error camera image: $e');
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryContainer.withAlpha(120),
-                                  foregroundColor: AppTheme.primary,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  elevation: 0,
-                                ),
-                                icon: const Icon(Icons.camera_alt_rounded, size: 18),
-                                label: const Text(
-                                  'Chụp ảnh mới',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
+                            icon: const Icon(Icons.photo_library_rounded, size: 18),
+                            label: const Text(
+                              'Từ thư viện',
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
@@ -3641,6 +3823,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       setState(() {
                                         _itineraryData['coverImage'] = selectedCoverImage;
                                       });
+                                      try { DatabaseService.refreshTrigger.value++; } catch (_) {}
                                       Navigator.pop(context);
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(
@@ -4640,12 +4823,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                                           TextOverflow
                                                                               .ellipsis,
                                                                     ),
-                                                                    const SizedBox(
-                                                                      height: 2,
-                                                                    ),
-                                                                    Text(
-                                                                      roleStr,
-                                                                      style: TextStyle(
+                                                                      const SizedBox(
+                                                                       height: 2,
+                                                                     ),
+                                                                     Text(
+                                                                       roleStr,
+                                                                       style: TextStyle(
                                                                         fontSize:
                                                                             11,
                                                                         color: Colors
@@ -5249,18 +5432,31 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final isPlace = item['placeId'] != null || item['place'] != null;
     if (isPlace) return false;
     final text = (item['noteText'] ?? item['notetext'] ?? '').toString();
-    final isChecklist = text.startsWith('[TODO]') || item['todoItems'] != null;
-    return !isChecklist && text.trim().isEmpty;
+    final rawTodo = item['todoItems'] ?? item['todoitems'];
+    final isChecklist = text.startsWith('[TODO]') || rawTodo != null;
+    if (isChecklist) return false;
+    return text.trim().isEmpty || text == 'Ghi chú mới' || text == 'Thêm ghi chú tại đây';
   }
 
   bool _isEmptyChecklist(Map<String, dynamic> item) {
     final isPlace = item['placeId'] != null || item['place'] != null;
     if (isPlace) return false;
     final text = (item['noteText'] ?? item['notetext'] ?? '').toString();
-    final isChecklist = text.startsWith('[TODO]') || item['todoItems'] != null;
+    final rawTodo = item['todoItems'] ?? item['todoitems'];
+    final isChecklist = text.startsWith('[TODO]') || rawTodo != null;
     if (!isChecklist) return false;
-    final items = item['todoItems'] as List?;
-    return items == null || items.isEmpty;
+
+    List<dynamic> todoList = [];
+    if (rawTodo != null) {
+      if (rawTodo is List) {
+        todoList = rawTodo;
+      } else if (rawTodo is String) {
+        try {
+          todoList = json.decode(rawTodo) as List;
+        } catch (_) {}
+      }
+    }
+    return todoList.isEmpty;
   }
 
   Future<void> _addNoteInline(String section) async {
@@ -5279,13 +5475,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           : _savedPlaces.where((sp) => sp['section'] == section).toList();
 
       for (final item in targetList) {
-        if (_isEmptyNote(item)) {
+        if (_isEmptyNote(item) || _isEmptyChecklist(item)) {
           setState(() {
             _editingNoteId = item['id'] as int?;
           });
           _showPremiumNotification(
             title: 'Vui lòng nhập nội dung',
-            message: 'Bạn đang có một ghi chú chưa nhập nội dung.',
+            message: 'Bạn đang có một ghi chú hoặc danh sách chưa nhập nội dung.',
             icon: Icons.edit_note_rounded,
             color: Colors.orangeAccent,
           );
@@ -5380,13 +5576,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           : _savedPlaces.where((sp) => sp['section'] == section).toList();
 
       for (final item in targetList) {
-        if (_isEmptyChecklist(item)) {
+        if (_isEmptyNote(item) || _isEmptyChecklist(item)) {
           setState(() {
             _editingNoteId = item['id'] as int?;
           });
           _showPremiumNotification(
-            title: 'Danh sách trống',
-            message: 'Bạn đã có một danh sách công việc chưa có mục nào.',
+            title: 'Vui lòng nhập nội dung',
+            message: 'Bạn đang có một ghi chú hoặc danh sách chưa nhập nội dung.',
             icon: Icons.checklist_rounded,
             color: Colors.orangeAccent,
           );
@@ -7573,7 +7769,576 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  Widget _buildPlaceTags(Map<String, dynamic> place) {
+  final Map<int, Map<String, dynamic>> _placeWeatherCache = {};
+
+  Map<String, dynamic> _getWeatherForPlace(Map<String, dynamic> place, [String? startTime]) {
+    final int placeId = (place['id'] as num?)?.toInt() ?? 0;
+
+    int hour = 9;
+    if (startTime != null && startTime.contains(':')) {
+      hour = int.tryParse(startTime.split(':')[0]) ?? 9;
+    }
+
+    if (_placeWeatherCache.containsKey(placeId)) {
+      final cached = _placeWeatherCache[placeId]!;
+      if (cached['isRealApi'] == true) {
+        cached['hour'] = hour;
+        return cached;
+      }
+      if (cached['hour'] == hour) {
+        return cached;
+      }
+    }
+
+    final double lat = (place['latitude'] as num?)?.toDouble() ?? 10.0371;
+    final double lon = (place['longitude'] as num?)?.toDouble() ?? 105.7882;
+
+    Map<String, dynamic> weather;
+    if (hour >= 5 && hour < 8) {
+      weather = {
+        'hour': hour,
+        'temp': 27,
+        'desc': 'Nắng sớm dịu nhẹ',
+        'icon': Icons.wb_twilight_rounded,
+        'color': const Color(0xFFD97706),
+        'bg': const Color(0xFFFEF3C7),
+        'humidity': 75,
+        'wind': 8,
+        'uv': 'Thấp (2)',
+        'advice': 'Thời tiết hừng đông rất dễ chịu, thích hợp đi dạo ngắm bình minh & ăn sáng.',
+      };
+    } else if (hour >= 8 && hour < 11) {
+      weather = {
+        'hour': hour,
+        'temp': 30,
+        'desc': 'Nắng nhẹ mát mẻ',
+        'icon': Icons.wb_sunny_rounded,
+        'color': const Color(0xFFEA580C),
+        'bg': const Color(0xFFFFEDD5),
+        'humidity': 65,
+        'wind': 10,
+        'uv': 'Vừa (5)',
+        'advice': 'Trời nắng nhẹ đẹp, lý tưởng để di chuyển tham quan các di tích & chụp ảnh.',
+      };
+    } else if (hour >= 11 && hour < 14) {
+      weather = {
+        'hour': hour,
+        'temp': 33,
+        'desc': 'Nắng trong & ấm',
+        'icon': Icons.wb_sunny_rounded,
+        'color': const Color(0xFFB45309),
+        'bg': const Color(0xFFFEF3C7),
+        'humidity': 58,
+        'wind': 12,
+        'uv': 'Cao (8)',
+        'advice': 'Trời đứng bóng khá nắng. Bạn nên dùng bữa trưa ở không gian máy lạnh hoặc có bóng râm!',
+      };
+    } else if (hour >= 14 && hour < 17) {
+      weather = {
+        'hour': hour,
+        'temp': 31,
+        'desc': 'Nắng chiều có mây',
+        'icon': Icons.wb_cloudy_rounded,
+        'color': const Color(0xFF0284C7),
+        'bg': const Color(0xFFE0F2FE),
+        'humidity': 64,
+        'wind': 14,
+        'uv': 'Vừa (4)',
+        'advice': 'Nắng chiều đã hạ nhiệt, có mây lộng gió thích hợp cho các hoạt động vui chơi giải trí.',
+      };
+    } else if (hour >= 17 && hour < 19) {
+      weather = {
+        'hour': hour,
+        'temp': 28,
+        'desc': 'Hoàng hôn mát mẻ',
+        'icon': Icons.brightness_6_rounded,
+        'color': const Color(0xFF7C3AED),
+        'bg': const Color(0xFFF3E8FF),
+        'humidity': 72,
+        'wind': 11,
+        'uv': 'Thấp (1)',
+        'advice': 'Thời điểm tuyệt vời nhất trong ngày để ngắm hoàng hôn và tận hưởng gió mát.',
+      };
+    } else {
+      weather = {
+        'hour': hour,
+        'temp': 26,
+        'desc': 'Trời đêm thoáng mát',
+        'icon': Icons.nightlight_round,
+        'color': const Color(0xFF1E293B),
+        'bg': const Color(0xFFF1F5F9),
+        'humidity': 78,
+        'wind': 9,
+        'uv': 'Không có (0)',
+        'advice': 'Không khí đêm dịu mát, rất tuyệt vời để thưởng thức ẩm thực đêm & đi dạo.',
+      };
+    }
+
+    _placeWeatherCache[placeId] = weather;
+    _fetchRealHourlyWeather(placeId, lat, lon, hour);
+    return weather;
+  }
+
+  Future<void> _fetchRealHourlyWeather(int placeId, double lat, double lon, int hour) async {
+    final bool isNight = (hour >= 18 || hour < 6);
+    try {
+      // Calling OpenWeatherMap API via Backend ApiClient endpoint /weather/current
+      final res = await ApiClient.get('/weather/current', query: {
+        'lat': lat.toString(),
+        'lon': lon.toString(),
+      });
+
+      if (res.statusCode == 200 && res.body.isNotEmpty) {
+        final data = jsonDecode(res.body);
+        final num? apiTemp = (data['temp'] ?? data['temperature']) as num?;
+        final int temp = apiTemp?.round() ?? (isNight ? 26 : 31);
+        final String rawDesc = (data['description'] ?? '').toString().trim();
+        final int humidity = (data['humidity'] as num?)?.toInt() ?? 75;
+        final int wind = ((data['windSpeed'] as num?)?.toDouble() ?? 5.0).round();
+
+        String desc = rawDesc;
+        if (desc.isNotEmpty) {
+          desc = desc[0].toUpperCase() + desc.substring(1);
+        } else {
+          desc = isNight ? 'Đêm quang đãng' : 'Nắng đẹp';
+        }
+
+        if (isNight && desc.toLowerCase().contains('nắng')) {
+          desc = 'Đêm thoáng mát';
+        }
+
+        IconData icon = isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded;
+        Color color = isNight ? const Color(0xFF1E293B) : const Color(0xFFD97706);
+        Color bg = isNight ? const Color(0xFFF1F5F9) : const Color(0xFFFEF3C7);
+
+        if (desc.toLowerCase().contains('mưa')) {
+          icon = Icons.grain_rounded;
+          color = const Color(0xFF2563EB);
+          bg = const Color(0xFFDBEAFE);
+        } else if (desc.toLowerCase().contains('mây')) {
+          icon = isNight ? Icons.nightlight_round : Icons.wb_cloudy_rounded;
+          color = isNight ? const Color(0xFF334155) : const Color(0xFF0284C7);
+          bg = isNight ? const Color(0xFFF1F5F9) : const Color(0xFFE0F2FE);
+        }
+
+        String advice = isNight
+            ? 'Đêm dịu mát, không khí rất tuyệt vời để thưởng thức ẩm thực đêm & dạo phố.'
+            : 'Thời tiết tuyệt vời cho các hoạt động di chuyển và tham quan ngoài trời.';
+
+        if (mounted) {
+          setState(() {
+            _placeWeatherCache[placeId] = {
+              'hour': hour,
+              'temp': temp,
+              'desc': desc,
+              'icon': icon,
+              'color': color,
+              'bg': bg,
+              'humidity': humidity,
+              'wind': wind,
+              'uv': isNight ? 'Không có (0)' : (temp > 32 ? 'Cao (8)' : 'Vừa (4)'),
+              'advice': advice,
+              'isRealApi': true,
+            };
+          });
+        }
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback: Open-Meteo hourly weather with strict night checking
+    try {
+      final url = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto',
+      );
+      final response = await http.get(url).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final hourly = data['hourly'];
+        if (hourly != null && hourly['time'] is List) {
+          final List times = hourly['time'];
+          final List temps = hourly['temperature_2m'];
+          final List humidities = hourly['relative_humidity_2m'];
+          final List codes = hourly['weather_code'];
+          final List winds = hourly['wind_speed_10m'];
+
+          int matchIndex = hour;
+          if (matchIndex < 0 || matchIndex >= times.length) matchIndex = 12;
+
+          final double tempDouble = (temps[matchIndex] as num?)?.toDouble() ?? 26.0;
+          final int temp = tempDouble.round();
+          final int code = (codes[matchIndex] as num?)?.toInt() ?? 0;
+          final int humidity = (humidities[matchIndex] as num?)?.toInt() ?? 70;
+          final int wind = ((winds[matchIndex] as num?)?.toDouble() ?? 10.0).round();
+
+          String desc = isNight ? 'Đêm quang đãng' : 'Nắng đẹp';
+          IconData icon = isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded;
+          Color color = isNight ? const Color(0xFF1E293B) : const Color(0xFFD97706);
+          Color bg = isNight ? const Color(0xFFF1F5F9) : const Color(0xFFFEF3C7);
+          String advice = isNight
+              ? 'Đêm dịu mát, không khí rất tuyệt vời để thưởng thức ẩm thực đêm & dạo phố.'
+              : 'Thời tiết rất tốt cho các hoạt động ngoài trời.';
+
+          if (code == 0) {
+            desc = isNight ? 'Đêm quang đãng' : 'Trời quang nắng';
+            icon = isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded;
+            color = isNight ? const Color(0xFF1E293B) : const Color(0xFFD97706);
+            bg = isNight ? const Color(0xFFF1F5F9) : const Color(0xFFFEF3C7);
+          } else if (code >= 1 && code <= 3) {
+            desc = isNight ? 'Đêm nhiều mây' : ((code == 3) ? 'Nhiều mây' : 'Nắng nhẹ mát');
+            icon = isNight ? Icons.nightlight_round : Icons.wb_cloudy_rounded;
+            color = isNight ? const Color(0xFF334155) : const Color(0xFF0284C7);
+            bg = isNight ? const Color(0xFFF1F5F9) : const Color(0xFFE0F2FE);
+            advice = isNight
+                ? 'Đêm nhiều mây lộng gió, thích hợp ăn uống & dạo phố đêm.'
+                : 'Trời mát mẻ lộng gió, cực kỳ thích hợp đi tham quan & dạo phố.';
+          } else if (code >= 51 && code <= 67) {
+            desc = 'Có mưa rào';
+            icon = Icons.grain_rounded;
+            color = const Color(0xFF2563EB);
+            bg = const Color(0xFFDBEAFE);
+            advice = 'Dự báo thời điểm này có mưa rào. Bạn nhớ mang theo ô/dù nhỏ nhé!';
+          } else if (code >= 80 && code <= 99) {
+            desc = 'Mưa giông';
+            icon = Icons.thunderstorm_rounded;
+            color = const Color(0xFF7C3AED);
+            bg = const Color(0xFFF3E8FF);
+            advice = 'Trời có khả năng mưa giông. Ưu tiên di chuyển các điểm tham quan trong nhà!';
+          }
+
+          if (mounted) {
+            setState(() {
+              _placeWeatherCache[placeId] = {
+                'hour': hour,
+                'temp': temp,
+                'desc': desc,
+                'icon': icon,
+                'color': color,
+                'bg': bg,
+                'humidity': humidity,
+                'wind': wind,
+                'uv': isNight ? 'Không có (0)' : (temp > 32 ? 'Cao (8)' : 'Vừa (4)'),
+                'advice': advice,
+                'isRealApi': true,
+              };
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Widget _buildWeatherChip(Map<String, dynamic> place, [String? startTime]) {
+    if (place.isEmpty) return const SizedBox.shrink();
+    final weather = _getWeatherForPlace(place, startTime);
+
+    return GestureDetector(
+      onTap: () => _showPlaceWeatherDetailsSheet(place, weather),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 145),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: weather['bg'] as Color,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: (weather['color'] as Color).withAlpha(50),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              weather['icon'] as IconData,
+              color: weather['color'] as Color,
+              size: 13,
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                '${weather['temp']}°C · ${weather['desc']}',
+                style: TextStyle(
+                  color: weather['color'] as Color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPlaceWeatherDetailsSheet(
+    Map<String, dynamic> place,
+    Map<String, dynamic> weather,
+  ) {
+    final String name = place['name'] ?? 'Địa điểm';
+    final String address = place['address'] ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: (weather['bg'] as Color),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          weather['icon'] as IconData,
+                          color: weather['color'] as Color,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.darkText,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (address.isNotEmpty)
+                              Text(
+                                address,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Main Weather Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          (weather['color'] as Color).withAlpha(20),
+                          (weather['color'] as Color).withAlpha(10),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: (weather['color'] as Color).withAlpha(40),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${weather['temp']}°C',
+                                  style: TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w800,
+                                    color: weather['color'] as Color,
+                                  ),
+                                ),
+                                Text(
+                                  weather['desc'].toString(),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Icon(
+                              weather['icon'] as IconData,
+                              size: 48,
+                              color: weather['color'] as Color,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildWeatherMetric('Độ ẩm', '${weather['humidity']}%', Icons.water_drop_rounded),
+                            _buildWeatherMetric('Tốc độ gió', '${weather['wind']} km/h', Icons.air_rounded),
+                            _buildWeatherMetric('Chỉ số UV', '${weather['uv']}', Icons.wb_sunny_outlined),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Travel Advice
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline_rounded,
+                          color: AppTheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            weather['advice'].toString(),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.darkText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Hourly Forecast Bar
+                  Text(
+                    'Dự báo trong ngày',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.subtitleText,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildHourlyItem('08:00', '${weather['temp'] - 2}°C', Icons.wb_sunny_rounded),
+                      _buildHourlyItem('11:00', '${weather['temp'] + 1}°C', Icons.wb_sunny_rounded),
+                      _buildHourlyItem('14:00', '${weather['temp']}°C', Icons.wb_cloudy_rounded),
+                      _buildHourlyItem('17:00', '${weather['temp'] - 2}°C', Icons.wb_cloudy_rounded),
+                      _buildHourlyItem('20:00', '${weather['temp'] - 4}°C', Icons.nightlight_round),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildWeatherMetric(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: AppTheme.subtitleText),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.darkText,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: AppTheme.subtitleText,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHourlyItem(String time, String temp, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        children: [
+          Text(
+            time,
+            style: TextStyle(fontSize: 10, color: AppTheme.subtitleText),
+          ),
+          const SizedBox(height: 4),
+          Icon(icon, size: 14, color: AppTheme.primary),
+          const SizedBox(height: 4),
+          Text(
+            temp,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.darkText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceTags(Map<String, dynamic> place, {String? startTime}) {
     List<dynamic> tags = [];
 
     if (place['category'] != null && place['category']['name'] != null) {
@@ -7583,28 +8348,131 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     }
 
     return Wrap(
-      spacing: 4,
+      spacing: 6,
       runSpacing: 4,
-      children: tags
-          .map(
-            (cat) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                cat.toString(),
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF475569),
-                  fontWeight: FontWeight.bold,
-                ),
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        ...tags.map(
+          (cat) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              cat.toString(),
+              style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFF475569),
+                fontWeight: FontWeight.bold,
               ),
             ),
-          )
-          .toList(),
+          ),
+        ),
+        _buildWeatherChip(place, startTime),
+      ],
     );
+  }
+
+  Future<void> _selectTimeForDetail(Map<String, dynamic> detail) async {
+    if (!_checkCanEdit()) return;
+    final int detailId = detail['id'] as int;
+    final bool isItineraryDetail = detail.containsKey('day');
+
+    TimeOfDay initialStart = const TimeOfDay(hour: 8, minute: 0);
+    if (detail['startTime'] != null && detail['startTime'].toString().contains(':')) {
+      final parts = detail['startTime'].toString().split(':');
+      initialStart = TimeOfDay(
+        hour: int.tryParse(parts[0]) ?? 8,
+        minute: int.tryParse(parts[1]) ?? 0,
+      );
+    }
+
+    final TimeOfDay? start = await showTimePicker(
+      context: context,
+      initialTime: initialStart,
+      helpText: 'CHỌN GIỜ BẮT ĐẦU',
+    );
+    if (start == null) return;
+
+    final int startMinutes = start.hour * 60 + start.minute;
+
+    TimeOfDay initialEnd = TimeOfDay(
+      hour: (start.hour + 1) % 24,
+      minute: (start.minute + 30) % 60,
+    );
+    if (detail['endTime'] != null && detail['endTime'].toString().contains(':')) {
+      final parts = detail['endTime'].toString().split(':');
+      final parsedH = int.tryParse(parts[0]) ?? initialEnd.hour;
+      final parsedM = int.tryParse(parts[1]) ?? initialEnd.minute;
+      if (parsedH * 60 + parsedM > startMinutes) {
+        initialEnd = TimeOfDay(hour: parsedH, minute: parsedM);
+      }
+    }
+
+    TimeOfDay? end = await showTimePicker(
+      context: context,
+      initialTime: initialEnd,
+      helpText: 'CHỌN GIỜ KẾT THÚC (SAU GIỜ BẮT ĐẦU)',
+    );
+    if (end == null) return;
+
+    int endMinutes = end.hour * 60 + end.minute;
+    if (endMinutes <= startMinutes) {
+      final adjustedMinutes = (startMinutes + 90) % (24 * 60);
+      end = TimeOfDay(
+        hour: adjustedMinutes ~/ 60,
+        minute: adjustedMinutes % 60,
+      );
+      _showPremiumNotification(
+        title: 'Giờ kết thúc đã tự điều chỉnh',
+        message:
+            'Giờ kết thúc phải sau giờ bắt đầu. Đã tự động chỉnh thành ${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}',
+        icon: Icons.access_time_filled_rounded,
+        color: const Color(0xFFD97706),
+      );
+    }
+
+    final startStr =
+        '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
+    final endStr =
+        '${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}';
+
+    setState(() {
+      if (isItineraryDetail) {
+        final idx = _details.indexWhere((d) => d['id'] == detailId);
+        if (idx != -1) {
+          _details[idx]['startTime'] = startStr;
+          _details[idx]['endTime'] = endStr;
+        }
+      } else {
+        final idx = _savedPlaces.indexWhere((sp) => sp['id'] == detailId);
+        if (idx != -1) {
+          _savedPlaces[idx]['startTime'] = startStr;
+          _savedPlaces[idx]['endTime'] = endStr;
+        }
+      }
+    });
+
+    _showPremiumNotification(
+      title: 'Đã cập nhật thời gian',
+      message: 'Thời gian ghé thăm: $startStr - $endStr',
+      icon: Icons.access_time_rounded,
+      color: AppTheme.primary,
+    );
+
+    if (isItineraryDetail) {
+      await DatabaseService().updateItineraryDetail(detailId, {
+        'startTime': startStr,
+        'endTime': endStr,
+      });
+    } else {
+      await DatabaseService().updateSavedPlace(detailId, {
+        'startTime': startStr,
+        'endTime': endStr,
+      });
+    }
+    await _loadData(silent: true);
   }
 
   Widget _buildSavedPlaceCard(
@@ -7634,6 +8502,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     String? extraInfo;
     if (detail['startTime'] != null && detail['endTime'] != null) {
       extraInfo = '${detail['startTime']} - ${detail['endTime']}';
+    } else if (detail['startTime'] != null) {
+      extraInfo = '${detail['startTime']}';
+    } else if (detail['endTime'] != null) {
+      extraInfo = '${detail['endTime']}';
     }
 
     return VisibilityDetector(
@@ -7749,8 +8621,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     shape: BoxShape.circle,
                                   ),
                                   alignment: Alignment.center,
-                                  child:
-                                      (_sectionIcons[detail['section']] ==
+                                  child: (_sectionIcons[detail['section']] ==
                                               null ||
                                           _sectionIcons[detail['section']]
                                                   ?.codePoint ==
@@ -7783,39 +8654,60 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           color: AppTheme.darkText,
                                         ),
                                       ),
-                                      if (extraInfo != null) ...[
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.access_time_rounded,
-                                              color: AppTheme.subtitleText,
-                                              size: 12,
+                                      if (extraInfo != null || isItineraryMode) ...[
+                                        const SizedBox(height: 5),
+                                        GestureDetector(
+                                          onTap: () => _selectTimeForDetail(detail),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
                                             ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                extraInfo,
-                                                style: TextStyle(
-                                                  color:
-                                                      extraInfo
-                                                          .toLowerCase()
-                                                          .contains('đóng cửa')
-                                                      ? Colors.red
-                                                      : AppTheme.subtitleText,
-                                                  fontWeight:
-                                                      extraInfo
-                                                          .toLowerCase()
-                                                          .contains('đóng cửa')
-                                                      ? FontWeight.w600
-                                                      : FontWeight.normal,
-                                                  fontSize: 11,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
+                                            decoration: BoxDecoration(
+                                              color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                  ? AppTheme.primary.withAlpha(18)
+                                                  : Colors.amber.withAlpha(25),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                    ? AppTheme.primary.withAlpha(40)
+                                                    : Colors.amber.withAlpha(80),
                                               ),
                                             ),
-                                          ],
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time_rounded,
+                                                  color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                      ? AppTheme.primary
+                                                      : Colors.amber[800],
+                                                  size: 13,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  (extraInfo != null && extraInfo.isNotEmpty)
+                                                      ? extraInfo
+                                                      : 'Chọn thời gian ghé thăm',
+                                                  style: TextStyle(
+                                                    color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                        ? AppTheme.primary
+                                                        : Colors.amber[900],
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Icon(
+                                                  Icons.edit_rounded,
+                                                  size: 11,
+                                                  color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                      ? AppTheme.primary.withAlpha(160)
+                                                      : Colors.amber[800],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         ),
                                       ],
                                       const SizedBox(height: 8),
@@ -7824,7 +8716,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           Expanded(
-                                            child: _buildPlaceTags(place),
+                                            child: _buildPlaceTags(place, startTime: detail['startTime']?.toString()),
                                           ),
                                         ],
                                       ),
@@ -8761,7 +9653,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
                                     if (isItineraryMode &&
                                         detail['place'] != null) {
-                                      return Container(
+                                      return ReorderableDelayedDragStartListener(
+                                         key: key,
+                                         index: sIdx,
+                                         child: Container(
                                         key: key,
                                         child: Stack(
                                           children: [
@@ -8815,13 +9710,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             ),
                                           ],
                                         ),
-                                      );
+                                      ),
+                                    );
                                     }
 
-                                    return Container(
-                                      key: key,
-                                      child: itemContent,
-                                    );
+                                    return ReorderableDelayedDragStartListener(
+                                       key: key,
+                                       index: sIdx,
+                                       child: Container(
+                                         key: key,
+                                         child: itemContent,
+                                       ),
+                                     );
                                   }
                                 },
                               ),
@@ -8963,12 +9863,69 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               const SizedBox(height: 8),
 
                               // Recommendations Horizontal List
-                              SizedBox(
-                                height: 70,
-                                child: ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount:
-                                      availableRecommendations.length + 1,
+                              if (_isLoadingPlaces && availableRecommendations.isEmpty)
+                                SizedBox(
+                                  height: 70,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: 3,
+                                    itemBuilder: (context, idx) => Container(
+                                      width: 160,
+                                      margin: const EdgeInsets.only(right: 8),
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: AppTheme.border),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 54,
+                                            height: 54,
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey.shade200,
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Container(
+                                                  height: 12,
+                                                  width: 60,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey.shade200,
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Container(
+                                                  height: 10,
+                                                  width: 40,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey.shade200,
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                SizedBox(
+                                  height: 70,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount:
+                                        availableRecommendations.length + 1,
                                   itemBuilder: (context, rIdx) {
                                     if (rIdx ==
                                         availableRecommendations.length) {
@@ -9148,32 +10105,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       );
     }
 
-    final existingPlaceIds = <int>{};
-    for (var d in _details) {
-      if (d['placeId'] != null) {
-        existingPlaceIds.add(d['placeId'] as int);
-      }
-    }
-
-    final Map<int, Map<String, dynamic>> uniquePlacesMap = {};
-    for (var d in overviewDetails) {
-      final p = d['place'];
-      if (p != null && p['id'] != null) {
-        final int placeId = p['id'] as int;
-        if (!existingPlaceIds.contains(placeId) &&
-            !uniquePlacesMap.containsKey(placeId)) {
-          final placeWithSection = Map<String, dynamic>.from(p);
-          placeWithSection['section_name'] = d['section'];
-          uniquePlacesMap[placeId] = placeWithSection;
-        }
-      }
-    }
-    final List<Map<String, dynamic>> savedPlaces = uniquePlacesMap.values
-        .toList();
-
     return GestureDetector(
       onTap: () {
-        _showAddPlaceBottomSheet(dayLabel, savedPlaces);
+        _showAddPlaceBottomSheet(dayLabel);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -9248,36 +10182,82 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               }
             }
 
-            // Build places list for Itinerary quick selection when query is empty
-            List<Map<String, dynamic>> quickPlacesList = [];
+            // Build places list grouped by section for Itinerary selection from Overview tab (_savedPlaces & _sectionNames)
+            List<Map<String, dynamic>> itinerarySectionItems = [];
             if (query.isEmpty && isItinerary) {
-              if (savedPlaces != null && savedPlaces.isNotEmpty) {
-                quickPlacesList = List.from(savedPlaces);
-              } else {
-                final Set<int> existingIds = {};
-                final int? dayNum = int.tryParse(
-                  sectionOrDay.replaceAll(RegExp(r'[^0-9]'), ''),
-                );
-                if (dayNum != null) {
-                  for (var d in _details) {
-                    if (d['day'] == dayNum && d['placeId'] != null) {
-                      existingIds.add(d['placeId'] as int);
-                    }
+              final Set<int> existingDayPlaceIds = {};
+              final int? dayNum = int.tryParse(
+                sectionOrDay.replaceAll(RegExp(r'[^0-9]'), ''),
+              );
+              if (dayNum != null) {
+                for (var d in _details) {
+                  if (d['day'] == dayNum && d['placeId'] != null) {
+                    existingDayPlaceIds.add(d['placeId'] as int);
                   }
                 }
-                for (var sp in _savedPlaces) {
-                  final p = sp['place'];
-                  if (p != null && p['id'] != null) {
-                    final int pId = p['id'] as int;
-                    if (!existingIds.contains(pId)) {
-                      final pCopy = Map<String, dynamic>.from(p);
-                      pCopy['section_name'] = sp['section'] ?? '';
-                      quickPlacesList.add(pCopy);
-                    }
+              }
+
+              final Map<String, List<Map<String, dynamic>>> grouped = {};
+              final sourceList = (savedPlaces != null && savedPlaces.isNotEmpty)
+                  ? savedPlaces
+                  : _savedPlaces;
+
+              for (var item in sourceList) {
+                // Skip notes and checklists (items that are not places)
+                final bool isPlace =
+                    item['place'] != null || item['placeId'] != null;
+                if (!isPlace) continue;
+
+                final Map<String, dynamic>? p = item['place'] != null
+                    ? item['place'] as Map<String, dynamic>?
+                    : item;
+                final String sec =
+                    (item['section_name'] ?? item['section'] ?? 'Điểm tham quan')
+                        .toString();
+
+                if (p != null && p['id'] != null) {
+                  final int pId = p['id'] as int;
+                  final pCopy = Map<String, dynamic>.from(p);
+                  pCopy['section_name'] = sec;
+                  pCopy['is_added_to_day'] = existingDayPlaceIds.contains(pId);
+                  grouped.putIfAbsent(sec, () => []).add(pCopy);
+                }
+              }
+
+              final List<String> allSecNames = List.from(_sectionNames);
+              for (var k in grouped.keys) {
+                if (!allSecNames.contains(k)) {
+                  allSecNames.add(k);
+                }
+              }
+
+              for (var secName in allSecNames) {
+                final places = grouped[secName] ?? [];
+                itinerarySectionItems.add({
+                  'type': 'section_header',
+                  'section_name': secName,
+                  'count': places.length,
+                });
+                if (places.isEmpty) {
+                  itinerarySectionItems.add({
+                    'type': 'empty_section',
+                    'section_name': secName,
+                  });
+                } else {
+                  for (var p in places) {
+                    itinerarySectionItems.add({
+                      'type': 'place_item',
+                      'place': p,
+                    });
                   }
                 }
               }
             }
+
+            // Use pre-computed prominent places list (memoized, zero-lag)
+            final List<Map<String, dynamic>> prominentPlaces = _cachedProminentPlaces.isNotEmpty
+                ? _cachedProminentPlaces
+                : _allPlaces;
 
             return SafeArea(
               child: Padding(
@@ -9367,150 +10347,519 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       // Body: Empty search vs Search results
                       Expanded(
                         child: query.isEmpty
-                            ? (isItinerary
-                                  ? (quickPlacesList.isEmpty
-                                        ? Center(
-                                            child: Text(
-                                              'Chưa có địa điểm nào trong danh sách Tổng quan',
+                            ? ListView.builder(
+                                itemCount: (isItinerary && itinerarySectionItems.isNotEmpty
+                                        ? (itinerarySectionItems.length + 1)
+                                        : 0) +
+                                    (prominentPlaces.isNotEmpty
+                                        ? (prominentPlaces.length + 1)
+                                        : 0) +
+                                    1,
+                                itemBuilder: (context, idx) {
+                                  final bool hasQuick = isItinerary && itinerarySectionItems.isNotEmpty;
+                                  final int quickOffset = hasQuick ? (itinerarySectionItems.length + 1) : 0;
+                                  final int prominentHeaderIdx = quickOffset;
+                                  final int prominentStartIdx = prominentHeaderIdx + 1;
+                                  final int prominentCount = prominentPlaces.length;
+                                  final int footerIdx = quickOffset +
+                                      (prominentPlaces.isNotEmpty ? (prominentCount + 1) : 0);
+
+                                  if (hasQuick && idx == 0) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 4, top: 4),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.collections_bookmark_rounded,
+                                            color: Color(0xFF5C5CFF),
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Địa điểm từ các Danh Sách Tổng Quan',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.darkText,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+
+                                  if (hasQuick && idx > 0 && idx < quickOffset) {
+                                    final item = itinerarySectionItems[idx - 1];
+                                    final String itemType = item['type'] ?? 'place_item';
+
+                                    if (itemType == 'section_header') {
+                                      return Container(
+                                        margin: const EdgeInsets.only(top: 14, bottom: 6),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.folder_special_rounded,
+                                              color: Color(0xFF5C5CFF),
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              item['section_name'],
                                               style: TextStyle(
-                                                color: Colors.grey[600],
                                                 fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.darkText,
                                               ),
                                             ),
-                                          )
-                                        : Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                  bottom: 12,
+                                            const Spacer(),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE2E8F0),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                '${item['count']} địa điểm',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: const Color(0xFF475569),
                                                 ),
-                                                child: Text(
-                                                  'Chọn nhanh từ các danh sách của bạn',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+
+                                    if (itemType == 'empty_section') {
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                        child: Text(
+                                          'Chưa có địa điểm trong "${item['section_name']}".',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontStyle: FontStyle.italic,
+                                            color: Colors.grey[400],
+                                          ),
+                                        ),
+                                      );
+                                    }
+
+                                    final place = item['place'] as Map<String, dynamic>;
+                                    final name = place['name'] ?? 'Địa điểm';
+                                    final section = place['section_name'] ?? place['section'] ?? '';
+                                    final address = place['address'] ?? '';
+                                    final image = place['image'] ?? '';
+                                    final double rating = (place['rating'] as num?)?.toDouble() ?? 0.0;
+                                    final int ratingCount = ((place['userRatingCount'] ??
+                                                place['user_rating_count'] ??
+                                                place['reviewsCount'] ??
+                                                0) as num)
+                                        .toInt();
+
+                                    return Column(
+                                      children: [
+                                        ListTile(
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            vertical: 6,
+                                            horizontal: 4,
+                                          ),
+                                          leading: ClipRRect(
+                                            borderRadius: BorderRadius.circular(10),
+                                            child: Image.network(
+                                              image,
+                                              width: 48,
+                                              height: 48,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Container(
+                                                width: 48,
+                                                height: 48,
+                                                color: Colors.grey[200],
+                                                child: const Icon(
+                                                  Icons.location_on_rounded,
+                                                  color: Color(0xFF334155),
+                                                  size: 24,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          title: Text(
+                                            name,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.darkText,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                children: [
+                                                  if (section.isNotEmpty) ...[
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFFE2E8F0),
+                                                        borderRadius: BorderRadius.circular(4),
+                                                      ),
+                                                      child: Text(
+                                                        section,
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: const Color(0xFF334155),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                  ],
+                                                  if (rating > 0) ...[
+                                                    const Icon(
+                                                      Icons.star_rounded,
+                                                      color: Colors.amber,
+                                                      size: 13,
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Text(
+                                                      rating.toStringAsFixed(1),
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.amber[800],
+                                                      ),
+                                                    ),
+                                                    if (ratingCount > 0) ...[
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        '($ratingCount)',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: Colors.grey[600],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ],
+                                              ),
+                                              if (address.isNotEmpty) ...[
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  address,
                                                   style: TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: AppTheme.darkText,
+                                                    fontSize: 11,
+                                                    color: Colors.grey[500],
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          trailing: place['is_added_to_day'] == true
+                                              ? Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFF1F5F9),
+                                                    borderRadius: BorderRadius.circular(20),
+                                                  ),
+                                                  child: const Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.check_rounded,
+                                                        size: 14,
+                                                        color: Color(0xFF64748B),
+                                                      ),
+                                                      SizedBox(width: 4),
+                                                      Text(
+                                                        'Đã thêm',
+                                                        style: TextStyle(
+                                                          color: Color(0xFF64748B),
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                )
+                                              : Container(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 6,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: AppTheme.primaryPeach,
+                                                    borderRadius: BorderRadius.circular(20),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.add,
+                                                        size: 14,
+                                                        color: AppTheme.primary,
+                                                      ),
+                                                      const SizedBox(width: 2),
+                                                      Text(
+                                                        'Thêm',
+                                                        style: TextStyle(
+                                                          color: AppTheme.primary,
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
-                                              ),
-                                              Expanded(
-                                                child: ListView.separated(
-                                                  itemCount:
-                                                      quickPlacesList.length,
-                                                  separatorBuilder: (_, __) =>
-                                                      const Divider(height: 1),
-                                                  itemBuilder: (context, idx) {
-                                                    final place =
-                                                        quickPlacesList[idx];
-                                                    final name =
-                                                        place['name'] ??
-                                                        'Địa điểm';
-                                                    final section =
-                                                        place['section_name'] ??
-                                                        place['section'] ??
-                                                        '';
+                                          onTap: () {
+                                            if (place['is_added_to_day'] == true) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    '${place['name']} đã có trong $sectionOrDay',
+                                                  ),
+                                                  duration: const Duration(seconds: 1),
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                            Navigator.pop(context);
+                                            _addPlace(place, sectionOrDay);
+                                          },
+                                        ),
+                                        const Divider(height: 1),
+                                      ],
+                                    );
+                                  }
 
-                                                    return ListTile(
-                                                      contentPadding:
-                                                          const EdgeInsets.symmetric(
-                                                            vertical: 6,
-                                                            horizontal: 4,
-                                                          ),
-                                                      leading: const Icon(
-                                                        Icons
-                                                            .location_on_rounded,
-                                                        color: Color(
-                                                          0xFF334155,
-                                                        ),
-                                                        size: 24,
-                                                      ),
-                                                      title: Text(
-                                                        name,
-                                                        style: TextStyle(
-                                                          fontSize: 15,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color:
-                                                              AppTheme.darkText,
-                                                        ),
-                                                      ),
-                                                      subtitle:
-                                                          section.isNotEmpty
-                                                          ? Text(
-                                                              section,
-                                                              style: TextStyle(
-                                                                fontSize: 12,
-                                                                color: Colors
-                                                                    .grey[600],
-                                                              ),
-                                                            )
-                                                          : null,
-                                                      onTap: () {
-                                                        Navigator.pop(context);
-                                                        _addPlace(
-                                                          place,
-                                                          sectionOrDay,
-                                                        );
-                                                      },
-                                                    );
-                                                  },
+                                  if (prominentPlaces.isNotEmpty && idx == prominentHeaderIdx) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 12, bottom: 8),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.star_rounded,
+                                            color: Colors.amber,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Địa điểm nổi bật (Đánh giá cao)',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.darkText,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+
+                                  if (prominentPlaces.isNotEmpty &&
+                                      idx >= prominentStartIdx &&
+                                      idx < footerIdx) {
+                                    final place = prominentPlaces[idx - prominentStartIdx];
+                                    final name = place['name'] ?? 'Địa điểm';
+                                    final address = place['address'] ?? '';
+                                    final image = place['image'] ?? '';
+                                    final double rating = (place['rating'] as num?)?.toDouble() ?? 0.0;
+                                    final int ratingCount = ((place['userRatingCount'] ??
+                                                place['user_rating_count'] ??
+                                                place['reviewsCount'] ??
+                                                0) as num)
+                                        .toInt();
+
+                                    return Column(
+                                      children: [
+                                        ListTile(
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            vertical: 6,
+                                            horizontal: 4,
+                                          ),
+                                          leading: ClipRRect(
+                                            borderRadius: BorderRadius.circular(10),
+                                            child: Image.network(
+                                              image,
+                                              width: 48,
+                                              height: 48,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Container(
+                                                width: 48,
+                                                height: 48,
+                                                color: Colors.grey[200],
+                                                child: const Icon(
+                                                  Icons.location_on_rounded,
+                                                  color: Color(0xFF334155),
+                                                  size: 24,
                                                 ),
                                               ),
+                                            ),
+                                          ),
+                                          title: Text(
+                                            name,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.darkText,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          subtitle: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.star_rounded,
+                                                    color: Colors.amber,
+                                                    size: 13,
+                                                  ),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    rating > 0
+                                                        ? rating.toStringAsFixed(1)
+                                                        : 'Chưa có đánh giá',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: rating > 0
+                                                          ? Colors.amber[800]
+                                                          : Colors.grey[500],
+                                                    ),
+                                                  ),
+                                                  if (ratingCount > 0) ...[
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '($ratingCount đánh giá)',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                              if (address.isNotEmpty) ...[
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  address,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey[500],
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
                                             ],
-                                          ))
-                                  : Center(
+                                          ),
+                                          trailing: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primaryPeach,
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.add,
+                                                  size: 14,
+                                                  color: AppTheme.primary,
+                                                ),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  'Thêm',
+                                                  style: TextStyle(
+                                                    color: AppTheme.primary,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          onTap: () {
+                                            Navigator.pop(context);
+                                            _addPlace(place, sectionOrDay);
+                                          },
+                                        ),
+                                        const Divider(height: 1),
+                                      ],
+                                    );
+                                  }
+
+                                  // Footer item
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 24),
+                                    child: Center(
                                       child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
                                         children: [
                                           Text(
                                             'Cần thêm ý tưởng?',
                                             style: TextStyle(
-                                              fontSize: 14,
+                                              fontSize: 13,
                                               color: Colors.grey[600],
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),
-                                          const SizedBox(height: 16),
+                                          const SizedBox(height: 12),
                                           ElevatedButton(
                                             onPressed: () {
                                               Navigator.pop(context);
                                               _tabController.animateTo(
-                                                _itineraryData['isGuide'] ==
-                                                        true
-                                                    ? 1
-                                                    : 3,
+                                                _itineraryData['isGuide'] == true ? 1 : 3,
                                               );
                                             },
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(
-                                                0xFFFF5A5F,
-                                              ),
+                                              backgroundColor: const Color(0xFFFF5A5F),
                                               foregroundColor: Colors.white,
                                               elevation: 0,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 24,
-                                                    vertical: 14,
-                                                  ),
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 24,
+                                                vertical: 12,
+                                              ),
                                               shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(30),
+                                                borderRadius: BorderRadius.circular(30),
                                               ),
                                             ),
                                             child: const Text(
                                               'Khám phá hướng dẫn và blog',
                                               style: TextStyle(
-                                                fontSize: 14,
+                                                fontSize: 13,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                           ),
                                         ],
                                       ),
-                                    ))
+                                    ),
+                                  );
+                                },
+                              )
                             : matchingPlaces.isEmpty
                             ? Center(
                                 child: Column(
@@ -9987,29 +11336,72 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     List<Map<String, dynamic>> dayDetails,
     Color customColor,
   ) {
+    final List<Map<String, dynamic>> sortedDayDetails = List.from(dayDetails);
+    sortedDayDetails.sort((a, b) {
+      final aStart = a['startTime']?.toString() ?? '';
+      final bStart = b['startTime']?.toString() ?? '';
+      if (aStart.isNotEmpty && bStart.isNotEmpty && aStart != bStart) {
+        return aStart.compareTo(bStart);
+      }
+      final aOrd = (a['sortOrder'] as num?)?.toInt() ?? 0;
+      final bOrd = (b['sortOrder'] as num?)?.toInt() ?? 0;
+      return aOrd.compareTo(bOrd);
+    });
+
     return ReorderableListView(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       buildDefaultDragHandles: false,
-      onReorder: (oldIndex, newIndex) {
+      onReorder: (oldIndex, newIndex) async {
         if (!_checkCanEdit()) return;
         if (oldIndex < newIndex) newIndex -= 1;
-        final updated = List.from(dayDetails);
+        if (oldIndex == newIndex) return;
+
+        final List<Map<String, String?>> timeSlots = sortedDayDetails.map((d) {
+          return {
+            'startTime': d['startTime']?.toString(),
+            'endTime': d['endTime']?.toString(),
+          };
+        }).toList();
+
+        final updated = List<Map<String, dynamic>>.from(sortedDayDetails);
         final item = updated.removeAt(oldIndex);
         updated.insert(newIndex, item);
 
         for (int i = 0; i < updated.length; i++) {
-          DatabaseService().updateNoteOrDetail(updated[i]['id'], {
-            'sortOrder': i,
-          }, true);
+          updated[i]['startTime'] = timeSlots[i]['startTime'];
+          updated[i]['endTime'] = timeSlots[i]['endTime'];
+          updated[i]['sortOrder'] = i;
         }
-        Future.delayed(
-          const Duration(milliseconds: 100),
-          () => _loadData(silent: true),
+
+        setState(() {
+          for (final item in updated) {
+            final idx = _details.indexWhere((d) => d['id'] == item['id']);
+            if (idx != -1) {
+              _details[idx]['startTime'] = item['startTime'];
+              _details[idx]['endTime'] = item['endTime'];
+              _details[idx]['sortOrder'] = item['sortOrder'];
+            }
+          }
+        });
+
+        _showPremiumNotification(
+          title: 'Đã sắp xếp lại vị trí',
+          message: 'Thứ tự và thời gian các địa điểm đã được cập nhật thành công.',
+          icon: Icons.swap_vert_rounded,
+          color: AppTheme.primary,
         );
+
+        for (int i = 0; i < updated.length; i++) {
+          await DatabaseService().updateItineraryDetail(updated[i]['id'], {
+            'sortOrder': i,
+            'startTime': updated[i]['startTime'],
+            'endTime': updated[i]['endTime'],
+          });
+        }
       },
-      children: List.generate(dayDetails.length, (idx) {
-        final detail = dayDetails[idx];
+      children: List.generate(sortedDayDetails.length, (idx) {
+        final detail = sortedDayDetails[idx];
         final int id = detail['id'] as int;
         final bool isCollapsed = !_expandedPlaceIds.contains(id);
 
@@ -10017,7 +11409,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         if (detail['place'] == null && detail['noteText'] != null) {
           childCard = Container(
             key: ValueKey('note_$id'),
-            child: _buildSavedNoteCard(detail, idx + 1, idx, dayDetails),
+            child: _buildSavedNoteCard(detail, idx + 1, idx, sortedDayDetails),
           );
         } else {
           final place = detail['place'] ?? {};
@@ -10026,6 +11418,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           String? extraInfo;
           if (detail['startTime'] != null && detail['endTime'] != null) {
             extraInfo = '${detail['startTime']} - ${detail['endTime']}';
+          } else if (detail['startTime'] != null) {
+            extraInfo = '${detail['startTime']}';
+          } else if (detail['endTime'] != null) {
+            extraInfo = '${detail['endTime']}';
           } else if (name.toLowerCase().contains('ueno') ||
               name.toLowerCase().contains('sở thú ueno')) {
             extraInfo = 'Đóng cửa T2';
@@ -10124,7 +11520,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Container(
+                                      ReorderableDragStartListener(
+                                         index: idx,
+                                         child: Row(
+                                           mainAxisSize: MainAxisSize.min,
+                                           children: [
+                                             const Icon(
+                                               Icons.drag_indicator_rounded,
+                                               color: Color(0xFF94A3B8),
+                                               size: 18,
+                                             ),
+                                             const SizedBox(width: 2),
+                                             Container(
                                         width: 32,
                                         height: 32,
                                         decoration: BoxDecoration(
@@ -10136,7 +11543,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           (() {
                                             int placeNumber = 0;
                                             for (int i = 0; i <= idx; i++) {
-                                              if (dayDetails[i]['place'] !=
+                                              if (sortedDayDetails[i]['place'] !=
                                                   null) {
                                                 placeNumber++;
                                               }
@@ -10150,7 +11557,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -10164,43 +11574,60 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                 color: AppTheme.darkText,
                                               ),
                                             ),
-                                            if (extraInfo != null) ...[
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.access_time_rounded,
-                                                    color:
-                                                        AppTheme.subtitleText,
-                                                    size: 12,
+                                            const SizedBox(height: 5),
+                                            GestureDetector(
+                                              onTap: () => _selectTimeForDetail(detail),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                      ? AppTheme.primary.withAlpha(18)
+                                                      : Colors.amber.withAlpha(25),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                        ? AppTheme.primary.withAlpha(40)
+                                                        : Colors.amber.withAlpha(80),
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    extraInfo,
-                                                    style: TextStyle(
-                                                      color:
-                                                          extraInfo
-                                                              .toLowerCase()
-                                                              .contains(
-                                                                'đóng cửa',
-                                                              )
-                                                          ? Colors.red
-                                                          : AppTheme
-                                                                .subtitleText,
-                                                      fontWeight:
-                                                          extraInfo
-                                                              .toLowerCase()
-                                                              .contains(
-                                                                'đóng cửa',
-                                                              )
-                                                          ? FontWeight.w600
-                                                          : FontWeight.normal,
-                                                      fontSize: 11,
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.access_time_rounded,
+                                                      color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                          ? AppTheme.primary
+                                                          : Colors.amber[800],
+                                                      size: 13,
                                                     ),
-                                                  ),
-                                                ],
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      (extraInfo != null && extraInfo.isNotEmpty)
+                                                          ? extraInfo
+                                                          : 'Chọn thời gian ghé thăm',
+                                                      style: TextStyle(
+                                                        color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                            ? AppTheme.primary
+                                                            : Colors.amber[900],
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Icon(
+                                                      Icons.edit_rounded,
+                                                      size: 11,
+                                                      color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                          ? AppTheme.primary.withAlpha(160)
+                                                          : Colors.amber[800],
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                            ],
+                                            ),
                                             const SizedBox(height: 8),
                                             Row(
                                               mainAxisAlignment:
@@ -10208,7 +11635,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                       .spaceBetween,
                                               children: [
                                                 Expanded(
-                                                  child: _buildPlaceTags(place),
+                                                  child: _buildPlaceTags(
+                                               place,
+                                               startTime: detail['startTime']
+                                                   ?.toString(),
+                                             ),
                                                 ),
                                               ],
                                             ),
@@ -10217,19 +11648,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       ),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Stack(
-                                  alignment: Alignment.topRight,
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child:
-                                          (place['image'] != null &&
-                                              place['image']
-                                                  .toString()
-                                                  .isNotEmpty)
-                                          ? Image.network(
+                                          ),
+                                 const SizedBox(width: 12),
+                                 Stack(
+                                   alignment: Alignment.topRight,
+                                   children: [
+                                     ClipRRect(
+                                       borderRadius: BorderRadius.circular(12),
+                                       child: (place['image'] != null &&
+                                               place['image']
+                                                   .toString()
+                                                   .isNotEmpty)
+                                           ? Image.network(
                                               place['image'],
                                               width: 80,
                                               height: 80,
@@ -10453,8 +11883,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           }
         }
 
-        return Container(
+        return ReorderableDelayedDragStartListener(
           key: ValueKey('item_$id'),
+          index: idx,
+          child: Container(
           child: Stack(
             children: [
               // Top line (for Place)
@@ -10518,8 +11950,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               ),
             ],
           ),
-        );
-      }),
+        ),
+      );
+    }),
     );
   }
 
@@ -10559,6 +11992,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               padding: const EdgeInsets.only(right: 8.0),
               child: GestureDetector(
                 onTap: () async {
+                  _isProgrammaticScrolling = true;
                   setState(() {
                     _activeDayIndex = index;
                     _dayCollapsed[index] = false; // Auto-expand day if collapsed
@@ -10598,6 +12032,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       }
                     });
                   }
+                  Future.delayed(const Duration(milliseconds: 400), () {
+                    _isProgrammaticScrolling = false;
+                  });
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -10644,7 +12081,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   )
                   .toList();
               final dayKey = _dayKeys.putIfAbsent(index, () => GlobalKey());
-              final customColor = _dayColors[index] ?? AppTheme.primary;
+              final customColor =
+                  _dayColors[index] ??
+                  _availableColors[index % _availableColors.length];
               final subtitle = _daySubtitles[index] ?? '';
               final isCollapsed = _dayCollapsed[index] == true;
 

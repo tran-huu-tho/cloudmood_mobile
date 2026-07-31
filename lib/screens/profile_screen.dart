@@ -1134,7 +1134,21 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     Widget childWidget = defaultIcon;
 
     if (coverStr != null && coverStr.isNotEmpty) {
-      if (coverStr.startsWith('http://') || coverStr.startsWith('https://')) {
+      if (coverStr.startsWith('data:image') || coverStr.length > 500) {
+        try {
+          final String base64Data = coverStr.contains(',')
+              ? coverStr.split(',').last
+              : coverStr;
+          final bytes = base64Decode(base64Data);
+          childWidget = Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            errorBuilder: (c, e, s) => defaultIcon,
+          );
+        } catch (_) {
+          childWidget = defaultIcon;
+        }
+      } else if (coverStr.startsWith('http://') || coverStr.startsWith('https://')) {
         childWidget = Image.network(
           coverStr,
           fit: BoxFit.cover,

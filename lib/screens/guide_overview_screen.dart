@@ -46,6 +46,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   late Map<String, dynamic> _itineraryData;
   bool _isLoading = true;
   List<Map<String, dynamic>> _allPlaces = [];
+  bool _isLoadingPlaces = false;
   List<Map<String, dynamic>> _details = [];
   List<Map<String, dynamic>> _savedPlaces = [];
   List<Map<String, dynamic>> _searchCategories = [];
@@ -515,7 +516,6 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
         final int idB = b['id'] ?? 0;
         return idA.compareTo(idB);
       });
-      _details = rawDetails;
 
       final rawSaved = List<Map<String, dynamic>>.from(
         refreshed['savedPlaces'] ?? [],
@@ -530,14 +530,37 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
         final int idB = b['id'] ?? 0;
         return idA.compareTo(idB);
       });
+
+      // Preserve pending optimistic temporary items (id >= 1000000000000)
+      final pendingTempSaved = _savedPlaces
+          .where((sp) => ((sp['id'] as num?)?.toInt() ?? 0) >= 1000000000000)
+          .toList();
+      final pendingTempDetails = _details
+          .where((d) => ((d['id'] as num?)?.toInt() ?? 0) >= 1000000000000)
+          .toList();
+
+      for (var ts in pendingTempSaved) {
+        if (!rawSaved.any((s) => s['id'] == ts['id'])) {
+          rawSaved.add(ts);
+        }
+      }
+      for (var td in pendingTempDetails) {
+        if (!rawDetails.any((d) => d['id'] == td['id'])) {
+          rawDetails.add(td);
+        }
+      }
+
+      _details = rawDetails;
       _savedPlaces = rawSaved;
     }
 
     // Fetch places near destination for Explore and recommendations (only if not loaded)
     if (_allPlaces.isEmpty) {
+      if (mounted) setState(() => _isLoadingPlaces = true);
       final String dest = _itineraryData['destination'] ?? '';
       final places = await DatabaseService().fetchPlacesByDestination(dest);
       _allPlaces = places;
+      if (mounted) setState(() => _isLoadingPlaces = false);
     }
 
     // Restore custom section names, colors, and icons from Database
@@ -1064,6 +1087,34 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
     final placeId = place['id'] as int;
     dynamic result;
 
+    // OPTIMISTIC UPDATE: Chèn ngay lập tức vào UI (0s)
+    final tempItem = {
+      'id': DateTime.now().millisecondsSinceEpoch,
+      'itineraryId': itineraryId,
+      'placeId': placeId,
+      'place': place,
+      'section': sectionOrDay,
+      'day': sectionOrDay.startsWith('Ngày')
+          ? (int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1)
+          : null,
+      'sortOrder': 9999,
+    };
+
+    setState(() {
+      if (sectionOrDay.startsWith('Ngày')) {
+        _details.add(tempItem);
+      } else {
+        _savedPlaces.add(tempItem);
+      }
+    });
+
+    _showPremiumNotification(
+      title: 'Thêm thành công',
+      message: 'Đã thêm "${place['name']}" vào $sectionOrDay!',
+      icon: Icons.check_circle_outline_rounded,
+      color: AppTheme.green,
+    );
+
     if (sectionOrDay.startsWith('Ngày')) {
       final int day =
           int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
@@ -1080,16 +1131,24 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
       );
     }
 
-    if (result != null) {
-      _showPremiumNotification(
-        title: 'Thêm thành công',
-        message: 'Đã thêm "${place['name']}" vào $sectionOrDay!',
-        icon: Icons.check_circle_outline_rounded,
-        color: AppTheme.green,
+    if (result != null && result['id'] != null) {
+      final Map<String, dynamic> updatedItem = Map<String, dynamic>.from(
+        result is Map ? result : {},
       );
-      await _loadData(silent: true);
-    } else {
-      await _loadData();
+      if (updatedItem['place'] == null) {
+        updatedItem['place'] = place;
+      }
+      setState(() {
+        if (sectionOrDay.startsWith('Ngày')) {
+          final idx = _details.indexWhere((d) => d['id'] == tempItem['id']);
+          if (idx != -1) _details[idx] = updatedItem;
+        } else {
+          final idx = _savedPlaces.indexWhere(
+            (sp) => sp['id'] == tempItem['id'],
+          );
+          if (idx != -1) _savedPlaces[idx] = updatedItem;
+        }
+      });
     }
   }
 
@@ -1099,20 +1158,32 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
     String placeName, {
     bool isSavedPlace = false,
   }) async {
-    final success = isSavedPlace
-        ? await DatabaseService().deletePlaceFromSaved(detailId)
-        : await DatabaseService().deletePlaceFromItinerary(detailId);
-    if (success) {
-      _showPremiumNotification(
-        title: 'Đã xóa',
-        message: 'Đã xóa "$placeName" khỏi lịch trình.',
-        icon: Icons.delete_sweep_outlined,
-        color: Colors.redAccent,
-      );
-      await _loadData(silent: true);
-    } else {
-      await _loadData();
-    }
+    final bool inSaved = _savedPlaces.any((p) => p['id'] == detailId);
+    final bool inDetails = _details.any((d) => d['id'] == detailId);
+
+    // OPTIMISTIC DELETE: Xóa khỏi giao diện ngay lập tức ở cả 2 danh sách (0ms)
+    setState(() {
+      _savedPlaces.removeWhere((p) => p['id'] == detailId);
+      _details.removeWhere((d) => d['id'] == detailId);
+    });
+
+    _showPremiumNotification(
+      title: 'Đã xóa',
+      message: 'Đã xóa "$placeName" khỏi lịch trình.',
+      icon: Icons.delete_sweep_outlined,
+      color: Colors.redAccent,
+    );
+
+    Future.microtask(() async {
+      try {
+        if (inSaved || isSavedPlace) {
+          await DatabaseService().deletePlaceFromSaved(detailId);
+        }
+        if (inDetails || (!inSaved && !isSavedPlace)) {
+          await DatabaseService().deletePlaceFromItinerary(detailId);
+        }
+      } catch (_) {}
+    });
   }
 
   // Local place search within destination
@@ -4486,13 +4557,60 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
     );
   }
 
-  Future<void> _addNoteInline(String section) async {
-    final itineraryId = _itineraryData['id'] as int;
+  bool _isEmptyNote(Map<String, dynamic> item) {
+    final isPlace = item['placeId'] != null || item['place'] != null;
+    if (isPlace) return false;
+    final text = (item['noteText'] ?? item['notetext'] ?? '').toString();
+    final rawTodo = item['todoItems'] ?? item['todoitems'];
+    final isChecklist = text.startsWith('[TODO]') || rawTodo != null;
+    if (isChecklist) return false;
+    return text.trim().isEmpty || text == 'Ghi chú mới' || text == 'Thêm ghi chú tại đây';
+  }
 
-    dynamic result;
+  bool _isEmptyChecklist(Map<String, dynamic> item) {
+    final isPlace = item['placeId'] != null || item['place'] != null;
+    if (isPlace) return false;
+    final text = (item['noteText'] ?? item['notetext'] ?? '').toString();
+    final rawTodo = item['todoItems'] ?? item['todoitems'];
+    final isChecklist = text.startsWith('[TODO]') || rawTodo != null;
+    if (!isChecklist) return false;
+
+    List<dynamic> todoList = [];
+    if (rawTodo != null) {
+      if (rawTodo is List) {
+        todoList = rawTodo;
+      } else if (rawTodo is String) {
+        try {
+          todoList = json.decode(rawTodo) as List;
+        } catch (_) {}
+      }
+    }
+    return todoList.isEmpty;
+  }
+
+  Future<void> _addNoteInline(String section) async {
     final sectionDetails = _savedPlaces
         .where((d) => d['section'] == section)
         .toList();
+
+    for (final item in sectionDetails) {
+      if (_isEmptyNote(item) || _isEmptyChecklist(item)) {
+        setState(() {
+          _editingNoteId = item['id'] as int?;
+        });
+        _showPremiumNotification(
+          title: 'Vui lòng nhập nội dung',
+          message: 'Bạn đang có một ghi chú hoặc danh sách chưa nhập nội dung.',
+          icon: Icons.edit_note_rounded,
+          color: Colors.orangeAccent,
+        );
+        return;
+      }
+    }
+
+    final itineraryId = _itineraryData['id'] as int;
+
+    dynamic result;
     int maxOrder = 0;
     for (var d in sectionDetails) {
       final ord = d['sortOrder'] ?? d['sortorder'] ?? 0;
@@ -4514,12 +4632,28 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   }
 
   Future<void> _addChecklistInline(String section) async {
-    final itineraryId = _itineraryData['id'] as int;
-
-    dynamic result;
     final sectionDetails = _savedPlaces
         .where((d) => d['section'] == section)
         .toList();
+
+    for (final item in sectionDetails) {
+      if (_isEmptyNote(item) || _isEmptyChecklist(item)) {
+        setState(() {
+          _editingNoteId = item['id'] as int?;
+        });
+        _showPremiumNotification(
+          title: 'Vui lòng nhập nội dung',
+          message: 'Bạn đang có một ghi chú hoặc danh sách chưa nhập nội dung.',
+          icon: Icons.checklist_rounded,
+          color: Colors.orangeAccent,
+        );
+        return;
+      }
+    }
+
+    final itineraryId = _itineraryData['id'] as int;
+
+    dynamic result;
     int maxOrder = 0;
     for (var d in sectionDetails) {
       final ord = d['sortOrder'] ?? d['sortorder'] ?? 0;
@@ -7926,11 +8060,68 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                             const SizedBox(height: 8),
 
                             // Recommendations Horizontal List
-                            SizedBox(
-                              height: 70,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: availableRecommendations.length + 1,
+                            if (_isLoadingPlaces && availableRecommendations.isEmpty)
+                              SizedBox(
+                                height: 70,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: 3,
+                                  itemBuilder: (context, idx) => Container(
+                                    width: 160,
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: AppTheme.border),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 54,
+                                          height: 54,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade200,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Container(
+                                                height: 12,
+                                                width: 60,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade200,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Container(
+                                                height: 10,
+                                                width: 40,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade200,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              SizedBox(
+                                height: 70,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: availableRecommendations.length + 1,
                                 itemBuilder: (context, rIdx) {
                                   if (rIdx == availableRecommendations.length) {
                                     // "Khám phá" card at the end
