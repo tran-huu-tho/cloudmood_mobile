@@ -315,30 +315,6 @@ class _InlinePlaceWhiteCardExtensionState
           runSpacing: 12,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            GestureDetector(
-              onTap: _pickTime,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.access_time_rounded,
-                    color: AppTheme.subtitleText,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    startTime != null && endTime != null
-                        ? '$startTime - $endTime'
-                        : 'Thêm giờ',
-                    style: TextStyle(
-                      color: AppTheme.subtitleText,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
             if (cost > 0)
               GestureDetector(
                 onTap: widget.onOpenExpenseSheet ?? () {},

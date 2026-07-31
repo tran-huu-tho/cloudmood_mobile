@@ -209,14 +209,14 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
   ];
 
   // Step 3: Pace (Nhịp độ chuyến đi)
-  String _selectedPace = 'Vừa phải (3-4 điểm/ngày)';
+  String _selectedPace = 'Vừa phải (4-5 điểm/ngày)';
   final List<Map<String, String>> _paces = [
-    {'name': 'Thong thả (2-3 điểm/ngày)', 'desc': 'Thư giãn, không vội vã'},
+    {'name': 'Thong thả (3-4 điểm/ngày)', 'desc': 'Thư giãn, không vội vã'},
     {
-      'name': 'Vừa phải (3-4 điểm/ngày)',
+      'name': 'Vừa phải (4-5 điểm/ngày)',
       'desc': 'Cân bằng giữa trải nghiệm và nghỉ ngơi',
     },
-    {'name': 'Dày đặc (5-6 điểm/ngày)', 'desc': 'Khám phá tối đa các điểm đến'},
+    {'name': 'Dày đặc (6 điểm/ngày)', 'desc': 'Khám phá tối đa các điểm đến'},
   ];
 
   // Step 4: Companions & Privacy (Email invites + Role)
@@ -535,8 +535,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       // ── STEP B: Call Gemini AI (Hybrid RAG + AI Agent) ─────────────────────
       if (mounted) {
         setState(() {
-          _creationProgress = 0.25;
-          _activeStepIndex = 1;
+          _creationProgress = math.max(_creationProgress, 0.35);
+          _activeStepIndex = math.max(_activeStepIndex, 1);
         });
       }
 
@@ -555,8 +555,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
       if (mounted) {
         setState(() {
-          _creationProgress = 0.60;
-          _activeStepIndex = 2;
+          _creationProgress = math.max(_creationProgress, 0.75);
+          _activeStepIndex = math.max(_activeStepIndex, 2);
         });
       }
 
@@ -610,41 +610,43 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           _creationProgress = 1.0;
           _activeStepIndex = 3;
         });
-        await Future.delayed(const Duration(milliseconds: 600));
-        _progressTimer?.cancel();
-        setState(() => _isCreating = false);
+        await Future.delayed(const Duration(milliseconds: 400));
 
         final updatedResult =
             await DatabaseService().fetchItineraryById(itineraryId) ?? result;
 
-        Navigator.of(context).pop(); // Close wizard
+        _progressTimer?.cancel();
 
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => TripOverviewScreen(
-              itinerary: updatedResult,
-              initialTabIndex: 1, // Directly open "Hành trình" tab
+        if (mounted) {
+          Navigator.of(context).pop(); // Close wizard sheet cleanly while overlay covers UI
+
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => TripOverviewScreen(
+                itinerary: updatedResult,
+                initialTabIndex: 1, // Directly open "Hành trình" tab
+              ),
             ),
-          ),
-        );
+          );
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.auto_awesome_rounded, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Gemini AI đã tạo lịch trình $_days ngày cho bạn!',
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.auto_awesome_rounded, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Gemini AI đã tạo lịch trình $_days ngày cho bạn!',
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              backgroundColor: const Color(0xFF8E2DE2),
+              behavior: SnackBarBehavior.fixed,
             ),
-            backgroundColor: const Color(0xFF8E2DE2),
-            behavior: SnackBarBehavior.fixed,
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
       debugPrint('AI Generation error: $e');
@@ -667,24 +669,26 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               _creationProgress = 1.0;
               _activeStepIndex = 3;
             });
-            await Future.delayed(const Duration(milliseconds: 600));
-            _progressTimer?.cancel();
-            setState(() => _isCreating = false);
+            await Future.delayed(const Duration(milliseconds: 400));
 
             final updatedResult =
                 await DatabaseService().fetchItineraryById(itineraryId) ?? result;
 
-            Navigator.of(context).pop();
+            _progressTimer?.cancel();
 
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => TripOverviewScreen(
-                  itinerary: updatedResult!,
-                  initialTabIndex: 1,
+            if (mounted) {
+              Navigator.of(context).pop();
+
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => TripOverviewScreen(
+                    itinerary: updatedResult!,
+                    initialTabIndex: 1,
+                  ),
                 ),
-              ),
-            );
-            return;
+              );
+              return;
+            }
           }
         } catch (fallbackErr) {
           debugPrint('Fallback auto-populate error: $fallbackErr');
@@ -692,6 +696,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       }
 
       if (mounted) {
+        _progressTimer?.cancel();
         setState(() => _isCreating = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -809,9 +814,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         totalBudgetVND: budgetInVND,
       );
 
-      int placesPerDay = 3;
-      if (paceStr.contains('Thong thả')) placesPerDay = 2;
-      if (paceStr.contains('Dày đặc')) placesPerDay = 5;
+      int placesPerDay = 5;
+      if (paceStr.contains('Thong thả')) placesPerDay = 4;
+      if (paceStr.contains('Dày đặc')) placesPerDay = 6;
 
       final int totalNeeded = days * placesPerDay;
 
@@ -1890,13 +1895,13 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       case 1:
         return 'Ngày khởi hành';
       case 2:
-        return 'Chủ đề chuyến đi';
-      case 3:
         return 'Nhịp độ chuyến đi';
+      case 3:
+        return 'Dự kiến ngân sách';
       case 4:
         return 'Bạn đồng hành';
       case 5:
-        return 'Dự kiến ngân sách';
+        return 'Danh mục chuyến đi';
       case 6:
         return 'Yêu cầu riêng cho AI';
       default:
@@ -2082,10 +2087,10 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                   children: [
                     _buildStep0TripNameAndDestination(),
                     _buildStep1Dates(),
-                    _buildStep2Categories(),
                     _buildStep3Pace(),
-                    _buildStep4Companions(),
                     _buildStep5Budget(),
+                    _buildStep4Companions(),
+                    _buildStep2Categories(),
                     _buildStep6CustomRequest(),
                   ],
 
@@ -3096,7 +3101,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
             ).createShader(bounds),
             child: const Text(
-              'Sở thích chuyến đi',
+              'Danh mục chuyến đi',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w800,
@@ -3115,72 +3120,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           ),
           const SizedBox(height: 20),
 
-          // Feature Card: Top Rated Attractions Filter (⭐ 4.0+)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [_aiPurple.withOpacity(0.08), const Color(0xFFEFF6FF)],
-              ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: _aiPurple.withOpacity(0.25),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: _aiPurple.withOpacity(0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: Colors.black12, blurRadius: 6),
-                    ],
-                  ),
-                  child: const Text('⭐', style: TextStyle(fontSize: 20)),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Địa điểm hàng đầu (⭐ 4.0+)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: _aiPurple,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Ưu tiên gợi ý các điểm tham quan được đánh giá cao nhất',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: _includeTopAttractions,
-                  activeColor: _aiPurple,
-                  onChanged: (val) {
-                    setState(() {
-                      _includeTopAttractions = val;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
+
 
           const SizedBox(height: 24),
           Text(
@@ -3761,10 +3701,20 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
             children: [
               Expanded(
                 child: ChoiceChip(
-                  label: const Center(child: Text('Mức chọn sẵn')),
+                  label: Center(
+                    child: Text(
+                      'Mức chọn sẵn',
+                      style: TextStyle(
+                        fontFamily: 'SDK_SC_Web-Heavy',
+                        color: !_useCustomBudget ? Colors.white : Colors.black87,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                   selected: !_useCustomBudget,
                   selectedColor: _aiPurple,
                   labelStyle: TextStyle(
+                    fontFamily: 'SDK_SC_Web-Heavy',
                     color: !_useCustomBudget ? Colors.white : Colors.black87,
                     fontWeight: FontWeight.w700,
                   ),
@@ -3776,10 +3726,20 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               const SizedBox(width: 12),
               Expanded(
                 child: ChoiceChip(
-                  label: const Center(child: Text('Tự nhập số tiền')),
+                  label: Center(
+                    child: Text(
+                      'Tự nhập số tiền',
+                      style: TextStyle(
+                        fontFamily: 'SDK_SC_Web-Heavy',
+                        color: _useCustomBudget ? Colors.white : Colors.black87,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                   selected: _useCustomBudget,
                   selectedColor: _aiPurple,
                   labelStyle: TextStyle(
+                    fontFamily: 'SDK_SC_Web-Heavy',
                     color: _useCustomBudget ? Colors.white : Colors.black87,
                     fontWeight: FontWeight.w700,
                   ),

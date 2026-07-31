@@ -7800,8 +7800,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final String image = place['image'] ?? '';
 
     String? extraInfo;
-    if (place['openingHours'] != null) {
-      extraInfo = TimeUtils.getOpeningHoursText(place['openingHours']);
+    if (detail['startTime'] != null && detail['endTime'] != null) {
+      extraInfo = '${detail['startTime']} - ${detail['endTime']}';
     }
 
     return VisibilityDetector(
@@ -10190,11 +10190,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           final name = place['name'] ?? '';
 
           String? extraInfo;
-          if (name.toLowerCase().contains('ueno') ||
+          if (detail['startTime'] != null && detail['endTime'] != null) {
+            extraInfo = '${detail['startTime']} - ${detail['endTime']}';
+          } else if (name.toLowerCase().contains('ueno') ||
               name.toLowerCase().contains('sở thú ueno')) {
             extraInfo = 'Đóng cửa T2';
-          } else if (place['openingHours'] != null) {
-            extraInfo = TimeUtils.getOpeningHoursText(place['openingHours']);
           }
 
           final card = VisibilityDetector(
@@ -10724,17 +10724,45 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             return Padding(
               padding: const EdgeInsets.only(right: 8.0),
               child: GestureDetector(
-                onTap: () {
+                onTap: () async {
                   setState(() {
                     _activeDayIndex = index;
+                    _dayCollapsed[index] = false; // Auto-expand day if collapsed
                   });
-                  final key = _dayKeys[index];
-                  if (key != null && key.currentContext != null) {
-                    Scrollable.ensureVisible(
-                      key.currentContext!,
-                      duration: const Duration(milliseconds: 300),
+
+                  if (_itineraryScrollController.hasClients) {
+                    // Calculate exact cumulative height offset based on preceding days & place counts
+                    double calculatedOffset = 0.0;
+                    for (int k = 0; k < index; k++) {
+                      final placesCount = _details.where((d) => d['day'] == (k + 1)).length;
+                      final isCollapsed = _dayCollapsed[k] == true;
+                      if (isCollapsed) {
+                        calculatedOffset += 90.0;
+                      } else {
+                        calculatedOffset += 110.0 + (placesCount * 260.0);
+                      }
+                    }
+
+                    final double maxExtent =
+                        _itineraryScrollController.position.maxScrollExtent;
+                    final double targetOffset = calculatedOffset.clamp(0.0, maxExtent);
+
+                    await _itineraryScrollController.animateTo(
+                      targetOffset,
+                      duration: const Duration(milliseconds: 350),
                       curve: Curves.easeInOut,
                     );
+
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      final updatedKey = _dayKeys[index];
+                      if (updatedKey?.currentContext != null) {
+                        Scrollable.ensureVisible(
+                          updatedKey!.currentContext!,
+                          duration: const Duration(milliseconds: 150),
+                          curve: Curves.easeInOut,
+                        );
+                      }
+                    });
                   }
                 },
                 child: Container(

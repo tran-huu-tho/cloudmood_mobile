@@ -2275,7 +2275,7 @@ class _CreateItineraryWizardSheetState
               colors: [Color(0xFF1A56DB), Color(0xFF0EA5E9)],
             ).createShader(bounds),
             child: const Text(
-              'Sở thích chuyến đi',
+              'Danh mục chuyến đi',
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w800,
@@ -2294,75 +2294,7 @@ class _CreateItineraryWizardSheetState
           ),
           const SizedBox(height: 20),
 
-          // Feature Card: Top Rated Attractions Filter
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppTheme.primary.withOpacity(0.08),
-                  const Color(0xFFEFF6FF),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppTheme.primary.withOpacity(0.25), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withOpacity(0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: Colors.black12, blurRadius: 6),
-                    ],
-                  ),
-                  child: const Text('⭐', style: TextStyle(fontSize: 20)),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Địa điểm hàng đầu (⭐ 4.0+)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Ưu tiên gợi ý các điểm tham quan được đánh giá cao nhất',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: _includeTopAttractions,
-                  activeColor: AppTheme.primary,
-                  onChanged: (val) {
-                    setState(() {
-                      _includeTopAttractions = val;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
+
 
           const SizedBox(height: 24),
           Text(

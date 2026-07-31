@@ -1724,75 +1724,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
           ),
           const SizedBox(height: 20),
 
-          // Feature Card: Top Rated Attractions Filter
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  guidePrimary.withOpacity(0.08),
-                  const Color(0xFFFFFBEB),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: guidePrimary.withOpacity(0.25), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: guidePrimary.withOpacity(0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: Colors.black12, blurRadius: 6),
-                    ],
-                  ),
-                  child: const Text('⭐', style: TextStyle(fontSize: 20)),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Địa điểm hàng đầu (⭐ 4.0+)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: guidePrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Ưu tiên gợi ý các điểm tham quan được đánh giá cao nhất',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: _includeTopAttractions,
-                  activeColor: guidePrimary,
-                  onChanged: (val) {
-                    setState(() {
-                      _includeTopAttractions = val;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
+
 
           const SizedBox(height: 24),
           Text(
