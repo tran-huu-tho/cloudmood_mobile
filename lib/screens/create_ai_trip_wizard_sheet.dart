@@ -563,6 +563,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       // ── STEP C: Save AI itinerary details into DB ──────────────────────────
       int totalAdded = 0;
       final List<dynamic> aiDays = aiPlan['days'] ?? [];
+      final List<Map<String, dynamic>> bulkDetails = [];
+
       for (final dayData in aiDays) {
         final int dayNumber = (dayData['dayNumber'] ?? 1) as int;
         final String dayTitle = (dayData['dayTitle'] ?? '').toString();
@@ -579,17 +581,23 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
           final timeSlot = _calculatePlaceTimeSlot(pi, places.length);
 
-          await DatabaseService().addPlaceToItinerary(
-            itineraryId: itineraryId,
-            placeId: placeId,
-            day: dayNumber,
-            sortOrder: pi,
-            noteText: note.isNotEmpty ? note : dayTitle,
-            startTime: timeSlot['startTime'],
-            endTime: timeSlot['endTime'],
-          );
-          totalAdded++;
+          bulkDetails.add({
+            'placeId': placeId,
+            'day': dayNumber,
+            'sortOrder': pi,
+            'noteText': note.isNotEmpty ? note : dayTitle,
+            'startTime': timeSlot['startTime'],
+            'endTime': timeSlot['endTime'],
+          });
         }
+      }
+
+      if (bulkDetails.isNotEmpty) {
+        final ok = await DatabaseService().addBulkPlacesToItinerary(
+          itineraryId: itineraryId,
+          details: bulkDetails,
+        );
+        if (ok) totalAdded = bulkDetails.length;
       }
 
       if (totalAdded == 0) {
@@ -859,6 +867,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           );
 
       final Set<int> addedPlaceIds = {};
+      final List<Map<String, dynamic>> bulkDetails = [];
+
       for (int day = 1; day <= days; day++) {
         final dayPlaces = optimizedPlan[day] ?? [];
         int placeIndexForDay = 0;
@@ -879,18 +889,24 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               totalPlacesForDay: dayPlaces.length,
             );
 
-            await DatabaseService().addPlaceToItinerary(
-              itineraryId: itineraryId,
-              placeId: placeId,
-              day: day,
-              sortOrder: placeIndexForDay + 1,
-              noteText: inspiringNote,
-              startTime: timeSlot['startTime'],
-              endTime: timeSlot['endTime'],
-            );
+            bulkDetails.add({
+              'placeId': placeId,
+              'day': day,
+              'sortOrder': placeIndexForDay + 1,
+              'noteText': inspiringNote,
+              'startTime': timeSlot['startTime'],
+              'endTime': timeSlot['endTime'],
+            });
             placeIndexForDay++;
           }
         }
+      }
+
+      if (bulkDetails.isNotEmpty) {
+        await DatabaseService().addBulkPlacesToItinerary(
+          itineraryId: itineraryId,
+          details: bulkDetails,
+        );
       }
     } catch (e) {
       debugPrint('Error auto populating AI places: $e');

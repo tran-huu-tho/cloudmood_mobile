@@ -511,6 +511,28 @@ class DatabaseService {
     }
   }
 
+  /// Adds multiple places to an itinerary in a single batch request
+  Future<bool> addBulkPlacesToItinerary({
+    required int itineraryId,
+    required List<Map<String, dynamic>> details,
+  }) async {
+    if (details.isEmpty) return true;
+    try {
+      final response = await ApiClient.post(
+        '/itineraries/$itineraryId/bulk-details',
+        body: {'details': details},
+      );
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        refreshTrigger.value++;
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error in addBulkPlacesToItinerary: $e');
+      return false;
+    }
+  }
+
   /// Deletes a place from an itinerary's details
   Future<bool> deletePlaceFromItinerary(int detailId) async {
     try {
