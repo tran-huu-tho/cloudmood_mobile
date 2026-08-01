@@ -10409,8 +10409,8 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<Map<String, dynamic>> _templates = [];
-  // Selected category ids
-  final Set<int> _selectedCategories = {};
+  // Selected item names
+  final Set<String> _selectedItems = {};
   // Expanded category ids
   final Set<int> _expandedCategories = {};
   bool _loading = true;
@@ -10439,17 +10439,7 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
   }
 
   void _addSelected() {
-    final List<String> newItems = [];
-    for (final cat in _templates) {
-      final catId = cat['id'] as int;
-      if (_selectedCategories.contains(catId)) {
-        final items = cat['items'] as List? ?? [];
-        for (final item in items) {
-          newItems.add(item['name'] as String);
-        }
-      }
-    }
-    widget.onAddItems(newItems);
+    widget.onAddItems(_selectedItems.toList());
     Navigator.pop(context);
   }
 
@@ -10575,7 +10565,9 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
         final catId = cat['id'] as int;
         final catName = cat['name'] as String;
         final items = cat['items'] as List? ?? [];
-        final isSelected = _selectedCategories.contains(catId);
+        final allItemNames = items.map((it) => it['name'] as String).toList();
+        final bool isSelected = allItemNames.isNotEmpty &&
+            allItemNames.every((name) => _selectedItems.contains(name));
         final isExpanded = _expandedCategories.contains(catId);
 
         return Column(
@@ -10618,32 +10610,22 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
                       onTap: () {
                         setState(() {
                           if (isSelected) {
-                            _selectedCategories.remove(catId);
+                            for (var name in allItemNames) {
+                              _selectedItems.remove(name);
+                            }
                           } else {
-                            _selectedCategories.add(catId);
+                            for (var name in allItemNames) {
+                              _selectedItems.add(name);
+                            }
                           }
                         });
                       },
-                      child: Container(
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: isSelected ? AppTheme.primary : Colors.grey,
-                            width: isSelected ? 0 : 1.5,
-                          ),
-                          color: isSelected
-                              ? AppTheme.primary
-                              : Colors.transparent,
-                        ),
-                        child: isSelected
-                            ? const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 16,
-                              )
-                            : null,
+                      child: Icon(
+                        isSelected
+                            ? Icons.check_box_rounded
+                            : Icons.check_box_outline_blank_rounded,
+                        color: isSelected ? AppTheme.primary : const Color(0xFFCBD5E1),
+                        size: 22,
                       ),
                     ),
                   ],
@@ -10653,24 +10635,46 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
             if (isExpanded)
               ...items.map((item) {
                 final itemName = item['name'] as String;
-                return Padding(
-                  padding: const EdgeInsets.only(
-                    left: 48,
-                    right: 20,
-                    bottom: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.circle, size: 6, color: Colors.grey),
-                      const SizedBox(width: 10),
-                      Text(
-                        itemName,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.black87,
+                final bool isItemSelfSelected = _selectedItems.contains(itemName);
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      if (isItemSelfSelected) {
+                        _selectedItems.remove(itemName);
+                      } else {
+                        _selectedItems.add(itemName);
+                      }
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      left: 48,
+                      right: 20,
+                      top: 6,
+                      bottom: 6,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isItemSelfSelected
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          color: isItemSelfSelected ? AppTheme.primary : const Color(0xFFCBD5E1),
+                          size: 18,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            itemName,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
+                            softWrap: true,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }),

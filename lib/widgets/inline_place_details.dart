@@ -24,6 +24,7 @@ class InlinePlaceWhiteCardExtension extends StatefulWidget {
   final VoidCallback? onShowEmojiPicker;
   final VoidCallback? onOpenExpenseSheet;
   final bool isReadOnly;
+  final bool hideNote;
 
   const InlinePlaceWhiteCardExtension({
     super.key,
@@ -33,6 +34,7 @@ class InlinePlaceWhiteCardExtension extends StatefulWidget {
     this.onShowEmojiPicker,
     this.onOpenExpenseSheet,
     this.isReadOnly = false,
+    this.hideNote = false,
   });
 
   @override
@@ -281,34 +283,34 @@ class _InlinePlaceWhiteCardExtensionState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 12),
-        // Note field
-        TextField(
-          controller: _noteController,
-          focusNode: _noteFocus,
-          onChanged: _onNoteChanged,
-          readOnly: widget.isReadOnly,
-          enabled: !widget.isReadOnly,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: AppTheme.darkText),
-          decoration: InputDecoration(
-            hintText: 'Thêm ghi chú, liên kết, v.v.',
-            hintStyle: Theme.of(
+        // Note field (only shown when not managed externally)
+        if (!widget.hideNote)
+          TextField(
+            controller: _noteController,
+            focusNode: _noteFocus,
+            onChanged: _onNoteChanged,
+            readOnly: widget.isReadOnly,
+            enabled: !widget.isReadOnly,
+            style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(color: AppTheme.subtitleText),
-            border: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            errorBorder: InputBorder.none,
-            disabledBorder: InputBorder.none,
-            filled: false,
-            fillColor: Colors.transparent,
-            isDense: true,
-            contentPadding: EdgeInsets.zero,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.darkText),
+            decoration: InputDecoration(
+              hintText: 'Thêm ghi chú, liên kết, v.v.',
+              hintStyle: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.subtitleText),
+              border: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              filled: false,
+              fillColor: Colors.transparent,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
+        if (!widget.hideNote) const SizedBox(height: 12),
         // Action row
         Wrap(
           spacing: 16,
