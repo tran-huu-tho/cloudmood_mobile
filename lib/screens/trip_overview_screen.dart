@@ -130,6 +130,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   bool _isLoading = true;
   List<Map<String, dynamic>> _allPlaces = [];
   List<Map<String, dynamic>> _cachedProminentPlaces = [];
+  static List<Map<String, dynamic>> _cachedExplorePosts = [];
+  static String? _cachedDestination;
   bool _isLoadingPlaces = false;
   List<Map<String, dynamic>> _details = [];
   List<Map<String, dynamic>> _savedPlaces = [];
@@ -138,6 +140,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   List<Map<String, dynamic>> _filteredMapPlaces = [];
   List<Map<String, dynamic>> _explorePosts = [];
   bool _isLoadingExplore = false;
+  bool _hasFetchedExplore = false;
 
   // Pagination for web images
   int _webImagesPage = 1;
@@ -323,6 +326,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       vsync: this,
       initialIndex: targetInitialIndex,
     );
+    final String dest = _itineraryData['destination'] ?? '';
+    if (_cachedDestination == dest) {
+      _explorePosts = _cachedExplorePosts;
+      _hasFetchedExplore = true;
+    } else {
+      _explorePosts = [];
+      _hasFetchedExplore = false;
+    }
+
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return;
       final int exploreIdx = (_itineraryData['isGuide'] == true) ? 1 : 3;
@@ -330,9 +342,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         _fetchExplorePosts();
       }
     });
-    if (targetInitialIndex == (isGuide ? 1 : 3)) {
-      _fetchExplorePosts();
-    }
+    _fetchExplorePosts();
 
     // Initialize details and savedPlaces from passed itinerary if available
     final rawDetails = List<Map<String, dynamic>>.from(
@@ -862,17 +872,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     setState(() => _isLoadingExplore = true);
     final String dest = _itineraryData['destination'] ?? '';
     try {
-      final posts = await DatabaseService().fetchExplorePosts(destination: dest);
+      final posts = await DatabaseService().fetchExplorePosts(
+        destination: dest,
+      );
       if (mounted) {
         setState(() {
           _explorePosts = posts;
+          _cachedExplorePosts = posts;
+          _cachedDestination = dest;
         });
       }
     } catch (e) {
       debugPrint('Error fetching explore posts: $e');
     } finally {
       if (mounted) {
-        setState(() => _isLoadingExplore = false);
+        setState(() {
+          _isLoadingExplore = false;
+          _hasFetchedExplore = true;
+        });
       }
     }
   }
@@ -8838,10 +8855,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                 Flexible(
                                                   child: Text(
                                                     (extraInfo != null &&
-                                                            extraInfo.isNotEmpty)
+                                                            extraInfo
+                                                                .isNotEmpty)
                                                         ? extraInfo
                                                         : 'Chọn thời gian ghé thăm',
-                                                    overflow: TextOverflow.ellipsis,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                     style: TextStyle(
                                                       color:
                                                           (extraInfo != null &&
@@ -8849,7 +8868,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                                   .isNotEmpty)
                                                           ? AppTheme.primary
                                                           : Colors.amber[900],
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       fontSize: 11,
                                                     ),
                                                   ),
@@ -9132,7 +9152,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.black : const Color(0xFF1A56DB)).withValues(alpha: 0.08),
+            color: (isDark ? Colors.black : const Color(0xFF1A56DB)).withValues(
+              alpha: 0.08,
+            ),
             blurRadius: 15,
             offset: const Offset(0, 6),
           ),
@@ -9152,7 +9174,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     children: [
                       Icon(
                         Icons.near_me_rounded,
-                        color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
+                        color: isDark
+                            ? const Color(0xFF60A5FA)
+                            : const Color(0xFF2563EB),
                         size: 18,
                       ),
                       const SizedBox(width: 8),
@@ -9161,19 +9185,28 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF1E40AF),
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF1E40AF),
                           letterSpacing: 1.0,
                         ),
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFEFF6FF),
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isDark ? const Color(0xFF475569) : const Color(0xFFDBEAFE),
+                        color: isDark
+                            ? const Color(0xFF475569)
+                            : const Color(0xFFDBEAFE),
                         width: 1,
                       ),
                     ),
@@ -9182,7 +9215,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1D4ED8),
+                        color: isDark
+                            ? const Color(0xFFE2E8F0)
+                            : const Color(0xFF1D4ED8),
                       ),
                     ),
                   ),
@@ -9203,7 +9238,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         errorBuilder: (_, _, _) => Container(
                           width: 72,
                           height: 72,
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
                           child: Icon(
                             Icons.image_not_supported_outlined,
                             color: isDark ? Colors.grey[500] : Colors.grey[400],
@@ -9217,7 +9254,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -9247,7 +9286,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             children: [
                               Icon(
                                 Icons.access_time_rounded,
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF4B5563),
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF4B5563),
                                 size: 13,
                               ),
                               const SizedBox(width: 4),
@@ -9256,7 +9297,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF4B5563),
+                                  color: isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : const Color(0xFF4B5563),
                                 ),
                               ),
                             ],
@@ -9266,7 +9309,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             'Chưa đặt giờ',
                             style: TextStyle(
                               fontSize: 11,
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                              color: isDark
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
                               fontStyle: FontStyle.italic,
                             ),
                           ),
@@ -9297,19 +9342,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                         side: BorderSide(
-                          color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                          color: isDark
+                              ? const Color(0xFF475569)
+                              : const Color(0xFFCBD5E1),
                         ),
-                        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        backgroundColor: isDark
+                            ? const Color(0xFF1E293B)
+                            : Colors.white,
                         foregroundColor: AppTheme.darkText,
                         elevation: 0,
                       ),
                       icon: const Icon(Icons.map_outlined, size: 16),
                       label: const Text(
                         'Xem bản đồ',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       onPressed: () {
-                        if (place['latitude'] != null && place['longitude'] != null) {
+                        if (place['latitude'] != null &&
+                            place['longitude'] != null) {
                           final lat = (place['latitude'] as num).toDouble();
                           final lon = (place['longitude'] as num).toDouble();
                           setState(() {
@@ -9329,14 +9382,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        backgroundColor: isDark ? const Color(0xFF059669) : const Color(0xFF10B981),
+                        backgroundColor: isDark
+                            ? const Color(0xFF059669)
+                            : const Color(0xFF10B981),
                         foregroundColor: Colors.white,
                         elevation: 0,
                       ),
-                      icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                      icon: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 16,
+                      ),
                       label: const Text(
                         'Đã ghé thăm',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       onPressed: () => _toggleVisitedDetail(detailId, detail),
                     ),
@@ -9389,10 +9450,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               Text(
                 'Bạn đã hoàn thành tất cả địa điểm trong lịch trình hoặc chưa thêm địa điểm nào.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.subtitleText,
-                ),
+                style: TextStyle(fontSize: 14, color: AppTheme.subtitleText),
               ),
             ],
           ),
@@ -9402,11 +9460,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      child: Column(
-        children: [
-          _buildNextLocationCard(nextLoc),
-        ],
-      ),
+      child: Column(children: [_buildNextLocationCard(nextLoc)]),
     );
   }
 
@@ -10825,10 +10879,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         });
       },
       proxyDecorator: (Widget child, int index, Animation<double> animation) {
-        return Material(
-          type: MaterialType.transparency,
-          child: child,
-        );
+        return Material(type: MaterialType.transparency, child: child);
       },
       onReorder: (oldIndex, newIndex) async {
         if (!_checkCanEdit()) return;
@@ -11979,7 +12030,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   // ================= TAB 3: KHÁM PHÁ =================
   Widget _buildExploreTab() {
-    if (_isLoadingExplore) {
+    if ((_isLoadingExplore || !_hasFetchedExplore) && _explorePosts.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: AppTheme.primary),
       );
@@ -12101,7 +12152,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ),
 
         // Posts List
-        if (_explorePosts.isEmpty)
+        if (_explorePosts.isEmpty && _hasFetchedExplore)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(40.0),
