@@ -580,14 +580,20 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           if (placeId <= 0) continue;
 
           final timeSlot = _calculatePlaceTimeSlot(pi, places.length);
+          final String startTime = (placeEntry['startTime'] != null && placeEntry['startTime'].toString().contains(':'))
+              ? placeEntry['startTime'].toString()
+              : (timeSlot['startTime'] ?? '07:00');
+          final String endTime = (placeEntry['endTime'] != null && placeEntry['endTime'].toString().contains(':'))
+              ? placeEntry['endTime'].toString()
+              : (timeSlot['endTime'] ?? '08:30');
 
           bulkDetails.add({
             'placeId': placeId,
             'day': dayNumber,
             'sortOrder': pi,
             'noteText': note.isNotEmpty ? note : dayTitle,
-            'startTime': timeSlot['startTime'],
-            'endTime': timeSlot['endTime'],
+            'startTime': startTime,
+            'endTime': endTime,
           });
         }
       }
@@ -1302,48 +1308,15 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     int placeIndex,
     int totalPlacesForDay,
   ) {
-    if (totalPlacesForDay <= 2) {
-      final slots = [
-        {'startTime': '08:30', 'endTime': '11:00'},
-        {'startTime': '14:30', 'endTime': '17:30'},
-      ];
-      return slots[placeIndex % slots.length];
-    } else if (totalPlacesForDay == 3) {
-      final slots = [
-        {'startTime': '08:00', 'endTime': '10:30'},
-        {'startTime': '11:30', 'endTime': '14:00'},
-        {'startTime': '15:30', 'endTime': '18:30'},
-      ];
-      return slots[placeIndex % slots.length];
-    } else if (totalPlacesForDay == 4) {
-      final slots = [
-        {'startTime': '08:00', 'endTime': '10:00'},
-        {'startTime': '11:00', 'endTime': '13:30'},
-        {'startTime': '14:30', 'endTime': '17:00'},
-        {'startTime': '18:30', 'endTime': '21:00'},
-      ];
-      return slots[placeIndex % slots.length];
-    } else if (totalPlacesForDay == 5) {
-      final slots = [
-        {'startTime': '07:30', 'endTime': '09:30'},
-        {'startTime': '10:00', 'endTime': '12:00'},
-        {'startTime': '12:30', 'endTime': '14:30'},
-        {'startTime': '15:00', 'endTime': '17:30'},
-        {'startTime': '18:30', 'endTime': '21:00'},
-      ];
-      return slots[placeIndex % slots.length];
-    } else {
-      final slots = [
-        {'startTime': '07:00', 'endTime': '08:30'},
-        {'startTime': '09:00', 'endTime': '10:30'},
-        {'startTime': '11:00', 'endTime': '13:00'},
-        {'startTime': '13:30', 'endTime': '15:30'},
-        {'startTime': '16:00', 'endTime': '18:30'},
-        {'startTime': '19:00', 'endTime': '21:30'},
-        {'startTime': '21:30', 'endTime': '22:30'},
-      ];
-      return slots[placeIndex % slots.length];
-    }
+    final slots = [
+      {'startTime': '07:00', 'endTime': '08:30'}, // Cữ 1: Ăn sáng & Cà phê
+      {'startTime': '09:30', 'endTime': '11:00'}, // Cữ 2: Tham quan chính
+      {'startTime': '11:30', 'endTime': '12:30'}, // Cữ 3: Ăn trưa & Nghỉ ngơi
+      {'startTime': '13:30', 'endTime': '15:00'}, // Cữ 4: Vui chơi / Check-in KS
+      {'startTime': '16:00', 'endTime': '17:30'}, // Cữ 5: Ăn chiều hoặc tối
+      {'startTime': '18:30', 'endTime': '22:00'}, // Cữ 6: Tham quan & Vui chơi tối
+    ];
+    return slots[placeIndex % slots.length];
   }
 
   String _generateInspiringAINote({
@@ -1352,117 +1325,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     required int placeIndex,
     required int totalPlacesForDay,
   }) {
-    final placeName = (place['name'] ?? '').toString().trim();
-    final description = (place['description'] ?? '').toString().trim();
-    final catObj = place['category'];
-    final catName = (catObj != null && catObj['name'] != null)
-        ? catObj['name'].toString().toLowerCase()
-        : (place['categoryName'] ?? '').toString().toLowerCase();
-
-    bool isMorning = placeIndex == 0;
-    bool isNoon = (placeIndex == 1 && totalPlacesForDay >= 3) || (placeIndex == 2 && totalPlacesForDay >= 5);
-    bool isEvening = placeIndex == totalPlacesForDay - 1;
-
-    // ignore: unused_local_variable
-    String icon = '';
-    String activityText = '';
-
-    // Extract core description highlight if available in DB
-    if (description.isNotEmpty &&
-        description.length > 10 &&
-        !description.toLowerCase().contains('không có mô tả') &&
-        !description.toLowerCase().contains('đang cập nhật')) {
-      final cleanDesc = description.replaceAll(RegExp(r'\s+'), ' ').trim();
-      final sentences = cleanDesc.split(RegExp(r'[.!?]')).where((s) => s.trim().isNotEmpty).toList();
-      if (sentences.isNotEmpty) {
-        String firstSentence = sentences.first.trim();
-        if (firstSentence.length > 85) {
-          firstSentence = '${firstSentence.substring(0, 82)}...';
-        }
-        activityText = firstSentence;
-      }
-    }
-
-    if (catName.contains('cà phê') || catName.contains('cafe')) {
-      icon = '☕';
-      if (activityText.isEmpty) {
-        if (isMorning) {
-          activityText = 'Thưởng thức tách cà phê thơm ngon, nạp năng lượng rạng rỡ chào Ngày $day.';
-        } else if (isEvening) {
-          activityText = 'Thư giãn trong không gian ấm cúng, ngắm cảnh phố phường lên đèn về đêm.';
-        } else {
-          activityText = 'Điểm dừng chân thư thái để nhâm nhi thức uống chuẩn vị và check-in góc view cực xinh.';
-        }
-      }
-    } else if (catName.contains('nhà hàng') ||
-        catName.contains('quán ăn') ||
-        catName.contains('ẩm thực')) {
-      icon = '🍜';
-      if (activityText.isEmpty) {
-        if (isNoon) {
-          activityText = 'Thưởng thức bữa trưa đậm đà hương vị đặc sản địa phương tại $placeName.';
-        } else if (isEvening) {
-          activityText = 'Dùng bữa tối ấm cúng, trải nghiệm nét ẩm thực độc đáo khó quên.';
-        } else {
-          activityText = 'Khám phá thiên đường ẩm thực phong phú với các món ăn hấp dẫn không thể bỏ qua.';
-        }
-      }
-    } else if (catName.contains('bảo tàng') ||
-        catName.contains('văn hóa') ||
-        catName.contains('lịch sử') ||
-        catName.contains('di tích')) {
-      icon = '🏛️';
-      if (activityText.isEmpty) {
-        activityText = 'Tìm hiểu kiến trúc cổ kính, lắng nghe những câu chuyện lịch sử văn hóa lâu đời.';
-      }
-    } else if (catName.contains('công viên') ||
-        catName.contains('thiên nhiên') ||
-        catName.contains('sinh thái')) {
-      icon = '🌿';
-      if (activityText.isEmpty) {
-        activityText = 'Dạo bước trong không gian xanh mát, tận hưởng không khí trong lành hòa mình cùng thiên nhiên.';
-      }
-    } else if (catName.contains('nightlife') ||
-        catName.contains('bar') ||
-        catName.contains('đêm') ||
-        catName.contains('chợ đêm')) {
-      icon = '🌃';
-      if (activityText.isEmpty) {
-        activityText = 'Hòa mình vào nhịp sống đêm sôi động, mua sắm và ăn vặt thả ga.';
-      }
-    } else if (catName.contains('khách sạn') ||
-        catName.contains('hotel') ||
-        catName.contains('resort')) {
-      icon = '🏨';
-      if (activityText.isEmpty) {
-        activityText = 'Điểm dừng chân nghỉ ngơi tiện nghi, giúp bạn phục hồi sức khỏe cho hành trình tiếp theo.';
-      }
-    } else if (catName.contains('check-in') ||
-        catName.contains('sống ảo') ||
-        catName.contains('thắng cảnh')) {
-      icon = '📸';
-      if (activityText.isEmpty) {
-        activityText = 'Tọa độ check-in siêu hot với vô vàn góc bấm máy đỉnh cao lưu giữ kỉ niệm đẹp.';
-      }
-    } else {
-      if (activityText.isEmpty) {
-        if (isMorning) {
-          icon = '🌅';
-          activityText = 'Điểm tham quan rạng rỡ mở màn cho chuỗi trải nghiệm tuyệt vời Ngày $day.';
-        } else if (isNoon) {
-          icon = '☀️';
-          activityText = 'Khám phá điểm đến thú vị, nâng tầm trải nghiệm cho chuyến đi.';
-        } else if (isEvening) {
-          icon = '🌆';
-          activityText = 'Tận hưởng khoảnh khắc thư thái chiều tối tại $placeName.';
-        } else {
-          icon = '✨';
-          activityText = 'Điểm đến hấp dẫn được Trợ lý AI CloudMood gợi ý riêng cho hành trình của bạn.';
-        }
-      }
-    }
-
-    return activityText;
+    return '';
   }
 
   void _showAddCompanionDialog() {

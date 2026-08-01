@@ -13,6 +13,9 @@ import '../widgets/avatar_image.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'create_itinerary_wizard_sheet.dart';
+import 'create_ai_trip_wizard_sheet.dart';
+import 'create_guide_wizard_sheet.dart';
+import 'home_screen.dart';
 import 'trip_overview_screen.dart';
 import '../widgets/place_detail_bottom_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -861,6 +864,31 @@ class _ProfileDashboardState extends State<ProfileDashboard>
   }
 
   void _showCreateItinerarySheet(BuildContext context) {
+    Navigator.of(context)
+        .push(
+          PageRouteBuilder(
+            opaque: false,
+            barrierDismissible: true,
+            pageBuilder: (context, _, _) =>
+                const CreateMenuOverlay(animationValue: 1.0),
+            transitionsBuilder: (context, animation, _, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          ),
+        )
+        .then((result) {
+          if (!mounted || result == null) return;
+          if (result == 'create_itinerary') {
+            _openCreateItinerarySheet();
+          } else if (result == 'ai_chat') {
+            _openCreateAITripSheet();
+          } else if (result == 'create_guide') {
+            _openCreateGuideSheet();
+          }
+        });
+  }
+
+  void _openCreateItinerarySheet() {
     showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
@@ -869,12 +897,44 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         return CreateItineraryWizardSheet(userId: widget.user.id);
       },
     ).then((result) {
-      if (result != null && context.mounted) {
+      if (result != null && mounted) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => TripOverviewScreen(itinerary: result),
           ),
         );
+        _loadData();
+      }
+    });
+  }
+
+  void _openCreateAITripSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const CreateAITripWizardSheet(),
+    ).then((_) {
+      if (mounted) _loadData();
+    });
+  }
+
+  void _openCreateGuideSheet() {
+    showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return CreateGuideWizardSheet(userId: widget.user.id);
+      },
+    ).then((result) {
+      if (result != null && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => TripOverviewScreen(itinerary: result),
+          ),
+        );
+        _loadData();
       }
     });
   }
