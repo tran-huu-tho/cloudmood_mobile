@@ -202,11 +202,26 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   final Set<String> _selectedSections = {};
   int? _focusedPlaceId;
   bool _isSheetHalf = false;
+  Color _filterHarshColor(Color c) {
+    final double r = c.r;
+    final double g = c.g;
+    final double b = c.b;
+    // Replace glaring neon cyan / bright teal with soft deep ocean blue
+    if ((g > 0.7 && b > 0.7 && r < 0.65) ||
+        (c.toARGB32() & 0x00FFFFFF) == 0x36E4C7 ||
+        (c.toARGB32() & 0x00FFFFFF) == 0x40E0D0 ||
+        (c.toARGB32() & 0x00FFFFFF) == 0x64FFDA ||
+        (c.toARGB32() & 0x00FFFFFF) == 0x1DE9B6) {
+      return const Color(0xFF0284C7);
+    }
+    return c;
+  }
+
   final List<Color> _availableColors = [
     const Color(0xFF16A34A), // Rich Green
-    const Color(0xFF0D9488), // Rich Teal
+    const Color(0xFF0284C7), // Rich Ocean Blue
     const Color(0xFF2563EB), // Royal Blue
-    const Color(0xFF0284C7), // Rich Sky Blue
+    const Color(0xFF0F766E), // Deep Teal
     const Color(0xFF7C3AED), // Rich Violet
     const Color(0xFFDB2777), // Rich Pink
     const Color(0xFFEA580C), // Rich Orange
@@ -425,14 +440,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       try {
         dayConfigs.forEach((k, v) {
           if (v is Map && v['color'] != null) {
-            _dayColors[int.parse(k)] = Color(int.parse(v['color'].toString()));
+            _dayColors[int.parse(k)] = _filterHarshColor(
+              Color(int.parse(v['color'].toString())),
+            );
           }
         });
       } catch (_) {}
     }
     for (int i = 0; i < numDays; i++) {
-      if (!_dayColors.containsKey(i)) {
-        _dayColors[i] = _availableColors[i % _availableColors.length];
+      if (!_dayColors.containsKey(i) ||
+          _dayColors[i] == const Color(0xFF40E0D0) ||
+          _dayColors[i] == const Color(0xFF36E4C7) ||
+          _dayColors[i] == const Color(0xFF64FFDA)) {
+        _dayColors[i] = _filterHarshColor(
+          _availableColors[i % _availableColors.length],
+        );
       }
     }
 
@@ -1349,7 +1371,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       try {
         dayConfigs.forEach((k, v) {
           if (v is Map && v['color'] != null) {
-            _dayColors[int.parse(k)] = Color(int.parse(v['color'].toString()));
+            _dayColors[int.parse(k)] = _filterHarshColor(
+              Color(int.parse(v['color'].toString())),
+            );
           }
         });
       } catch (e) {
@@ -1359,8 +1383,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     final int numDays = (_itineraryData['days'] as num?)?.toInt() ?? 1;
     for (int i = 0; i < numDays; i++) {
-      if (!_dayColors.containsKey(i)) {
-        _dayColors[i] = _availableColors[i % _availableColors.length];
+      if (!_dayColors.containsKey(i) ||
+          _dayColors[i] == const Color(0xFF40E0D0) ||
+          _dayColors[i] == const Color(0xFF36E4C7) ||
+          _dayColors[i] == const Color(0xFF64FFDA)) {
+        _dayColors[i] = _filterHarshColor(
+          _availableColors[i % _availableColors.length],
+        );
       }
     }
 
@@ -1979,6 +2008,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     bool isSavedPlace = false,
   }) async {
     if (!_checkCanEdit()) return;
+    if (_visitedDetailIds.contains(detailId)) {
+      _showPremiumNotification(
+        title: 'Địa điểm đã ghé thăm',
+        message: 'Không thể xóa địa điểm đã hoàn thành!',
+        icon: Icons.lock_rounded,
+        color: Colors.orange,
+      );
+      return;
+    }
     if (_deletingDetailIds.contains(detailId)) return;
     _deletingDetailIds.add(detailId);
 
@@ -1986,10 +2024,35 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final bool inSaved = _savedPlaces.any((p) => p['id'] == detailId);
     final bool inDetails = _details.any((d) => d['id'] == detailId);
 
+    int? affectedDay;
+    final itemToRemove = _details.firstWhere(
+      (d) => d['id'] == detailId,
+      orElse: () => {},
+    );
+    if (itemToRemove.isNotEmpty && itemToRemove['day'] != null) {
+      affectedDay = (itemToRemove['day'] as num).toInt();
+    }
+
     // OPTIMISTIC DELETE: Xóa khỏi giao diện ngay lập tức ở cả 2 danh sách (0ms)
     setState(() {
       _savedPlaces.removeWhere((p) => p['id'] == detailId);
       _details.removeWhere((d) => d['id'] == detailId);
+
+      if (affectedDay != null) {
+        final dayItems =
+            _details.where((d) => d['day'] == affectedDay).toList();
+        if (dayItems.isNotEmpty) {
+          final optimized = _optimizeDayTimeSlots(dayItems);
+          for (final item in optimized) {
+            final idx = _details.indexWhere((d) => d['id'] == item['id']);
+            if (idx != -1) {
+              _details[idx]['startTime'] = item['startTime'];
+              _details[idx]['endTime'] = item['endTime'];
+              _details[idx]['sortOrder'] = item['sortOrder'];
+            }
+          }
+        }
+      }
     });
 
     // Gom thông báo xóa bằng Debounce Timer để không sinh ra hàng loạt Overlay gây giật lag
@@ -1998,11 +2061,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     _deleteNotificationTimer = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       final msg = _deletedCountInBatch == 1
-          ? 'Đã xóa "$placeName" khỏi lịch trình.'
-          : 'Đã xóa $_deletedCountInBatch mục khỏi lịch trình.';
+          ? 'Đã xóa "$placeName" khỏi lịch trình và tự động cập nhật thời gian.'
+          : 'Đã xóa $_deletedCountInBatch mục và tự động cập nhật thời gian.';
       _deletedCountInBatch = 0;
       _showPremiumNotification(
-        title: 'Đã xóa',
+        title: 'Đã xóa & cập nhật thời gian',
         message: msg,
         icon: Icons.delete_sweep_outlined,
         color: Colors.redAccent,
@@ -2017,6 +2080,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         }
         if (inDetails || (!inSaved && !isSavedPlace)) {
           await DatabaseService().deletePlaceFromItinerary(detailId);
+          if (affectedDay != null) {
+            final dayItems =
+                _details.where((d) => d['day'] == affectedDay).toList();
+            for (final item in dayItems) {
+              if (item['id'] != null) {
+                await DatabaseService().updateItineraryDetail(
+                  item['id'] as int,
+                  {
+                    'startTime': item['startTime'],
+                    'endTime': item['endTime'],
+                    'sortOrder': item['sortOrder'],
+                  },
+                );
+              }
+            }
+          }
         }
       } catch (_) {
       } finally {
@@ -8177,10 +8256,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           final int humidity = (humidities[matchIndex] as num?)?.toInt() ?? 70;
           final int wind = ((winds[matchIndex] as num?)?.toDouble() ?? 10.0)
               .round();
-          final int rainProb = rainProbs != null && matchIndex < rainProbs.length
+          final int rainProb =
+              rainProbs != null && matchIndex < rainProbs.length
               ? (rainProbs[matchIndex] as num?)?.toInt() ?? 0
               : 0;
-          final double rainAmount = rainAmounts != null && matchIndex < rainAmounts.length
+          final double rainAmount =
+              rainAmounts != null && matchIndex < rainAmounts.length
               ? (rainAmounts[matchIndex] as num?)?.toDouble() ?? 0.0
               : 0.0;
 
@@ -8216,7 +8297,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             } else if (code == 3) {
               // Nhiều mây -> Màu xám mây râm mát
               icon = Icons.wb_cloudy_rounded;
-              color = const Color(0xFF1E293B); // Dark grey/slate for readability
+              color = const Color(
+                0xFF1E293B,
+              ); // Dark grey/slate for readability
               bg = const Color(0xFFF1F5F9); // Light grey
               advice =
                   'Trời nhiều mây lộng gió, thời tiết râm mát thích hợp đi chơi.';
@@ -8283,11 +8366,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     }
   }
 
-  Widget _buildWeatherChip(
-    Map place, [
-    String? startTime,
-    DateTime? date,
-  ]) {
+  Widget _buildWeatherChip(Map place, [String? startTime, DateTime? date]) {
     if (place.isEmpty) return const SizedBox.shrink();
     final weather = _getWeatherForPlace(place, startTime, date);
     final bool isLoading = weather['isLoading'] == true;
@@ -8343,10 +8422,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  void _showPlaceWeatherDetailsSheet(
-    Map place,
-    Map weather,
-  ) {
+  void _showPlaceWeatherDetailsSheet(Map place, Map weather) {
     final String name = place['name'] ?? 'Địa điểm';
     final String address = StringUtils.cleanAddress(place['address'] ?? '');
 
@@ -8541,13 +8617,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-
-
-  Widget _buildPlaceTags(
-    Map place, {
-    String? startTime,
-    DateTime? date,
-  }) {
+  Widget _buildPlaceTags(Map place, {String? startTime, DateTime? date}) {
     List<dynamic> tags = [];
 
     if (place['category'] != null && place['category']['name'] != null) {
@@ -9682,7 +9752,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         }
       }
 
-      currentTime = (endH + endM / 60.0) + (travelDuration + 15) / 60.0;
+      currentTime = (endH + endM / 60.0) + (travelDuration + 30) / 60.0;
     }
 
     return sorted;
@@ -10663,7 +10733,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           place['section_name'] ??
                                           place['section'] ??
                                           '';
-                                      final address = StringUtils.cleanAddress(place['address'] ?? '');
+                                      final address = StringUtils.cleanAddress(
+                                        place['address'] ?? '',
+                                      );
                                       final image = place['image'] ?? '';
                                       final double rating =
                                           (place['rating'] as num?)
@@ -11066,7 +11138,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           displayProminent[idx -
                                               prominentStartIdx];
                                       final name = place['name'] ?? 'Địa điểm';
-                                      final address = StringUtils.cleanAddress(place['address'] ?? '');
+                                      final address = StringUtils.cleanAddress(
+                                        place['address'] ?? '',
+                                      );
                                       final image = place['image'] ?? '';
                                       final double rating =
                                           (place['rating'] as num?)
@@ -11461,7 +11535,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   itemBuilder: (context, idx) {
                                     final place = displayMatching[idx];
                                     final name = place['name'] ?? 'Địa điểm';
-                                    final address = StringUtils.cleanAddress(place['address'] ?? '');
+                                    final address = StringUtils.cleanAddress(
+                                      place['address'] ?? '',
+                                    );
                                     final bool isOpen =
                                         TimeUtils.isPlaceOpenOnDate(
                                           place['openingHours'],
@@ -12277,7 +12353,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? AppTheme.primary.withAlpha(18) : const Color(0xFFF4F6F8),
+          color: active
+              ? AppTheme.primary.withAlpha(18)
+              : const Color(0xFFF4F6F8),
           borderRadius: BorderRadius.circular(9),
           border: Border.all(
             color: active ? AppTheme.primary.withAlpha(60) : Colors.transparent,
@@ -12399,7 +12477,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   onChanged: (val) {
                     detail['noteText'] = val;
                     final itinId = _itineraryData['id'] as int;
-                    final userId = AuthService().currentUser.value?.id?.toString();
+                    final userId = AuthService().currentUser.value?.id
+                        ?.toString();
                     ItinerarySocketService().sendTypingNote(
                       itineraryId: itinId,
                       noteId: id,
@@ -12462,11 +12541,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.description_rounded,
-              size: 14,
-              color: AppTheme.primary,
-            ),
+            Icon(Icons.description_rounded, size: 14, color: AppTheme.primary),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -12587,8 +12662,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   if (todoList.isNotEmpty)
                     Builder(
                       builder: (context) {
-                        final List activeItems = todoList.where((item) => item['done'] != true).toList();
-                        final List completedItems = todoList.where((item) => item['done'] == true).toList();
+                        final List activeItems = todoList
+                            .where((item) => item['done'] != true)
+                            .toList();
+                        final List completedItems = todoList
+                            .where((item) => item['done'] == true)
+                            .toList();
 
                         Widget buildTodoRow(Map item) {
                           final int idx = todoList.indexOf(item);
@@ -12647,7 +12726,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 ),
                                 GestureDetector(
                                   onTap: () {
-                                    final updated = List.from(todoList)..removeAt(idx);
+                                    final updated = List.from(todoList)
+                                      ..removeAt(idx);
                                     setState(() {
                                       detail['todoItems'] = updated;
                                     });
@@ -12679,15 +12759,25 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             shrinkWrap: true,
                             children: [
                               if (activeItems.isNotEmpty)
-                                ...activeItems.map((item) => buildTodoRow(item)),
+                                ...activeItems.map(
+                                  (item) => buildTodoRow(item),
+                                ),
                               if (completedItems.isNotEmpty) ...[
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
                                   child: Row(
                                     children: [
-                                      const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                                      const Expanded(
+                                        child: Divider(
+                                          color: Color(0xFFE2E8F0),
+                                        ),
+                                      ),
                                       Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                        ),
                                         child: Text(
                                           'Đã hoàn thành (${completedItems.length})',
                                           style: TextStyle(
@@ -12697,16 +12787,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           ),
                                         ),
                                       ),
-                                      const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                                      const Expanded(
+                                        child: Divider(
+                                          color: Color(0xFFE2E8F0),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
-                                ...completedItems.map((item) => buildTodoRow(item)),
+                                ...completedItems.map(
+                                  (item) => buildTodoRow(item),
+                                ),
                               ],
                             ],
                           ),
                         );
-                      }
+                      },
                     )
                   else
                     Padding(
@@ -12728,7 +12824,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
                     child: Row(
                       children: [
                         GestureDetector(
@@ -12742,7 +12841,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   (d) => d['id'] == id,
                                   orElse: () => detail,
                                 );
-                                detail['todoItems'] = updatedDetail['todoItems'];
+                                detail['todoItems'] =
+                                    updatedDetail['todoItems'];
                                 localSetState(() {});
                               },
                             );
@@ -12779,10 +12879,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 detail['todoItems'] = updated;
                               });
                               localSetState(() {});
-                              DatabaseService().updateItineraryDetail(
-                                id,
-                                {'todoItems': updated},
-                              );
+                              DatabaseService().updateItineraryDetail(id, {
+                                'todoItems': updated,
+                              });
                               addCtrl.clear();
                             },
                           ),
@@ -12804,10 +12903,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     detail['todoItems'] = updated;
                                   });
                                   localSetState(() {});
-                                  DatabaseService().updateItineraryDetail(
-                                    id,
-                                    {'todoItems': updated},
-                                  );
+                                  DatabaseService().updateItineraryDetail(id, {
+                                    'todoItems': updated,
+                                  });
                                   addCtrl.clear();
                                 }
                               : null,
@@ -12893,7 +12991,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 12,
-                          color: done ? const Color(0xFF94A3B8) : const Color(0xFF334155),
+                          color: done
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF334155),
                           decoration: done ? TextDecoration.lineThrough : null,
                         ),
                       ),
@@ -12926,6 +13026,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   ) {
     final List<Map<String, dynamic>> sortedDayDetails = List.from(dayDetails);
     sortedDayDetails.sort((a, b) {
+      final bool aVis = _visitedDetailIds.contains(a['id']);
+      final bool bVis = _visitedDetailIds.contains(b['id']);
+      if (aVis && !bVis) return -1;
+      if (!aVis && bVis) return 1;
       final aOrd = (a['sortOrder'] as num?)?.toInt() ?? 0;
       final bOrd = (b['sortOrder'] as num?)?.toInt() ?? 0;
       return aOrd.compareTo(bOrd);
@@ -12955,6 +13059,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         if (oldIndex < newIndex) newIndex -= 1;
         if (oldIndex == newIndex) return;
 
+        int visitedCount = 0;
+        for (var d in sortedDayDetails) {
+          if (_visitedDetailIds.contains(d['id'])) {
+            visitedCount++;
+          }
+        }
+
+        if (oldIndex < visitedCount) {
+          _showPremiumNotification(
+            title: 'Địa điểm đã cố định',
+            message: 'Địa điểm đã ghé thăm được nén cố định ở đầu hành trình!',
+            icon: Icons.lock_rounded,
+            color: Colors.orange,
+          );
+          return;
+        }
+
+        if (newIndex < visitedCount) {
+          newIndex = visitedCount;
+        }
+
         final updated = List<Map<String, dynamic>>.from(sortedDayDetails);
         final item = updated.removeAt(oldIndex);
         updated.insert(newIndex, item);
@@ -12963,30 +13088,37 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           updated[i]['sortOrder'] = i;
         }
 
+        // Auto-optimize schedule times & breaks after reordering
+        final optimized = _optimizeDayTimeSlots(updated);
+
         // Instant UI update
         setState(() {
-          for (final it in updated) {
+          for (final it in optimized) {
             final idx = _details.indexWhere((d) => d['id'] == it['id']);
             if (idx != -1) {
               _details[idx]['sortOrder'] = it['sortOrder'];
+              _details[idx]['startTime'] = it['startTime'];
+              _details[idx]['endTime'] = it['endTime'];
             }
           }
         });
 
         _showPremiumNotification(
-          title: 'Đã cập nhật vị trí',
-          message: 'Ghi chú / Địa điểm đã được sắp xếp lại theo vị trí mới.',
-          icon: Icons.check_circle_rounded,
+          title: 'Đã tự động tối ưu vị trí & thời gian',
+          message: 'Lịch trình đã được sắp xếp và điều chỉnh thời gian tối ưu.',
+          icon: Icons.auto_awesome_rounded,
           color: AppTheme.primary,
         );
 
         // Non-blocking background database save
         _isUpdatingDatabase = true;
         final List<Future<bool>> futures = [];
-        for (int i = 0; i < updated.length; i++) {
+        for (int i = 0; i < optimized.length; i++) {
           futures.add(
-            DatabaseService().updateItineraryDetail(updated[i]['id'], {
-              'sortOrder': i,
+            DatabaseService().updateItineraryDetail(optimized[i]['id'] as int, {
+              'sortOrder': optimized[i]['sortOrder'],
+              'startTime': optimized[i]['startTime'],
+              'endTime': optimized[i]['endTime'],
             }),
           );
         }
@@ -13002,6 +13134,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       children: List.generate(sortedDayDetails.length, (idx) {
         final detail = sortedDayDetails[idx];
         final int id = detail['id'] as int;
+        final bool isVisited = _visitedDetailIds.contains(id);
         final bool isCollapsed = !_expandedPlaceIds.contains(id);
 
         final place = detail['place'] ?? {};
@@ -13038,155 +13171,309 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               }
             }
           },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Slidable(
-              key: ValueKey('itinerary_place_${detail['id']}'),
-              endActionPane: ActionPane(
-                motion: const ScrollMotion(),
-                extentRatio: 0.25,
-                children: [
-                  CustomSlidableAction(
-                    onPressed: (context) =>
-                        _removePlaceDetail(detail['id'], place['name'] ?? ''),
-                    backgroundColor: const Color(0xFFE53935),
-                    foregroundColor: Colors.white,
-                    borderRadius: const BorderRadius.horizontal(
-                      right: Radius.circular(20),
-                    ),
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.delete_outline,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Xóa',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (isCollapsed) {
-                      _expandedPlaceIds.add(id);
-                    } else {
-                      _expandedPlaceIds.remove(id);
-                    }
-                  });
-                },
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Opacity(
+            opacity: isVisited ? 0.6 : 1.0,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Slidable(
+                key: ValueKey('itinerary_place_${detail['id']}'),
+                endActionPane: ActionPane(
+                  motion: const ScrollMotion(),
+                  extentRatio: 0.25,
                   children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFECEFF4)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(12),
-                            blurRadius: 18,
-                            offset: const Offset(0, 5),
+                    CustomSlidableAction(
+                      onPressed: (context) {
+                        if (isVisited) {
+                          _showPremiumNotification(
+                            title: 'Địa điểm đã ghé thăm',
+                            message:
+                                'Không thể xóa địa điểm đã hoàn thành!',
+                            icon: Icons.lock_rounded,
+                            color: Colors.orange,
+                          );
+                        } else {
+                          _removePlaceDetail(
+                            detail['id'],
+                            place['name'] ?? '',
+                          );
+                        }
+                      },
+                      backgroundColor: isVisited
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFFE53935),
+                      foregroundColor: Colors.white,
+                      borderRadius: const BorderRadius.horizontal(
+                        right: Radius.circular(20),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isVisited
+                                ? Icons.lock_outline_rounded
+                                : Icons.delete_outline,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isVisited ? 'Đã khóa' : 'Xóa',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // ── TOP SECTION: image + info ──
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // LEFT: drag handle + number badge + text info
-                                Expanded(
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      // Drag handle (slim, unobtrusive)
-                                      ReorderableDragStartListener(
-                                        index: idx,
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 2,
-                                            right: 6,
-                                          ),
-                                          child: const Icon(
-                                            Icons.drag_indicator_rounded,
-                                            color: Color(0xFFCBD5E1),
-                                            size: 18,
-                                          ),
-                                        ),
-                                      ),
-                                      // Number badge
-                                      Container(
-                                        width: 28,
-                                        height: 28,
-                                        margin: const EdgeInsets.only(
-                                          right: 10,
-                                          top: 1,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: customColor,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          (() {
-                                            int n = 0;
-                                            for (int i = 0; i <= idx; i++) {
-                                              if (sortedDayDetails[i]['place'] !=
-                                                  null)
-                                                n++;
-                                            }
-                                            return '$n';
-                                          })(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
-                                      // Name + time + tags
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              name.isNotEmpty
-                                                  ? name
-                                                  : 'Địa điểm',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 15,
-                                                color: Color(0xFF0F172A),
-                                                letterSpacing: -0.2,
-                                                height: 1.3,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isCollapsed) {
+                        _expandedPlaceIds.add(id);
+                      } else {
+                        _expandedPlaceIds.remove(id);
+                      }
+                    });
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFECEFF4)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(12),
+                              blurRadius: 18,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // ── TOP SECTION: image + info ──
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // LEFT: drag handle + number badge + text info
+                                  Expanded(
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Drag handle (disabled if isVisited)
+                                        if (isVisited)
+                                          const Padding(
+                                            padding: EdgeInsets.only(
+                                              top: 2,
+                                              right: 6,
                                             ),
-                                            const SizedBox(height: 6),
-                                            // Time pill
-                                            GestureDetector(
-                                              onTap: () =>
-                                                  _selectTimeForDetail(detail),
+                                            child: Icon(
+                                              Icons.lock_outline_rounded,
+                                              color: Color(0xFF94A3B8),
+                                              size: 16,
+                                            ),
+                                          )
+                                        else
+                                          ReorderableDragStartListener(
+                                            index: idx,
+                                            child: const Padding(
+                                              padding: EdgeInsets.only(
+                                                top: 2,
+                                                right: 6,
+                                              ),
+                                              child: Icon(
+                                                Icons.drag_indicator_rounded,
+                                                color: Color(0xFFCBD5E1),
+                                                size: 18,
+                                              ),
+                                            ),
+                                          ),
+                                        // Number badge
+                                        Container(
+                                          width: 28,
+                                          height: 28,
+                                          margin: const EdgeInsets.only(
+                                            right: 10,
+                                            top: 1,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isVisited
+                                                ? const Color(0xFF10B981)
+                                                : customColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: isVisited
+                                              ? const Icon(
+                                                  Icons.check_rounded,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                )
+                                              : Text(
+                                                  (() {
+                                                    int n = 0;
+                                                    for (
+                                                      int i = 0;
+                                                      i <= idx;
+                                                      i++
+                                                    ) {
+                                                      if (sortedDayDetails[i]['place'] !=
+                                                          null) {
+                                                        n++;
+                                                      }
+                                                    }
+                                                    return '$n';
+                                                  })(),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                        ),
+                                        // Name + time + tags
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      name.isNotEmpty
+                                                          ? name
+                                                          : 'Địa điểm',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        fontSize: 15,
+                                                        color: isVisited
+                                                            ? const Color(
+                                                                0xFF64748B,
+                                                              )
+                                                            : const Color(
+                                                                0xFF0F172A,
+                                                              ),
+                                                        decoration: isVisited
+                                                            ? TextDecoration
+                                                                .lineThrough
+                                                            : null,
+                                                        decorationColor:
+                                                            const Color(
+                                                              0xFF94A3B8,
+                                                            ),
+                                                        letterSpacing: -0.2,
+                                                        height: 1.3,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  InkWell(
+                                                    onTap: () =>
+                                                        _toggleVisitedDetail(
+                                                          id,
+                                                          detail,
+                                                        ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                    child: Container(
+                                                      padding:
+                                                          const EdgeInsets
+                                                              .symmetric(
+                                                            horizontal: 7,
+                                                            vertical: 3,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: isVisited
+                                                            ? const Color(
+                                                                0xFF10B981,
+                                                              ).withAlpha(25)
+                                                            : Colors.grey
+                                                                .withAlpha(18),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(12),
+                                                        border: Border.all(
+                                                          color: isVisited
+                                                              ? const Color(
+                                                                  0xFF10B981,
+                                                                )
+                                                              : Colors.grey
+                                                                  .withAlpha(
+                                                                    60,
+                                                                  ),
+                                                          width: 1,
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            isVisited
+                                                                ? Icons
+                                                                    .check_circle_rounded
+                                                                : Icons
+                                                                    .radio_button_unchecked_rounded,
+                                                            size: 13,
+                                                            color: isVisited
+                                                                ? const Color(
+                                                                    0xFF059669,
+                                                                  )
+                                                                : Colors
+                                                                    .grey[600],
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 3,
+                                                          ),
+                                                          Text(
+                                                            isVisited
+                                                                ? 'Đã ghé'
+                                                                : 'Chưa ghé',
+                                                            style: TextStyle(
+                                                              fontSize: 10,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color: isVisited
+                                                                  ? const Color(
+                                                                      0xFF059669,
+                                                                    )
+                                                                  : Colors
+                                                                      .grey[600],
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 6),
+                                              // Time pill
+                                              GestureDetector(
+                                                onTap: isVisited
+                                                    ? null
+                                                    : () =>
+                                                        _selectTimeForDetail(
+                                                          detail,
+                                                        ),
                                               child: Container(
                                                 padding:
                                                     const EdgeInsets.symmetric(
@@ -13399,20 +13686,23 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               children: [
                                 // 📝 Ghi chú
                                 _buildCardActionIcon(
-                                  icon: (detail['noteText'] != null &&
+                                  icon:
+                                      (detail['noteText'] != null &&
                                           detail['noteText']
                                               .toString()
                                               .trim()
                                               .isNotEmpty)
                                       ? Icons.description_rounded
                                       : Icons.description_outlined,
-                                  active: detail['noteText'] != null &&
+                                  active:
+                                      detail['noteText'] != null &&
                                       detail['noteText']
                                           .toString()
                                           .trim()
                                           .isNotEmpty,
                                   badge: null,
-                                  onTap: () => _showInlineNoteBottomSheet(detail),
+                                  onTap: () =>
+                                      _showInlineNoteBottomSheet(detail),
                                 ),
                                 const SizedBox(width: 4),
                                 // ✓ Danh sách công việc
@@ -13439,7 +13729,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       badge: hasItems
                                           ? '$done/${tl.length}'
                                           : null,
-                                      onTap: () => _showInlineChecklistBottomSheet(detail),
+                                      onTap: () =>
+                                          _showInlineChecklistBottomSheet(
+                                            detail,
+                                          ),
                                     );
                                   },
                                 ),
@@ -13556,10 +13849,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               }
                             ), */
                             if (detail['noteText'] != null &&
-                                detail['noteText']
-                                    .toString()
-                                    .trim()
-                                    .isNotEmpty)
+                                detail['noteText'].toString().trim().isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(
                                   12,
@@ -13578,7 +13868,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   12,
                                   10,
                                 ),
-                                child: _buildInlinePlaceChecklistPreview(detail),
+                                child: _buildInlinePlaceChecklistPreview(
+                                  detail,
+                                ),
                               ),
                           ],
                         ],
@@ -13589,7 +13881,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               ),
             ),
           ),
-        );
+        ),
+      );
 
         Widget? travelSeparator;
         // Render travel separator at the bottom of item `idx` IF AND ONLY IF the next item (`idx + 1`) is a Place
@@ -13628,91 +13921,102 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           }
         }
 
-        return ReorderableDragStartListener(
-          key: ValueKey('item_$id'),
-          index: idx,
-          child: Container(
-            child: Stack(
-              children: [
-                // Top line (for Place)
-                if (detail['place'] != null && hasPrevPlace)
-                  Positioned(
-                    top: 0,
-                    height: 24,
-                    left: 15,
-                    child: Container(
-                      width: 2,
-                      color: customColor.withOpacity(0.3),
-                    ),
-                  ),
-                // Bottom line (for Place)
-                if (detail['place'] != null && hasNextPlace)
-                  Positioned(
-                    top: 36,
-                    bottom: 0,
-                    left: 15,
-                    child: Container(
-                      width: 2,
-                      color: customColor.withOpacity(0.3),
-                    ),
-                  ),
-                // Numbered Circle (for Place Timeline marker)
-                if (detail['place'] != null)
-                  Positioned(
-                    top: 18,
-                    left: 4,
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: customColor,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        (() {
-                          int placeNumber = 0;
-                          for (int i = 0; i <= idx; i++) {
-                            if (sortedDayDetails[i]['place'] != null) {
-                              placeNumber++;
-                            }
-                          }
-                          return '$placeNumber';
-                        })(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-                // Continuous line (for Note)
-                if (detail['place'] == null && hasPrevPlace && hasNextPlace)
-                  Positioned(
-                    top: 0,
-                    bottom: 0,
-                    left: 15,
-                    child: Container(
-                      width: 2,
-                      color: customColor.withOpacity(0.3),
-                    ),
-                  ),
-                // The content
-                Padding(
-                  padding: const EdgeInsets.only(left: 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      card,
-                      if (travelSeparator != null) travelSeparator,
-                    ],
+        final contentWidget = Container(
+          child: Stack(
+            children: [
+              // Top line (for Place)
+              if (detail['place'] != null && hasPrevPlace)
+                Positioned(
+                  top: 0,
+                  height: 24,
+                  left: 15,
+                  child: Container(
+                    width: 2,
+                    color: isVisited
+                        ? const Color(0xFF10B981).withOpacity(0.5)
+                        : customColor.withOpacity(0.3),
                   ),
                 ),
-              ],
-            ),
+              // Bottom line (for Place)
+              if (detail['place'] != null && hasNextPlace)
+                Positioned(
+                  top: 36,
+                  bottom: 0,
+                  left: 15,
+                  child: Container(
+                    width: 2,
+                    color: isVisited
+                        ? const Color(0xFF10B981).withOpacity(0.5)
+                        : customColor.withOpacity(0.3),
+                  ),
+                ),
+              // Numbered Circle / Check Marker (for Place Timeline marker)
+              if (detail['place'] != null)
+                Positioned(
+                  top: 18,
+                  left: 4,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: isVisited ? const Color(0xFF10B981) : customColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    alignment: Alignment.center,
+                    child: isVisited
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 13,
+                          )
+                        : Text(
+                            (() {
+                              int placeNumber = 0;
+                              for (int i = 0; i <= idx; i++) {
+                                if (sortedDayDetails[i]['place'] != null) {
+                                  placeNumber++;
+                                }
+                              }
+                              return '$placeNumber';
+                            })(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                  ),
+                ),
+              // Continuous line (for Note)
+              if (detail['place'] == null && hasPrevPlace && hasNextPlace)
+                Positioned(
+                  top: 0,
+                  bottom: 0,
+                  left: 15,
+                  child: Container(
+                    width: 2,
+                    color: customColor.withOpacity(0.3),
+                  ),
+                ),
+              // The content
+              Padding(
+                padding: const EdgeInsets.only(left: 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    card,
+                    if (travelSeparator != null) travelSeparator,
+                  ],
+                ),
+              ),
+            ],
           ),
+        );
+
+        return Container(
+          key: ValueKey('item_$id'),
+          child: contentWidget,
         );
       }),
     );
@@ -14011,6 +14315,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             if (!isCollapsed) ...[
                               Builder(
                                 builder: (context) {
+                                  final bool isAiTrip =
+                                      _itineraryData['isAiGenerated'] == true ||
+                                      _itineraryData['isAiTrip'] == true ||
+                                      _itineraryData['isAi'] == true ||
+                                      (_itineraryData['title'] ?? '')
+                                          .toString()
+                                          .toLowerCase()
+                                          .contains('ai');
+
+                                  if (isAiTrip) {
+                                    return const SizedBox.shrink();
+                                  }
+
                                   final placesOnly = dayDetails
                                       .where(
                                         (d) =>
@@ -14021,130 +14338,61 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   final placesCount = placesOnly.length;
 
                                   if (placesCount == 0) {
-                                    return Row(
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  String optimizeText = 'Tối ưu lộ trình';
+                                  if (placesCount >= 2) {
+                                    int totalDuration = 0;
+                                    double totalDistance = 0;
+                                    for (
+                                      int i = 0;
+                                      i < placesOnly.length - 1;
+                                      i++
+                                    ) {
+                                      final p1 = Map<String, dynamic>.from(
+                                        placesOnly[i]['place'] as Map,
+                                      );
+                                      final p2 = Map<String, dynamic>.from(
+                                        placesOnly[i + 1]['place'] as Map,
+                                      );
+                                      final info = _getMockTravelInfo(p1, p2);
+                                      totalDuration +=
+                                          info['duration'] as int;
+                                      final dist =
+                                          double.tryParse(
+                                            (info['distance'] as String)
+                                                .replaceAll(',', '.'),
+                                          ) ??
+                                          0.0;
+                                      totalDistance += dist;
+                                    }
+                                    optimizeText =
+                                        'Tối ưu lộ trình · $totalDuration phút, ${totalDistance.toStringAsFixed(1).replaceAll('.', ',')} km';
+                                  }
+
+                                  return GestureDetector(
+                                    onTap: () => _optimizeDay(index),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        GestureDetector(
-                                          onTap: () {
-                                            _showPremiumNotification(
-                                              title: 'Tự động điền',
-                                              message:
-                                                  'Đang tạo lịch trình tự động từ AI...',
-                                              icon: Icons.bolt_rounded,
-                                              color: AppTheme.primary,
-                                            );
-                                          },
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(
-                                                Icons.bolt_rounded,
-                                                size: 16,
-                                                color: Color(0xFF10B981),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              const Text(
-                                                'Tự động điền',
-                                                style: TextStyle(
-                                                  color: Color(0xFF10B981),
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                        const Icon(
+                                          Icons.route_outlined,
+                                          color: Color(0xFF0284C7),
+                                          size: 16,
                                         ),
-                                        const SizedBox(width: 8),
-                                        const Text(
-                                          '·',
-                                          style: TextStyle(color: Colors.grey),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        GestureDetector(
-                                          onTap: () {
-                                            _showPremiumNotification(
-                                              title: 'Tối ưu lộ trình',
-                                              message:
-                                                  'Tính năng tối ưu lộ trình thông minh!',
-                                              icon: Icons.alt_route_rounded,
-                                              color: const Color(0xFF0284C7),
-                                            );
-                                          },
-                                          child: const Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.alt_route_rounded,
-                                                size: 16,
-                                                color: Color(0xFF0284C7),
-                                              ),
-                                              SizedBox(width: 4),
-                                              Text(
-                                                'Tối ưu lộ trình',
-                                                style: TextStyle(
-                                                  color: Color(0xFF0284C7),
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          optimizeText,
+                                          style: const TextStyle(
+                                            color: Color(0xFF0284C7),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                       ],
-                                    );
-                                  } else {
-                                    String optimizeText = 'Tối ưu lộ trình';
-                                    if (placesCount >= 2) {
-                                      int totalDuration = 0;
-                                      double totalDistance = 0;
-                                      for (
-                                        int i = 0;
-                                        i < placesOnly.length - 1;
-                                        i++
-                                      ) {
-                                        final p1 = Map<String, dynamic>.from(
-                                          placesOnly[i]['place'] as Map,
-                                        );
-                                        final p2 = Map<String, dynamic>.from(
-                                          placesOnly[i + 1]['place'] as Map,
-                                        );
-                                        final info = _getMockTravelInfo(p1, p2);
-                                        totalDuration +=
-                                            info['duration'] as int;
-                                        final dist =
-                                            double.tryParse(
-                                              (info['distance'] as String)
-                                                  .replaceAll(',', '.'),
-                                            ) ??
-                                            0.0;
-                                        totalDistance += dist;
-                                      }
-                                      optimizeText =
-                                          'Tối ưu lộ trình · $totalDuration phút, ${totalDistance.toStringAsFixed(1).replaceAll('.', ',')} km';
-                                    }
-
-                                    return GestureDetector(
-                                      onTap: () => _optimizeDay(index),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.route_outlined,
-                                            color: Color(0xFF0284C7),
-                                            size: 16,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            optimizeText,
-                                            style: const TextStyle(
-                                              color: Color(0xFF0284C7),
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }
+                                    ),
+                                  );
                                 },
                               ),
                               const SizedBox(height: 16),
@@ -20994,7 +21242,8 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
         final catName = cat['name'] as String;
         final items = cat['items'] as List? ?? [];
         final allItemNames = items.map((it) => it['name'] as String).toList();
-        final bool isSelected = allItemNames.isNotEmpty &&
+        final bool isSelected =
+            allItemNames.isNotEmpty &&
             allItemNames.every((name) => _selectedItems.contains(name));
         final isExpanded = _expandedCategories.contains(catId);
 
@@ -21052,7 +21301,9 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
                         isSelected
                             ? Icons.check_box_rounded
                             : Icons.check_box_outline_blank_rounded,
-                        color: isSelected ? AppTheme.primary : const Color(0xFFCBD5E1),
+                        color: isSelected
+                            ? AppTheme.primary
+                            : const Color(0xFFCBD5E1),
                         size: 22,
                       ),
                     ),
@@ -21063,7 +21314,9 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
             if (isExpanded)
               ...items.map((item) {
                 final itemName = item['name'] as String;
-                final bool isItemSelfSelected = _selectedItems.contains(itemName);
+                final bool isItemSelfSelected = _selectedItems.contains(
+                  itemName,
+                );
                 return InkWell(
                   onTap: () {
                     setState(() {
@@ -21087,7 +21340,9 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
                           isItemSelfSelected
                               ? Icons.check_box_rounded
                               : Icons.check_box_outline_blank_rounded,
-                          color: isItemSelfSelected ? AppTheme.primary : const Color(0xFFCBD5E1),
+                          color: isItemSelfSelected
+                              ? AppTheme.primary
+                              : const Color(0xFFCBD5E1),
                           size: 18,
                         ),
                         const SizedBox(width: 10),

@@ -2,6 +2,7 @@ import 'dart:ui' show ImageFilter;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
@@ -24,6 +25,8 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
   Map<String, dynamic>? _weatherData;
   bool _isLoadingWeather = true;
   String _weatherQuote = "";
+  List<Map<String, dynamic>>? _forecastData;
+  bool _isLoadingForecast = true;
 
   @override
   void initState() {
@@ -47,12 +50,15 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
           if (permission == LocationPermission.whileInUse ||
               permission == LocationPermission.always) {
             try {
-              position = await Geolocator.getCurrentPosition(
-                desiredAccuracy: LocationAccuracy.high,
-                timeLimit: const Duration(seconds: 5),
-              );
-            } catch (_) {
               position = await Geolocator.getLastKnownPosition();
+              if (position == null) {
+                position = await Geolocator.getCurrentPosition(
+                  desiredAccuracy: LocationAccuracy.low,
+                  timeLimit: const Duration(seconds: 2),
+                );
+              }
+            } catch (_) {
+              // Fail-safe
             }
           }
         }
@@ -79,9 +85,15 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
             _weatherQuote = _getQuoteForCondition(data['condition'] ?? '');
           });
         }
+        final double lat = (data['latitude'] as num?)?.toDouble() ?? 16.0544;
+        final double lon = (data['longitude'] as num?)?.toDouble() ?? 108.2022;
+        _fetchForecast(lat, lon);
+      } else {
+        _fetchForecast(16.0544, 108.2022);
       }
     } catch (e) {
       debugPrint('Error fetching weather: $e');
+      _fetchForecast(16.0544, 108.2022);
     } finally {
       if (mounted) {
         setState(() {
@@ -127,6 +139,101 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       ];
       return (quotes..shuffle()).first;
     }
+  }
+
+  Future<void> _fetchForecast(double lat, double lon) async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingForecast = true;
+    });
+    try {
+      final url = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto',
+      );
+      final response = await http.get(url).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final daily = data['daily'];
+        if (daily != null && daily['time'] is List) {
+          final List times = daily['time'];
+          final List codes = daily['weather_code'];
+          final List maxTemps = daily['temperature_2m_max'];
+          final List minTemps = daily['temperature_2m_min'];
+          final List rainProbs = daily['precipitation_probability_max'] ?? [];
+          final List rainSums = daily['precipitation_sum'] ?? [];
+
+          final List<Map<String, dynamic>> forecast = [];
+          for (int i = 0; i < times.length; i++) {
+            final date = DateTime.tryParse(times[i]) ?? DateTime.now();
+            final int code = (codes[i] as num?)?.toInt() ?? 0;
+            final double maxT = (maxTemps[i] as num?)?.toDouble() ?? 25.0;
+            final double minT = (minTemps[i] as num?)?.toDouble() ?? 20.0;
+            final int rainProb = i < rainProbs.length ? (rainProbs[i] as num?)?.toInt() ?? 0 : 0;
+            final double rainSum = i < rainSums.length ? (rainSums[i] as num?)?.toDouble() ?? 0.0 : 0.0;
+
+            final weatherMeta = _getWeatherMetaForCode(code);
+
+            forecast.add({
+              'date': date,
+              'dateStr': times[i],
+              'tempMax': maxT.round(),
+              'tempMin': minT.round(),
+              'desc': weatherMeta['desc'],
+              'icon': weatherMeta['icon'],
+              'color': weatherMeta['color'],
+              'rainProb': rainProb,
+              'rainSum': rainSum,
+            });
+          }
+          if (mounted) {
+            setState(() {
+              _forecastData = forecast;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching forecast: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingForecast = false;
+        });
+      }
+    }
+  }
+
+  Map<String, dynamic> _getWeatherMetaForCode(int code) {
+    String desc = 'Nắng đẹp';
+    IconData icon = Icons.wb_sunny_rounded;
+    Color color = const Color(0xFFEA580C); // Orange
+
+    if (code == 0) {
+      desc = 'Trời quang';
+      icon = Icons.wb_sunny_rounded;
+      color = const Color(0xFFEA580C);
+    } else if (code >= 1 && code <= 3) {
+      desc = code == 3 ? 'Nhiều mây' : 'Nắng nhẹ';
+      icon = code == 3 ? Icons.wb_cloudy_rounded : Icons.wb_cloudy_outlined;
+      color = code == 3 ? const Color(0xFF1E293B) : const Color(0xFF475569);
+    } else if (code == 45 || code == 48) {
+      desc = 'Sương mù';
+      icon = Icons.blur_on_rounded;
+      color = const Color(0xFF334155);
+    } else if (code >= 51 && code <= 67) {
+      desc = 'Mưa rào';
+      icon = Icons.grain_rounded;
+      color = const Color(0xFF2563EB);
+    } else if (code >= 80 && code <= 99) {
+      desc = 'Mưa giông';
+      icon = Icons.thunderstorm_rounded;
+      color = const Color(0xFF7C3AED);
+    }
+    return {
+      'desc': desc,
+      'icon': icon,
+      'color': color,
+    };
   }
 
   Widget _buildWeatherWidget() {
@@ -308,36 +415,131 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                         ),
                       ],
                     ),
-
-                    const SizedBox(height: 16),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildMetricItem(
-                          icon: Icons.umbrella_rounded,
-                          label: 'Tỷ lệ mưa',
-                          value: '$rainProb%',
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10.0),
+                      child: Text(
+                        'Dự báo thời tiết 7 ngày',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.darkText.withOpacity(0.8),
+                          letterSpacing: 0.2,
                         ),
-                        _buildMetricItem(
-                          icon: Icons.water_drop_rounded,
-                          label: 'Lượng mưa',
-                          value: rainfall > 0
-                              ? '${rainfall.toStringAsFixed(1)} mm'
-                              : '0 mm',
-                        ),
-                        _buildMetricItem(
-                          icon: Icons.opacity_rounded,
-                          label: 'Độ ẩm',
-                          value: '$humidity%',
-                        ),
-                        _buildMetricItem(
-                          icon: Icons.air_rounded,
-                          label: 'Gió',
-                          value: '${windSpeed.toStringAsFixed(1)} m/s',
-                        ),
-                      ],
+                      ),
                     ),
+                    if (_isLoadingForecast && (_forecastData == null || _forecastData!.isEmpty))
+                      Container(
+                        height: 110,
+                        alignment: Alignment.center,
+                        child: const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                          ),
+                        ),
+                      )
+                    else if (_forecastData != null && _forecastData!.isNotEmpty)
+                      SizedBox(
+                        height: 112,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _forecastData!.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, idx) {
+                            final dayData = _forecastData![idx];
+                            final date = dayData['date'] as DateTime;
+                            final bool isToday = (idx == 0);
+
+                            String dayOfWeekLabel = '';
+                            if (isToday) {
+                              dayOfWeekLabel = 'Hôm nay';
+                            } else {
+                              final List<String> weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+                              dayOfWeekLabel = weekdays[date.weekday - 1];
+                            }
+                            final String dateStr = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}";
+
+                            return Container(
+                              width: 78,
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                              decoration: BoxDecoration(
+                                color: isToday 
+                                    ? AppTheme.primary.withOpacity(0.06) 
+                                    : Colors.white.withOpacity(0.55),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isToday 
+                                      ? AppTheme.primary.withOpacity(0.2) 
+                                      : Colors.grey.withOpacity(0.12),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    dayOfWeekLabel,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                      color: isToday ? AppTheme.primary : AppTheme.darkText,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    dateStr,
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: AppTheme.subtitleText,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Icon(
+                                    dayData['icon'] as IconData,
+                                    color: dayData['color'] as Color,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${dayData['tempMax']}°/${dayData['tempMin']}°',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.darkText,
+                                    ),
+                                  ),
+                                  if (dayData['rainProb'] > 0) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '💧 ${dayData['rainProb']}%',
+                                      style: const TextStyle(
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF2563EB),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                    else
+                      Container(
+                        height: 110,
+                        alignment: Alignment.center,
+                        child: Text(
+                          'Không có dữ liệu dự báo',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.subtitleText,
+                          ),
+                        ),
+                      ),
 
                     if (_weatherQuote.isNotEmpty) ...[
                       const SizedBox(height: 16),
@@ -387,35 +589,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
     );
   }
 
-  Widget _buildMetricItem({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Column(
-      children: [
-        Icon(icon, size: 18, color: AppTheme.primary.withOpacity(0.8)),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.darkText,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w500,
-            color: AppTheme.subtitleText,
-          ),
-        ),
-      ],
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {

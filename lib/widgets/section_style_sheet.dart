@@ -42,10 +42,10 @@ class _SectionStyleSheetState extends State<SectionStyleSheet> {
   final List<Map<String, dynamic>> _flattenedItems = [];
 
   final List<Color> _colors = [
-    Colors.green,
-    Colors.tealAccent,
-    Colors.lightBlue,
-    Colors.blue,
+    const Color(0xFF16A34A),
+    const Color(0xFF0284C7),
+    const Color(0xFF2563EB),
+    const Color(0xFF0F766E),
     Colors.deepPurple,
     Colors.pinkAccent,
     Colors.orange,

@@ -38,7 +38,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
   final PageController _pageController = PageController();
   int _currentStep = 0;
-  final int _totalSteps = 7;
+  final int _totalSteps = 6;
 
   bool _isCreating = false;
 
@@ -1774,14 +1774,12 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       case 1:
         return 'Ngày khởi hành';
       case 2:
-        return 'Nhịp độ chuyến đi';
-      case 3:
         return 'Dự kiến ngân sách';
-      case 4:
+      case 3:
         return 'Bạn đồng hành';
-      case 5:
+      case 4:
         return 'Danh mục chuyến đi';
-      case 6:
+      case 5:
         return 'Yêu cầu riêng cho AI';
       default:
         return '';
@@ -1794,13 +1792,14 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       case 0:
       case 1:
       case 2:
+        return 'Tiếp tục';
       case 3:
-        return 'Tiếp tục';
+        return (_privacyLevel == 'Riêng tư' || _invitedCompanionsList.isEmpty)
+            ? 'Tiếp tục'
+            : 'Mời bạn đồng hành';
       case 4:
-        return (_privacyLevel == 'Riêng tư' || _invitedCompanionsList.isEmpty) ? 'Tiếp tục' : 'Mời bạn đồng hành';
-      case 5:
         return 'Tiếp tục';
-      case 6:
+      case 5:
         return 'Tạo Lịch Trình AI';
       default:
         return 'Tiếp tục';
@@ -1966,7 +1965,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                   children: [
                     _buildStep0TripNameAndDestination(),
                     _buildStep1Dates(),
-                    _buildStep3Pace(),
                     _buildStep5Budget(),
                     _buildStep4Companions(),
                     _buildStep2Categories(),

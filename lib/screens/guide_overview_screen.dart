@@ -85,10 +85,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   int? _focusedPlaceId;
   bool _isSheetHalf = false;
   final List<Color> _availableColors = [
-    Colors.green,
-    Colors.tealAccent,
-    Colors.lightBlue,
-    Colors.blue,
+    const Color(0xFF16A34A),
+    const Color(0xFF0284C7),
+    const Color(0xFF2563EB),
+    const Color(0xFF0F766E),
     Colors.deepPurple,
     Colors.pinkAccent,
     Colors.orange,
@@ -6758,6 +6758,25 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
     );
   }
 
+  Widget _buildCategoryChip(String catName) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Text(
+        catName,
+        style: const TextStyle(
+          fontSize: 10.5,
+          color: Color(0xFF475569),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _buildPlaceTags(Map<String, dynamic> place, {Widget? timeChip}) {
     List<dynamic> tags = [];
 
@@ -6769,27 +6788,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
 
     return Wrap(
       spacing: 6,
-      runSpacing: 6,
+      runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        ...tags.map((cat) => _buildCategoryChip(cat.toString())),
         if (timeChip != null) timeChip,
-        ...tags.map(
-          (cat) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              cat.toString(),
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color(0xFF475569),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
