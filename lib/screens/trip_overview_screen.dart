@@ -13265,12 +13265,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // LEFT: drag handle + number badge + text info
-                                  Expanded(
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        // Drag handle (disabled if isVisited)
+                                  // Drag handle (disabled if isVisited)
                                         if (isVisited)
                                           const Padding(
                                             padding: EdgeInsets.only(
@@ -13280,7 +13275,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             child: Icon(
                                               Icons.lock_outline_rounded,
                                               color: Color(0xFF94A3B8),
-                                              size: 16,
+                                              size: 13,
                                             ),
                                           )
                                         else
@@ -13313,33 +13308,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             shape: BoxShape.circle,
                                           ),
                                           alignment: Alignment.center,
-                                          child: isVisited
-                                              ? const Icon(
-                                                  Icons.check_rounded,
-                                                  color: Colors.white,
-                                                  size: 16,
-                                                )
-                                              : Text(
-                                                  (() {
-                                                    int n = 0;
-                                                    for (
-                                                      int i = 0;
-                                                      i <= idx;
-                                                      i++
-                                                    ) {
-                                                      if (sortedDayDetails[i]['place'] !=
-                                                          null) {
-                                                        n++;
-                                                      }
-                                                    }
-                                                    return '$n';
-                                                  })(),
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 13,
-                                                  ),
-                                                ),
+                                          child: Text(
+                                            (() {
+                                              int n = 0;
+                                              for (int i = 0; i <= idx; i++) {
+                                                if (sortedDayDetails[i]['place'] != null) {
+                                                  n++;
+                                                }
+                                              }
+                                              return '$n';
+                                            })(),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
                                         ),
                                         // Name + time + tags
                                         Expanded(
@@ -13347,116 +13331,114 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
-                                              Row(
+                                              Text(
+                                                name.isNotEmpty ? name : 'Địa điểm',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 15,
+                                                  color: isVisited
+                                                      ? const Color(0xFF64748B)
+                                                      : const Color(0xFF0F172A),
+                                                  decoration: isVisited
+                                                      ? TextDecoration.lineThrough
+                                                      : null,
+                                                  decorationColor:
+                                                      const Color(0xFF94A3B8),
+                                                  letterSpacing: -0.2,
+                                                  height: 1.25,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Wrap(
+                                                crossAxisAlignment: WrapCrossAlignment.center,
+                                                spacing: 6,
+                                                runSpacing: 4,
                                                 children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      name.isNotEmpty
-                                                          ? name
-                                                          : 'Địa điểm',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        fontSize: 15,
-                                                        color: isVisited
-                                                            ? const Color(
-                                                                0xFF64748B,
-                                                              )
-                                                            : const Color(
-                                                                0xFF0F172A,
-                                                              ),
-                                                        decoration: isVisited
-                                                            ? TextDecoration
-                                                                .lineThrough
-                                                            : null,
-                                                        decorationColor:
-                                                            const Color(
-                                                              0xFF94A3B8,
-                                                            ),
-                                                        letterSpacing: -0.2,
-                                                        height: 1.3,
+                                                  // Time pill
+                                                  GestureDetector(
+                                                    onTap: isVisited
+                                                        ? null
+                                                        : () => _selectTimeForDetail(detail),
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4,
                                                       ),
-                                                      maxLines: 2,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
+                                                      decoration: BoxDecoration(
+                                                        color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                            ? customColor.withAlpha(20)
+                                                            : const Color(0xFFFEF3C7),
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        border: Border.all(
+                                                          color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                              ? customColor.withAlpha(70)
+                                                              : const Color(0xFFFBBF24).withAlpha(120),
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            Icons.schedule_rounded,
+                                                            size: 12,
+                                                            color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                                ? customColor
+                                                                : const Color(0xFFD97706),
+                                                          ),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            (extraInfo != null && extraInfo.isNotEmpty)
+                                                                ? extraInfo
+                                                                : 'Thêm thời gian',
+                                                            style: TextStyle(
+                                                              fontSize: 11,
+                                                              fontWeight: FontWeight.w600,
+                                                              color: (extraInfo != null && extraInfo.isNotEmpty)
+                                                                  ? customColor
+                                                                  : const Color(0xFFD97706),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 6),
+                                                  // Visited badge
                                                   InkWell(
-                                                    onTap: () =>
-                                                        _toggleVisitedDetail(
-                                                          id,
-                                                          detail,
-                                                        ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12,
-                                                        ),
+                                                    onTap: () => _toggleVisitedDetail(id, detail),
+                                                    borderRadius: BorderRadius.circular(12),
                                                     child: Container(
-                                                      padding:
-                                                          const EdgeInsets
-                                                              .symmetric(
-                                                            horizontal: 7,
-                                                            vertical: 3,
-                                                          ),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                                       decoration: BoxDecoration(
                                                         color: isVisited
-                                                            ? const Color(
-                                                                0xFF10B981,
-                                                              ).withAlpha(25)
-                                                            : Colors.grey
-                                                                .withAlpha(18),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(12),
+                                                            ? const Color(0xFF10B981).withAlpha(25)
+                                                            : Colors.grey.withAlpha(18),
+                                                        borderRadius: BorderRadius.circular(12),
                                                         border: Border.all(
                                                           color: isVisited
-                                                              ? const Color(
-                                                                  0xFF10B981,
-                                                                )
-                                                              : Colors.grey
-                                                                  .withAlpha(
-                                                                    60,
-                                                                  ),
+                                                              ? const Color(0xFF10B981)
+                                                              : Colors.grey.withAlpha(60),
                                                           width: 1,
                                                         ),
                                                       ),
                                                       child: Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
+                                                        mainAxisSize: MainAxisSize.min,
                                                         children: [
                                                           Icon(
                                                             isVisited
-                                                                ? Icons
-                                                                    .check_circle_rounded
-                                                                : Icons
-                                                                    .radio_button_unchecked_rounded,
+                                                                ? Icons.check_circle_rounded
+                                                                : Icons.radio_button_unchecked_rounded,
                                                             size: 13,
-                                                            color: isVisited
-                                                                ? const Color(
-                                                                    0xFF059669,
-                                                                  )
-                                                                : Colors
-                                                                    .grey[600],
+                                                            color: isVisited ? const Color(0xFF059669) : Colors.grey[600],
                                                           ),
-                                                          const SizedBox(
-                                                            width: 3,
-                                                          ),
+                                                          const SizedBox(width: 3),
                                                           Text(
-                                                            isVisited
-                                                                ? 'Đã ghé'
-                                                                : 'Chưa ghé',
+                                                            isVisited ? 'Đã ghé' : 'Chưa ghé',
                                                             style: TextStyle(
                                                               fontSize: 10,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              color: isVisited
-                                                                  ? const Color(
-                                                                      0xFF059669,
-                                                                    )
-                                                                  : Colors
-                                                                      .grey[600],
+                                                              fontWeight: FontWeight.bold,
+                                                              color: isVisited ? const Color(0xFF059669) : Colors.grey[600],
                                                             ),
                                                           ),
                                                         ],
@@ -13465,107 +13447,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                   ),
                                                 ],
                                               ),
-                                              const SizedBox(height: 6),
-                                              // Time pill
-                                              GestureDetector(
-                                                onTap: isVisited
-                                                    ? null
-                                                    : () =>
-                                                        _selectTimeForDetail(
-                                                          detail,
-                                                        ),
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      (extraInfo != null &&
-                                                          extraInfo.isNotEmpty)
-                                                      ? customColor.withAlpha(
-                                                          20,
-                                                        )
-                                                      : const Color(0xFFFEF3C7),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color:
-                                                        (extraInfo != null &&
-                                                            extraInfo
-                                                                .isNotEmpty)
-                                                        ? customColor.withAlpha(
-                                                            70,
-                                                          )
-                                                        : const Color(
-                                                            0xFFFBBF24,
-                                                          ).withAlpha(120),
-                                                  ),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.schedule_rounded,
-                                                      size: 12,
-                                                      color:
-                                                          (extraInfo != null &&
-                                                              extraInfo
-                                                                  .isNotEmpty)
-                                                          ? customColor
-                                                          : const Color(
-                                                              0xFFD97706,
-                                                            ),
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Flexible(
-                                                      child: Text(
-                                                        (extraInfo != null &&
-                                                                extraInfo
-                                                                    .isNotEmpty)
-                                                            ? extraInfo
-                                                            : 'Thêm thời gian',
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color:
-                                                              (extraInfo !=
-                                                                      null &&
-                                                                  extraInfo
-                                                                      .isNotEmpty)
-                                                              ? customColor
-                                                              : const Color(
-                                                                  0xFFD97706,
-                                                                ),
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
+                                              const SizedBox(height: 7),
+                                              // Tags row (category + weather)
+                                              _buildPlaceTags(
+                                                place,
+                                                date: _getDateForDetail(detail),
+                                                startTime: detail['startTime']?.toString(),
                                               ),
-                                            ),
-                                            const SizedBox(height: 7),
-                                            // Tags row (category + weather)
-                                            _buildPlaceTags(
-                                              place,
-                                              date: _getDateForDetail(detail),
-                                              startTime: detail['startTime']
-                                                  ?.toString(),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                // RIGHT: hero image + optional checkbox
-                                Stack(
+                                        const SizedBox(width: 10),
+                                        // RIGHT: hero image + optional checkbox
+                                        Stack(
                                   alignment: Alignment.topRight,
                                   children: [
                                     ClipRRect(
