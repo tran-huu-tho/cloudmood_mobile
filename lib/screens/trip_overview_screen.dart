@@ -1911,16 +1911,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       shrunkId = calculated['shrunkId'];
       shrunkEndTime = calculated['shrunkEndTime'];
     }
-    // OPTIMISTIC UPDATE: Chèn ngay lập tức vào UI (0s)
-    final tempItem = {
+    final int? affectedDay = sectionOrDay.startsWith('Ngày')
+        ? (int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1)
+        : null;
+
+    final Map<String, dynamic> tempItem = {
       'id': DateTime.now().millisecondsSinceEpoch,
       'itineraryId': itineraryId,
       'placeId': placeId,
       'place': place,
       'section': sectionOrDay,
-      'day': sectionOrDay.startsWith('Ngày')
-          ? (int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1)
-          : null,
+      'day': affectedDay,
       'startTime': calculatedStartTime,
       'endTime': calculatedEndTime,
       'sortOrder': 9999,
@@ -1936,9 +1937,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           }
         }
       }
-      if (sectionOrDay.startsWith('Ngày') &&
-          _itineraryData['isGuide'] != true) {
+      if (affectedDay != null && _itineraryData['isGuide'] != true) {
         _details.add(tempItem);
+        final dayItems = _details.where((d) => d['day'] == affectedDay).toList();
+        final optimized = _optimizeDayTimeSlots(dayItems);
+        for (final item in optimized) {
+          final idx = _details.indexWhere((d) => d['id'] == item['id']);
+          if (idx != -1) {
+            _details[idx]['startTime'] = item['startTime'];
+            _details[idx]['endTime'] = item['endTime'];
+            _details[idx]['sortOrder'] = item['sortOrder'];
+          }
+        }
+        final optimizedTempItem = optimized.firstWhere((item) => item['id'] == tempItem['id'], orElse: () => tempItem);
+        calculatedStartTime = optimizedTempItem['startTime'];
+        calculatedEndTime = optimizedTempItem['endTime'];
       } else {
         _savedPlaces.add(tempItem);
       }
@@ -1951,10 +1964,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       color: AppTheme.green,
     );
 
-    if (sectionOrDay.startsWith('Ngày') && _itineraryData['isGuide'] != true) {
-      final int day =
-          int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1;
-
+    if (affectedDay != null && _itineraryData['isGuide'] != true) {
       if (shrunkId != null && shrunkEndTime != null) {
         final sid = int.tryParse(shrunkId!);
         if (sid != null) {
@@ -1967,10 +1977,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       result = await DatabaseService().addPlaceToItinerary(
         itineraryId: itineraryId,
         placeId: placeId,
-        day: day,
+        day: affectedDay,
         startTime: calculatedStartTime,
         endTime: calculatedEndTime,
       );
+
+      final dayItems = _details.where((d) => d['day'] == affectedDay && d['id'] != tempItem['id']).toList();
+      final List<Future<bool>> futures = [];
+      for (final item in dayItems) {
+        final itemId = item['id'] as int;
+        futures.add(
+          DatabaseService().updateItineraryDetail(itemId, {
+            'startTime': item['startTime'],
+            'endTime': item['endTime'],
+            'sortOrder': item['sortOrder'],
+          }),
+        );
+      }
+      Future.wait(futures).catchError((e) => <bool>[]);
     } else {
       result = await DatabaseService().addPlaceToSaved(
         itineraryId: itineraryId,
@@ -1979,7 +2003,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       );
     }
 
-    // Cập nhật id thật từ Server trả về mà giữ lại object place (tránh chớp/mất địa điểm)
     if (result != null && result['id'] != null) {
       final Map<String, dynamic> updatedItem = Map<String, dynamic>.from(
         result is Map ? result : {},
@@ -1988,8 +2011,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         updatedItem['place'] = place;
       }
       setState(() {
-        if (sectionOrDay.startsWith('Ngày') &&
-            _itineraryData['isGuide'] != true) {
+        if (affectedDay != null && _itineraryData['isGuide'] != true) {
           final idx = _details.indexWhere((d) => d['id'] == tempItem['id']);
           if (idx != -1) _details[idx] = updatedItem;
         } else {
@@ -2039,8 +2061,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       _details.removeWhere((d) => d['id'] == detailId);
 
       if (affectedDay != null) {
-        final dayItems =
-            _details.where((d) => d['day'] == affectedDay).toList();
+        final dayItems = _details
+            .where((d) => d['day'] == affectedDay)
+            .toList();
         if (dayItems.isNotEmpty) {
           final optimized = _optimizeDayTimeSlots(dayItems);
           for (final item in optimized) {
@@ -2081,18 +2104,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         if (inDetails || (!inSaved && !isSavedPlace)) {
           await DatabaseService().deletePlaceFromItinerary(detailId);
           if (affectedDay != null) {
-            final dayItems =
-                _details.where((d) => d['day'] == affectedDay).toList();
+            final dayItems = _details
+                .where((d) => d['day'] == affectedDay)
+                .toList();
             for (final item in dayItems) {
               if (item['id'] != null) {
-                await DatabaseService().updateItineraryDetail(
-                  item['id'] as int,
-                  {
-                    'startTime': item['startTime'],
-                    'endTime': item['endTime'],
-                    'sortOrder': item['sortOrder'],
-                  },
-                );
+                await DatabaseService()
+                    .updateItineraryDetail(item['id'] as int, {
+                      'startTime': item['startTime'],
+                      'endTime': item['endTime'],
+                      'sortOrder': item['sortOrder'],
+                    });
               }
             }
           }
@@ -2848,12 +2870,127 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 _buildSettingTile(
                   Icons.delete_outline_rounded,
                   'Xóa chuyến đi này',
+                  onTap: _showDeleteTripDialog,
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  void _showDeleteTripDialog() {
+    final bool isGuide = _itineraryData['isGuide'] == true;
+    final String label = isGuide ? 'hướng dẫn' : 'chuyến đi';
+
+    if (_currentRole != 'OWNER') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Chỉ chủ sở hữu (OWNER) mới có quyền xóa $label này.',
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.redAccent,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Text('Xóa $label'),
+            ],
+          ),
+          content: Text(
+            'Bạn có chắc chắn muốn xóa $label này không? Tất cả dữ liệu của $label sẽ bị xóa vĩnh viễn và không thể hoàn tác.',
+            style: const TextStyle(fontSize: 14, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'Hủy',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+
+                final int itineraryId = _itineraryData['id'] is int
+                    ? _itineraryData['id'] as int
+                    : int.parse(_itineraryData['id'].toString());
+
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => const Center(
+                    child: CircularProgressIndicator(color: AppTheme.primary),
+                  ),
+                );
+
+                final success = await DatabaseService().deleteItinerary(
+                  itineraryId,
+                );
+
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Đã xóa $label thành công.'),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    Navigator.of(context).pop(true);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Không thể xóa $label. Vui lòng thử lại.',
+                        ),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text(
+                'Xóa',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -8617,6 +8754,311 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
+  void _showPlaceIncidentReportSheet(Map<String, dynamic> detail) {
+    final place = detail['place'] ?? {};
+    final String name = place['name'] ?? 'Địa điểm';
+    final TextEditingController noteCtrl = TextEditingController(
+      text: detail['incidentNote']?.toString() ?? '',
+    );
+    String selectedTag =
+        detail['incidentTag']?.toString() ?? 'Đóng cửa bất ngờ';
+
+    final List<Map<String, dynamic>> tagsOptions = [
+      {'label': '🚫 Đóng cửa bất ngờ', 'value': 'Đóng cửa bất ngờ'},
+      {'label': '🌧️ Mưa lớn đột xuất', 'value': 'Mưa lớn đột xuất'},
+      {'label': '🚧 Đang sửa chữa', 'value': 'Đang sửa chữa'},
+      {'label': '⏳ Quá tải / Đông đúc', 'value': 'Quá tải / Đông đúc'},
+      {'label': '💬 Ghi chú khác', 'value': 'Ghi chú khác'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.rate_review_rounded,
+                          color: AppTheme.primary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Báo cáo thực tế & Phản hồi',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Chọn loại sự cố / phản hồi:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF334155),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: tagsOptions.map((opt) {
+                        final bool isSel = selectedTag == opt['value'];
+                        return ChoiceChip(
+                          label: Text(
+                            opt['label'] as String,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSel
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: isSel
+                                  ? Colors.white
+                                  : const Color(0xFF334155),
+                            ),
+                          ),
+                          selected: isSel,
+                          selectedColor: AppTheme.primary,
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          onSelected: (val) {
+                            if (val) {
+                              setSheetState(() {
+                                selectedTag = opt['value'] as String;
+                              });
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: noteCtrl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText:
+                            'Nhập chi tiết ghi chú (ví dụ: Quán nghỉ đến ngày 5/8, đường ngập mưa...)',
+                        hintStyle: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFCBD5E1),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: AppTheme.primary,
+                            width: 1.5,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.all(12),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        if (detail['incidentReport'] != null)
+                          TextButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _clearIncidentReport(detail);
+                            },
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Xóa báo cáo',
+                              style: TextStyle(color: Colors.redAccent),
+                            ),
+                          ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _saveIncidentReport(
+                              detail: detail,
+                              tag: selectedTag,
+                              note: noteCtrl.text.trim(),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.check_circle_outline_rounded,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Lưu phản hồi',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _saveIncidentReport({
+    required Map<String, dynamic> detail,
+    required String tag,
+    required String note,
+  }) {
+    final int detailId = detail['id'] as int;
+    final int dayNum = (detail['day'] as num?)?.toInt() ?? 1;
+
+    final String fullReport = note.isNotEmpty ? '$tag - $note' : tag;
+
+    setState(() {
+      final idx = _details.indexWhere((d) => d['id'] == detailId);
+      if (idx != -1) {
+        _details[idx]['incidentReport'] = fullReport;
+        _details[idx]['incidentTag'] = tag;
+        _details[idx]['incidentNote'] = note;
+      }
+    });
+
+    _showPremiumNotification(
+      title: 'Đã lưu phản hồi thực tế',
+      message: 'Báo cáo sự cố "$tag" đã được ghi nhận vào hành trình.',
+      icon: Icons.check_circle_rounded,
+      color: Colors.green,
+    );
+
+    DatabaseService().updateItineraryDetail(detailId, {
+      'incidentReport': fullReport,
+    });
+
+    if (tag == 'Mưa lớn đột xuất' || tag == 'Đóng cửa bất ngờ') {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppTheme.primary,
+                  size: 22,
+                ),
+                SizedBox(width: 8),
+                Text('Tối ưu AI tự động?'),
+              ],
+            ),
+            content: Text(
+              'Bạn vừa báo cáo "$tag". Bạn có muốn AI Gemini tự động sắp xếp lại lịch trình Ngày $dayNum cho hợp lý hơn không?',
+              style: const TextStyle(fontSize: 13, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'Để tôi tự kéo',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _optimizeDay(dayNum - 1);
+                },
+                icon: const Icon(Icons.auto_awesome, size: 16),
+                label: const Text('AI Tối Ưu Ngay'),
+              ),
+            ],
+          ),
+        );
+      });
+    }
+  }
+
+  void _clearIncidentReport(Map<String, dynamic> detail) {
+    final int detailId = detail['id'] as int;
+    setState(() {
+      final idx = _details.indexWhere((d) => d['id'] == detailId);
+      if (idx != -1) {
+        _details[idx].remove('incidentReport');
+        _details[idx].remove('incidentTag');
+        _details[idx].remove('incidentNote');
+      }
+    });
+    DatabaseService().updateItineraryDetail(detailId, {'incidentReport': null});
+  }
+
   Widget _buildPlaceTags(Map place, {String? startTime, DateTime? date}) {
     List<dynamic> tags = [];
 
@@ -8625,6 +9067,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     } else {
       tags = ['Điểm tham quan'];
     }
+
+    final weather = _getWeatherForPlace(place, startTime, date);
+    final String wDesc = (weather['desc'] ?? '').toString().toLowerCase();
+    final bool isRainy =
+        wDesc.contains('mưa') ||
+        wDesc.contains('dông') ||
+        ((weather['rainProb'] as num?)?.toInt() ?? 0) >= 60;
 
     return Wrap(
       spacing: 6,
@@ -8649,6 +9098,34 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           ),
         ),
         _buildWeatherChip(place, startTime, date),
+        if (isRainy)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFCA5A5)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 12,
+                  color: Color(0xFFDC2626),
+                ),
+                SizedBox(width: 3),
+                Text(
+                  'Cảnh báo mưa',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFFDC2626),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -9573,8 +10050,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       return {'startTime': startStr, 'endTime': endStr};
     }
 
-    // If no existing places with time in the day, start first place at 07:00 - 08:30
-    return {'startTime': '07:00', 'endTime': '08:30'};
+    // If no existing places with time in the day, start first place at 07:00 - 08:00
+    return {'startTime': '07:00', 'endTime': '08:00'};
   }
 
   List<Map<String, dynamic>> _recalculateDayTimeline(
@@ -9594,165 +10071,114 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
 
-    sorted.sort((a, b) {
-      final bool aPinned = a['isUserPinned'] == true;
-      final bool bPinned = b['isUserPinned'] == true;
-
-      if (aPinned && bPinned) {
-        final aStartVal = _getSortableTimeValue(
-          a['startTime']?.toString() ?? '07:00',
-        );
-        final bStartVal = _getSortableTimeValue(
-          b['startTime']?.toString() ?? '07:00',
-        );
-        return aStartVal.compareTo(bStartVal);
-      } else if (aPinned && !bPinned) {
-        final aStartVal = _getSortableTimeValue(
-          a['startTime']?.toString() ?? '07:00',
-        );
-        final int bOrd = (b['sortOrder'] as num?)?.toInt() ?? 0;
-        final double approxBTime = 7.0 + (bOrd * 1.5);
-        return aStartVal.compareTo(approxBTime);
-      } else if (!aPinned && bPinned) {
-        final bStartVal = _getSortableTimeValue(
-          b['startTime']?.toString() ?? '07:00',
-        );
-        final int aOrd = (a['sortOrder'] as num?)?.toInt() ?? 0;
-        final double approxATime = 7.0 + (aOrd * 1.5);
-        return approxATime.compareTo(bStartVal);
+    bool hasFloatingMarket = false;
+    int nonFloatingMarketCount = 0;
+    for (var item in sorted) {
+      final place = item['place'] ?? {};
+      final String name = (place['name'] ?? '').toString().toLowerCase();
+      if (name.contains('chợ nổi') || name.contains('cái răng') || name.contains('floating market')) {
+        hasFloatingMarket = true;
+      } else {
+        nonFloatingMarketCount++;
       }
+    }
+
+    // Keep sorting strictly by sortOrder, but put floating market at index 0
+    sorted.sort((a, b) {
+      final placeA = a['place'] ?? {};
+      final placeB = b['place'] ?? {};
+      final String nameA = (placeA['name'] ?? '').toString().toLowerCase();
+      final String nameB = (placeB['name'] ?? '').toString().toLowerCase();
+      final isMarketA = nameA.contains('chợ nổi') || nameA.contains('cái răng') || nameA.contains('floating market');
+      final isMarketB = nameB.contains('chợ nổi') || nameB.contains('cái răng') || nameB.contains('floating market');
+      if (isMarketA && !isMarketB) return -1;
+      if (!isMarketA && isMarketB) return 1;
 
       final int orderA = (a['sortOrder'] as num?)?.toInt() ?? 0;
       final int orderB = (b['sortOrder'] as num?)?.toInt() ?? 0;
       return orderA.compareTo(orderB);
     });
 
-    double currentTime = 7.0;
+    final List<Map<String, String>> slotMatrix7 = [
+      {'startTime': '07:00', 'endTime': '08:00'}, // Ăn sáng
+      {'startTime': '08:30', 'endTime': '10:30'}, // Đi chơi 1
+      {'startTime': '11:30', 'endTime': '13:00'}, // Ăn trưa (90 phút)
+      {'startTime': '13:30', 'endTime': '15:00'}, // Nghỉ ngơi / Cafe
+      {'startTime': '15:30', 'endTime': '17:00'}, // Đi chơi 2
+      {'startTime': '17:30', 'endTime': '19:00'}, // Ăn tối (90 phút)
+      {'startTime': '19:30', 'endTime': '21:30'}, // Đi chơi tối / Cafe
+    ];
 
+    final List<Map<String, String>> slotMatrix8 = [
+      {'startTime': '07:00', 'endTime': '08:00'}, // Ăn sáng
+      {'startTime': '08:30', 'endTime': '10:30'}, // Đi chơi 1
+      {'startTime': '11:00', 'endTime': '12:00'}, // Đi chơi 2
+      {'startTime': '12:30', 'endTime': '14:00'}, // Ăn trưa (90 phút)
+      {'startTime': '14:30', 'endTime': '15:30'}, // Nghỉ ngơi / Cafe
+      {'startTime': '16:00', 'endTime': '17:30'}, // Đi chơi 3
+      {'startTime': '18:00', 'endTime': '19:30'}, // Ăn tối (90 phút)
+      {'startTime': '20:00', 'endTime': '22:00'}, // Đi chơi tối / Cafe
+    ];
+
+    final List<Map<String, String>> hardSlots = [
+      {'startTime': '07:00', 'endTime': '08:00'}, // Slot 0: Ăn sáng
+      {'startTime': '08:30', 'endTime': '09:30'}, // Slot 1: Đi chơi 1
+      {'startTime': '10:00', 'endTime': '11:30'}, // Slot 2: Đi chơi 2
+      {'startTime': '12:00', 'endTime': '13:30'}, // Slot 3: Ăn trưa (90 phút)
+      {'startTime': '14:00', 'endTime': '15:00'}, // Slot 4: Đi chơi 3 / Check-in
+      {'startTime': '15:30', 'endTime': '17:00'}, // Slot 5: Đi chơi 4
+      {'startTime': '17:30', 'endTime': '19:00'}, // Slot 6: Ăn tối (90 phút)
+      {'startTime': '19:30', 'endTime': '20:30'}, // Slot 7: Đi chơi 5
+      {'startTime': '21:00', 'endTime': '22:30'}, // Slot 8: Đi chơi 6 / Coffee
+    ];
+
+    final List<Map<String, String>> canThoSlotMatrix10 = [
+      {'startTime': '05:30', 'endTime': '07:15'}, // Chợ nổi sáng sớm
+      {'startTime': '07:30', 'endTime': '08:30'}, // Cà phê sáng
+      {'startTime': '09:00', 'endTime': '10:00'}, // Đi chơi 1
+      {'startTime': '10:30', 'endTime': '11:30'}, // Đi chơi 2
+      {'startTime': '12:00', 'endTime': '13:30'}, // Ăn trưa (90 phút)
+      {'startTime': '14:00', 'endTime': '15:00'}, // Đi chơi 3
+      {'startTime': '15:30', 'endTime': '17:00'}, // Đi chơi 4
+      {'startTime': '17:30', 'endTime': '19:00'}, // Ăn tối (90 phút)
+      {'startTime': '19:30', 'endTime': '20:30'}, // Đi chơi 5
+      {'startTime': '21:00', 'endTime': '22:30'}, // Đi chơi 6
+    ];
+
+    final List<Map<String, String>> activeMatrix = hasFloatingMarket
+        ? canThoSlotMatrix10
+        : (nonFloatingMarketCount <= 7
+            ? slotMatrix7
+            : (nonFloatingMarketCount == 8 ? slotMatrix8 : hardSlots));
+
+    int slotIndex = 0;
     for (int i = 0; i < sorted.length; i++) {
       final item = sorted[i];
       final place = item['place'] ?? {};
-      final String name = (place['name'] ?? '').toString().toLowerCase();
 
-      // Rule for Floating Market / Chợ nổi -> 05:30 - 07:30
-      if (name.contains('chợ nổi') ||
-          name.contains('cái răng') ||
-          name.contains('floating market')) {
-        item['startTime'] = '05:30';
-        item['endTime'] = '07:30';
-        item['sortOrder'] = i;
-        currentTime = 7.5;
-        continue;
+      if (slotIndex < activeMatrix.length) {
+        item['startTime'] = activeMatrix[slotIndex]['startTime'];
+        item['endTime'] = activeMatrix[slotIndex]['endTime'];
+        slotIndex++;
+      } else {
+        final lastEnd = activeMatrix.last['endTime']!;
+        final parts = lastEnd.split(':');
+        int h =
+            (int.tryParse(parts[0]) ?? 22) +
+            ((slotIndex - activeMatrix.length) * 1);
+        h = h % 24;
+        item['startTime'] = '${h.toString().padLeft(2, '0')}:00';
+        item['endTime'] = '${(h + 1).toString().padLeft(2, '0')}:00';
+        slotIndex++;
       }
 
-      final bool isNightScene =
-          name.contains('chợ đêm') ||
-          name.contains('night market') ||
-          name.contains('cầu đi bộ') ||
-          name.contains('pedestrian bridge') ||
-          name.contains('bar') ||
-          name.contains('pub') ||
-          name.contains('bến tàu') ||
-          name.contains('hoàng hôn') ||
-          name.contains('sunset') ||
-          name.contains('du thuyền') ||
-          name.contains('club') ||
-          name.contains('lounge');
-
-      final bool isOutdoorDaytime =
-          name.contains('vườn') ||
-          name.contains('sinh thái') ||
-          name.contains('di tích') ||
-          name.contains('chùa') ||
-          name.contains('bảo tàng') ||
-          name.contains('đền');
-
-      final bool isPinned = item['isUserPinned'] == true;
-
-      // Rule: NIGHT_ONLY places start at or after 18:30
-      if (isNightScene && currentTime < 18.5 && !isPinned) {
-        currentTime = 18.5;
-      }
-
-      // Rule: NOON_REST (12:30 - 14:30) - avoid outdoor places in peak sun
-      if (isOutdoorDaytime &&
-          currentTime >= 12.5 &&
-          currentTime < 14.5 &&
-          !isPinned) {
-        currentTime = 14.5;
-      }
-
-      final existingStart = item['startTime']?.toString() ?? '';
-      double itemStartVal = currentTime;
-      double itemDuration = 1.5;
-
-      if (isPinned && existingStart.isNotEmpty && existingStart.contains(':')) {
-        final val = _getSortableTimeValue(existingStart);
-        itemStartVal = val;
-        final existingEnd = item['endTime']?.toString() ?? '';
-        if (existingEnd.isNotEmpty && existingEnd.contains(':')) {
-          final endVal = _getSortableTimeValue(existingEnd);
-          if (endVal > itemStartVal) {
-            itemDuration = endVal - itemStartVal;
-            if (itemDuration < 0.5) itemDuration = 0.5;
-          }
-        }
-      }
-
-      int startH = itemStartVal.toInt();
-      int startM = ((itemStartVal - startH) * 60).round();
-      startM = (startM / 5).round() * 5;
-      if (startM >= 60) {
-        startH += startM ~/ 60;
-        startM = startM % 60;
-      }
-      startH = startH % 24;
-
-      if (startH >= 22 || startH < 6) {
-        item['startTime'] = null;
-        item['endTime'] = null;
-        item['sortOrder'] = i;
-        continue;
-      }
-
-      final startStr =
-          '${startH.toString().padLeft(2, '0')}:${startM.toString().padLeft(2, '0')}';
-
-      int endH = startH + itemDuration.toInt();
-      int endM = startM + ((itemDuration - itemDuration.toInt()) * 60).round();
-      if (endM >= 60) {
-        endH += endM ~/ 60;
-        endM = endM % 60;
-      }
-      endH = endH % 24;
-
-      if (endH >= 22 && endM > 30) {
-        item['startTime'] = null;
-        item['endTime'] = null;
-        item['sortOrder'] = i;
-        continue;
-      }
-
-      final endStr =
-          '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
-
-      item['startTime'] = startStr;
-      item['endTime'] = endStr;
       item['sortOrder'] = i;
 
-      int travelDuration = 15;
-      if (i < sorted.length - 1) {
-        final nextItem = sorted[i + 1];
-        if (place.isNotEmpty && nextItem['place'] != null) {
-          final travelInfo = _getMockTravelInfo(
-            Map<String, dynamic>.from(place),
-            Map<String, dynamic>.from(nextItem['place'] as Map),
-          );
-          travelDuration = (travelInfo['duration'] as num?)?.toInt() ?? 15;
-        }
+      // Invalidate weather cache for this place so new time slot fetches correct weather forecast
+      final int placeId = (place['id'] as num?)?.toInt() ?? 0;
+      if (placeId > 0) {
+        _placeWeatherCache.removeWhere((key, _) => key.startsWith('$placeId-'));
       }
-
-      currentTime = (endH + endM / 60.0) + (travelDuration + 30) / 60.0;
     }
 
     return sorted;
@@ -9761,18 +10187,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   List<Map<String, dynamic>> _optimizeDayTimeSlots(
     List<Map<String, dynamic>> items,
   ) {
-    final resetItems = List<Map<String, dynamic>>.from(items);
-    for (var item in resetItems) {
-      final place = item['place'] ?? {};
-      final String name = (place['name'] ?? '').toString().toLowerCase();
-      if (!(name.contains('chợ nổi') ||
-          name.contains('cái răng') ||
-          name.contains('floating market'))) {
-        item['startTime'] = null;
-        item['endTime'] = null;
-      }
-    }
-    return _recalculateDayTimeline(resetItems);
+    return _recalculateDayTimeline(items);
   }
 
   Future<void> _optimizeDay(int dayIndex) async {
@@ -13186,16 +13601,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         if (isVisited) {
                           _showPremiumNotification(
                             title: 'Địa điểm đã ghé thăm',
-                            message:
-                                'Không thể xóa địa điểm đã hoàn thành!',
+                            message: 'Không thể xóa địa điểm đã hoàn thành!',
                             icon: Icons.lock_rounded,
                             color: Colors.orange,
                           );
                         } else {
-                          _removePlaceDetail(
-                            detail['id'],
-                            place['name'] ?? '',
-                          );
+                          _removePlaceDetail(detail['id'], place['name'] ?? '');
                         }
                       },
                       backgroundColor: isVisited
@@ -13266,373 +13677,570 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 children: [
                                   // LEFT: drag handle + number badge + text info
                                   // Drag handle (disabled if isVisited)
-                                        if (isVisited)
-                                          const Padding(
-                                            padding: EdgeInsets.only(
-                                              top: 2,
-                                              right: 6,
-                                            ),
-                                            child: Icon(
-                                              Icons.lock_outline_rounded,
-                                              color: Color(0xFF94A3B8),
-                                              size: 13,
-                                            ),
-                                          )
-                                        else
-                                          ReorderableDragStartListener(
-                                            index: idx,
-                                            child: const Padding(
-                                              padding: EdgeInsets.only(
-                                                top: 2,
-                                                right: 6,
-                                              ),
-                                              child: Icon(
-                                                Icons.drag_indicator_rounded,
-                                                color: Color(0xFFCBD5E1),
-                                                size: 18,
-                                              ),
-                                            ),
-                                          ),
-                                        // Number badge
-                                        Container(
-                                          width: 28,
-                                          height: 28,
-                                          margin: const EdgeInsets.only(
-                                            right: 10,
-                                            top: 1,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: isVisited
-                                                ? const Color(0xFF10B981)
-                                                : customColor,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            (() {
-                                              int n = 0;
-                                              for (int i = 0; i <= idx; i++) {
-                                                if (sortedDayDetails[i]['place'] != null) {
-                                                  n++;
-                                                }
-                                              }
-                                              return '$n';
-                                            })(),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13,
-                                            ),
-                                          ),
+                                  if (isVisited)
+                                    const Padding(
+                                      padding: EdgeInsets.only(
+                                        top: 2,
+                                        right: 6,
+                                      ),
+                                      child: Icon(
+                                        Icons.lock_outline_rounded,
+                                        color: Color(0xFF94A3B8),
+                                        size: 13,
+                                      ),
+                                    )
+                                  else
+                                    ReorderableDragStartListener(
+                                      index: idx,
+                                      child: const Padding(
+                                        padding: EdgeInsets.only(
+                                          top: 2,
+                                          right: 6,
                                         ),
-                                        // Name + time + tags
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                name.isNotEmpty ? name : 'Địa điểm',
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 15,
-                                                  color: isVisited
-                                                      ? const Color(0xFF64748B)
-                                                      : const Color(0xFF0F172A),
-                                                  decoration: isVisited
-                                                      ? TextDecoration.lineThrough
-                                                      : null,
-                                                  decorationColor:
-                                                      const Color(0xFF94A3B8),
-                                                  letterSpacing: -0.2,
-                                                  height: 1.25,
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Wrap(
-                                                crossAxisAlignment: WrapCrossAlignment.center,
-                                                spacing: 6,
-                                                runSpacing: 4,
-                                                children: [
-                                                  // Time pill
-                                                  GestureDetector(
-                                                    onTap: isVisited
-                                                        ? null
-                                                        : () => _selectTimeForDetail(detail),
-                                                    child: Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 4,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: (extraInfo != null && extraInfo.isNotEmpty)
-                                                            ? customColor.withAlpha(20)
-                                                            : const Color(0xFFFEF3C7),
-                                                        borderRadius: BorderRadius.circular(8),
-                                                        border: Border.all(
-                                                          color: (extraInfo != null && extraInfo.isNotEmpty)
-                                                              ? customColor.withAlpha(70)
-                                                              : const Color(0xFFFBBF24).withAlpha(120),
-                                                        ),
-                                                      ),
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Icon(
-                                                            Icons.schedule_rounded,
-                                                            size: 12,
-                                                            color: (extraInfo != null && extraInfo.isNotEmpty)
-                                                                ? customColor
-                                                                : const Color(0xFFD97706),
-                                                          ),
-                                                          const SizedBox(width: 4),
-                                                          Text(
-                                                            (extraInfo != null && extraInfo.isNotEmpty)
-                                                                ? extraInfo
-                                                                : 'Thêm thời gian',
-                                                            style: TextStyle(
-                                                              fontSize: 11,
-                                                              fontWeight: FontWeight.w600,
-                                                              color: (extraInfo != null && extraInfo.isNotEmpty)
-                                                                  ? customColor
-                                                                  : const Color(0xFFD97706),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  // Visited badge
-                                                  InkWell(
-                                                    onTap: () => _toggleVisitedDetail(id, detail),
-                                                    borderRadius: BorderRadius.circular(12),
-                                                    child: Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                                      decoration: BoxDecoration(
-                                                        color: isVisited
-                                                            ? const Color(0xFF10B981).withAlpha(25)
-                                                            : Colors.grey.withAlpha(18),
-                                                        borderRadius: BorderRadius.circular(12),
-                                                        border: Border.all(
-                                                          color: isVisited
-                                                              ? const Color(0xFF10B981)
-                                                              : Colors.grey.withAlpha(60),
-                                                          width: 1,
-                                                        ),
-                                                      ),
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Icon(
-                                                            isVisited
-                                                                ? Icons.check_circle_rounded
-                                                                : Icons.radio_button_unchecked_rounded,
-                                                            size: 13,
-                                                            color: isVisited ? const Color(0xFF059669) : Colors.grey[600],
-                                                          ),
-                                                          const SizedBox(width: 3),
-                                                          Text(
-                                                            isVisited ? 'Đã ghé' : 'Chưa ghé',
-                                                            style: TextStyle(
-                                                              fontSize: 10,
-                                                              fontWeight: FontWeight.bold,
-                                                              color: isVisited ? const Color(0xFF059669) : Colors.grey[600],
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 7),
-                                              // Tags row (category + weather)
-                                              _buildPlaceTags(
-                                                place,
-                                                date: _getDateForDetail(detail),
-                                                startTime: detail['startTime']?.toString(),
-                                              ),
-                                            ],
-                                          ),
+                                        child: Icon(
+                                          Icons.drag_indicator_rounded,
+                                          color: Color(0xFFCBD5E1),
+                                          size: 18,
                                         ),
-                                        const SizedBox(width: 10),
-                                        // RIGHT: hero image + optional checkbox
-                                        Stack(
-                                  alignment: Alignment.topRight,
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(14),
-                                      child:
-                                          (place['image'] != null &&
-                                              place['image']
-                                                  .toString()
-                                                  .isNotEmpty)
-                                          ? Image.network(
-                                              place['image'],
-                                              width: 90,
-                                              height: 90,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
-                                                  Container(
-                                                    width: 90,
-                                                    height: 90,
-                                                    decoration: BoxDecoration(
-                                                      color: customColor
-                                                          .withAlpha(18),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            14,
-                                                          ),
-                                                    ),
-                                                    child: Icon(
-                                                      Icons
-                                                          .photo_camera_outlined,
-                                                      size: 28,
-                                                      color: customColor
-                                                          .withAlpha(120),
-                                                    ),
-                                                  ),
-                                            )
-                                          : Container(
-                                              width: 90,
-                                              height: 90,
-                                              decoration: BoxDecoration(
-                                                color: customColor.withAlpha(
-                                                  18,
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(14),
-                                              ),
-                                              child: Icon(
-                                                Icons.photo_camera_outlined,
-                                                size: 28,
-                                                color: customColor.withAlpha(
-                                                  120,
-                                                ),
-                                              ),
-                                            ),
+                                      ),
                                     ),
-                                    if (_isSelectionMode || !isCollapsed)
-                                      IgnorePointer(
-                                        ignoring: _isSelectionMode,
-                                        child: Container(
-                                          margin: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(
-                                              4,
+                                  // Number badge
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    margin: const EdgeInsets.only(
+                                      right: 10,
+                                      top: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isVisited
+                                          ? const Color(0xFF10B981)
+                                          : customColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      (() {
+                                        int n = 0;
+                                        for (int i = 0; i <= idx; i++) {
+                                          if (sortedDayDetails[i]['place'] !=
+                                              null) {
+                                            n++;
+                                          }
+                                        }
+                                        return '$n';
+                                      })(),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                  // Name + time + tags
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name.isNotEmpty ? name : 'Địa điểm',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                            color: isVisited
+                                                ? const Color(0xFF64748B)
+                                                : const Color(0xFF0F172A),
+                                            decoration: isVisited
+                                                ? TextDecoration.lineThrough
+                                                : null,
+                                            decorationColor: const Color(
+                                              0xFF94A3B8,
+                                            ),
+                                            letterSpacing: -0.2,
+                                            height: 1.25,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          spacing: 6,
+                                          runSpacing: 4,
+                                          children: [
+                                            // Time pill
+                                            GestureDetector(
+                                              onTap: isVisited
+                                                  ? null
+                                                  : () => _selectTimeForDetail(
+                                                      detail,
+                                                    ),
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      (extraInfo != null &&
+                                                          extraInfo.isNotEmpty)
+                                                      ? customColor.withAlpha(
+                                                          20,
+                                                        )
+                                                      : const Color(0xFFFEF3C7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color:
+                                                        (extraInfo != null &&
+                                                            extraInfo
+                                                                .isNotEmpty)
+                                                        ? customColor.withAlpha(
+                                                            70,
+                                                          )
+                                                        : const Color(
+                                                            0xFFFBBF24,
+                                                          ).withAlpha(120),
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.schedule_rounded,
+                                                      size: 12,
+                                                      color:
+                                                          (extraInfo != null &&
+                                                              extraInfo
+                                                                  .isNotEmpty)
+                                                          ? customColor
+                                                          : const Color(
+                                                              0xFFD97706,
+                                                            ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      (extraInfo != null &&
+                                                              extraInfo
+                                                                  .isNotEmpty)
+                                                          ? extraInfo
+                                                          : 'Thêm thời gian',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color:
+                                                            (extraInfo !=
+                                                                    null &&
+                                                                extraInfo
+                                                                    .isNotEmpty)
+                                                            ? customColor
+                                                            : const Color(
+                                                                0xFFD97706,
+                                                              ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            // Incident Report / Comment Button
+                                            InkWell(
+                                              onTap: () =>
+                                                  _showPlaceIncidentReportSheet(
+                                                    detail,
+                                                  ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 7,
+                                                      vertical: 3,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      (detail['incidentReport'] !=
+                                                          null)
+                                                      ? const Color(0xFFFEF2F2)
+                                                      : Colors.grey.withAlpha(
+                                                          18,
+                                                        ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color:
+                                                        (detail['incidentReport'] !=
+                                                            null)
+                                                        ? const Color(
+                                                            0xFFEF4444,
+                                                          )
+                                                        : Colors.grey.withAlpha(
+                                                            60,
+                                                          ),
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      detail['incidentReport'] !=
+                                                              null
+                                                          ? Icons
+                                                                .report_problem_rounded
+                                                          : Icons
+                                                                .chat_bubble_outline_rounded,
+                                                      size: 12,
+                                                      color:
+                                                          detail['incidentReport'] !=
+                                                              null
+                                                          ? const Color(
+                                                              0xFFDC2626,
+                                                            )
+                                                          : Colors.grey[600],
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Text(
+                                                      detail['incidentReport'] !=
+                                                              null
+                                                          ? 'Có báo cáo'
+                                                          : 'Phản hồi',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            detail['incidentReport'] !=
+                                                                null
+                                                            ? const Color(
+                                                                0xFFDC2626,
+                                                              )
+                                                            : Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            // Visited badge
+                                            InkWell(
+                                              onTap: () => _toggleVisitedDetail(
+                                                id,
+                                                detail,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 7,
+                                                      vertical: 3,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: isVisited
+                                                      ? const Color(
+                                                          0xFF10B981,
+                                                        ).withAlpha(25)
+                                                      : Colors.grey.withAlpha(
+                                                          18,
+                                                        ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: isVisited
+                                                        ? const Color(
+                                                            0xFF10B981,
+                                                          )
+                                                        : Colors.grey.withAlpha(
+                                                            60,
+                                                          ),
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      isVisited
+                                                          ? Icons
+                                                                .check_circle_rounded
+                                                          : Icons
+                                                                .radio_button_unchecked_rounded,
+                                                      size: 13,
+                                                      color: isVisited
+                                                          ? const Color(
+                                                              0xFF059669,
+                                                            )
+                                                          : Colors.grey[600],
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Text(
+                                                      isVisited
+                                                          ? 'Đã ghé'
+                                                          : 'Chưa ghé',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: isVisited
+                                                            ? const Color(
+                                                                0xFF059669,
+                                                              )
+                                                            : Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 7),
+                                        // Tags row (category + weather)
+                                        _buildPlaceTags(
+                                          place,
+                                          date: _getDateForDetail(detail),
+                                          startTime: detail['startTime']
+                                              ?.toString(),
+                                        ),
+                                        if (detail['incidentReport'] !=
+                                            null) ...[
+                                          const SizedBox(height: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 9,
+                                              vertical: 5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFEF2F2),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: const Color(0xFFFCA5A5),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.warning_amber_rounded,
+                                                  size: 13,
+                                                  color: Color(0xFFDC2626),
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Expanded(
+                                                  child: Text(
+                                                    'Báo cáo: ${detail['incidentReport']}',
+                                                    style: const TextStyle(
+                                                      fontSize: 10.5,
+                                                      color: Color(0xFFB91C1C),
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                                GestureDetector(
+                                                  onTap: () =>
+                                                      _clearIncidentReport(
+                                                        detail,
+                                                      ),
+                                                  child: const Icon(
+                                                    Icons.close,
+                                                    size: 13,
+                                                    color: Color(0xFF991B1B),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                          width: 22,
-                                          height: 22,
-                                          child: Checkbox(
-                                            value: _selectedItemIds.contains(
-                                              detail['id'],
-                                            ),
-                                            onChanged: _isSelectionMode
-                                                ? (_) {}
-                                                : (val) {
-                                                    setState(() {
-                                                      _isSelectionMode = true;
-                                                      if (val == true) {
-                                                        _selectedItemIds.add(
-                                                          detail['id'] as int,
-                                                        );
-                                                      } else {
-                                                        _selectedItemIds.remove(
-                                                          detail['id'] as int,
-                                                        );
-                                                      }
-                                                    });
-                                                  },
-                                            activeColor: AppTheme.primary,
-                                            shape: RoundedRectangleBorder(
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  // RIGHT: hero image + optional checkbox
+                                  Stack(
+                                    alignment: Alignment.topRight,
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child:
+                                            (place['image'] != null &&
+                                                place['image']
+                                                    .toString()
+                                                    .isNotEmpty)
+                                            ? Image.network(
+                                                place['image'],
+                                                width: 90,
+                                                height: 90,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    Container(
+                                                      width: 90,
+                                                      height: 90,
+                                                      decoration: BoxDecoration(
+                                                        color: customColor
+                                                            .withAlpha(18),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              14,
+                                                            ),
+                                                      ),
+                                                      child: Icon(
+                                                        Icons
+                                                            .photo_camera_outlined,
+                                                        size: 28,
+                                                        color: customColor
+                                                            .withAlpha(120),
+                                                      ),
+                                                    ),
+                                              )
+                                            : Container(
+                                                width: 90,
+                                                height: 90,
+                                                decoration: BoxDecoration(
+                                                  color: customColor.withAlpha(
+                                                    18,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(14),
+                                                ),
+                                                child: Icon(
+                                                  Icons.photo_camera_outlined,
+                                                  size: 28,
+                                                  color: customColor.withAlpha(
+                                                    120,
+                                                  ),
+                                                ),
+                                              ),
+                                      ),
+                                      if (_isSelectionMode || !isCollapsed)
+                                        IgnorePointer(
+                                          ignoring: _isSelectionMode,
+                                          child: Container(
+                                            margin: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
                                               borderRadius:
                                                   BorderRadius.circular(4),
                                             ),
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            materialTapTargetSize:
-                                                MaterialTapTargetSize
-                                                    .shrinkWrap,
+                                            width: 22,
+                                            height: 22,
+                                            child: Checkbox(
+                                              value: _selectedItemIds.contains(
+                                                detail['id'],
+                                              ),
+                                              onChanged: _isSelectionMode
+                                                  ? (_) {}
+                                                  : (val) {
+                                                      setState(() {
+                                                        _isSelectionMode = true;
+                                                        if (val == true) {
+                                                          _selectedItemIds.add(
+                                                            detail['id'] as int,
+                                                          );
+                                                        } else {
+                                                          _selectedItemIds
+                                                              .remove(
+                                                                detail['id']
+                                                                    as int,
+                                                              );
+                                                        }
+                                                      });
+                                                    },
+                                              activeColor: AppTheme.primary,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                  ],
-                                ),
-                              ],
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          // ── FOOTER: 4 action icons + expand chevron ──
-                          const Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Color(0xFFF1F5F9),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                            // ── FOOTER: 4 action icons + expand chevron ──
+                            const Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: Color(0xFFF1F5F9),
                             ),
-                            child: Row(
-                              children: [
-                                // 📝 Ghi chú
-                                _buildCardActionIcon(
-                                  icon:
-                                      (detail['noteText'] != null &&
-                                          detail['noteText']
-                                              .toString()
-                                              .trim()
-                                              .isNotEmpty)
-                                      ? Icons.description_rounded
-                                      : Icons.description_outlined,
-                                  active:
-                                      detail['noteText'] != null &&
-                                      detail['noteText']
-                                          .toString()
-                                          .trim()
-                                          .isNotEmpty,
-                                  badge: null,
-                                  onTap: () =>
-                                      _showInlineNoteBottomSheet(detail),
-                                ),
-                                const SizedBox(width: 4),
-                                // ✓ Danh sách công việc
-                                Builder(
-                                  builder: (ctx) {
-                                    final List tl = detail['todoItems'] is List
-                                        ? (detail['todoItems'] as List)
-                                        : (detail['todoItems'] is String
-                                              ? (json.decode(
-                                                          detail['todoItems'],
-                                                        )
-                                                        as List? ??
-                                                    [])
-                                              : []);
-                                    final bool hasItems = tl.isNotEmpty;
-                                    final int done = hasItems
-                                        ? tl
-                                              .where((x) => x['done'] == true)
-                                              .length
-                                        : 0;
-                                    return _buildCardActionIcon(
-                                      icon: Icons.checklist_rounded,
-                                      active: hasItems,
-                                      badge: hasItems
-                                          ? '$done/${tl.length}'
-                                          : null,
-                                      onTap: () =>
-                                          _showInlineChecklistBottomSheet(
-                                            detail,
-                                          ),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(width: 4),
-                                // 😊 Biểu cảm
-                                /* _buildCardActionIcon(
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              child: Row(
+                                children: [
+                                  // 📝 Ghi chú
+                                  _buildCardActionIcon(
+                                    icon:
+                                        (detail['noteText'] != null &&
+                                            detail['noteText']
+                                                .toString()
+                                                .trim()
+                                                .isNotEmpty)
+                                        ? Icons.description_rounded
+                                        : Icons.description_outlined,
+                                    active:
+                                        detail['noteText'] != null &&
+                                        detail['noteText']
+                                            .toString()
+                                            .trim()
+                                            .isNotEmpty,
+                                    badge: null,
+                                    onTap: () =>
+                                        _showInlineNoteBottomSheet(detail),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  // ✓ Danh sách công việc
+                                  Builder(
+                                    builder: (ctx) {
+                                      final List tl =
+                                          detail['todoItems'] is List
+                                          ? (detail['todoItems'] as List)
+                                          : (detail['todoItems'] is String
+                                                ? (json.decode(
+                                                            detail['todoItems'],
+                                                          )
+                                                          as List? ??
+                                                      [])
+                                                : []);
+                                      final bool hasItems = tl.isNotEmpty;
+                                      final int done = hasItems
+                                          ? tl
+                                                .where((x) => x['done'] == true)
+                                                .length
+                                          : 0;
+                                      return _buildCardActionIcon(
+                                        icon: Icons.checklist_rounded,
+                                        active: hasItems,
+                                        badge: hasItems
+                                            ? '$done/${tl.length}'
+                                            : null,
+                                        onTap: () =>
+                                            _showInlineChecklistBottomSheet(
+                                              detail,
+                                            ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(width: 4),
+                                  // 😊 Biểu cảm
+                                  /* _buildCardActionIcon(
                                   icon: Icons.add_reaction_outlined,
                                   active: false,
                                   badge: null,
@@ -13651,65 +14259,65 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     );
                                   },
                                 ), */
-                                /* const SizedBox(width: 4), */
-                                // 💰 Chi phí
-                                Builder(
-                                  builder: (ctx) {
-                                    final expObj = detail['expense'];
-                                    double amt = 0;
-                                    if (expObj is Map<String, dynamic>) {
-                                      final v = expObj['amount'];
-                                      if (v is num)
-                                        amt = v.toDouble();
-                                      else if (v is String)
-                                        amt = double.tryParse(v) ?? 0;
-                                    }
-                                    return _buildCardActionIcon(
-                                      icon: Icons.attach_money_rounded,
-                                      active: amt > 0,
-                                      badge: null,
-                                      onTap: () => _openPlaceExpenseSheet(
-                                        detail,
-                                        isItineraryDetail: true,
-                                        dayIndex:
-                                            (detail['day'] as int? ?? 1) - 1,
-                                      ),
-                                    );
-                                  },
-                                ),
-                                const Spacer(),
-                                // ▼/▲ Expand / collapse
-                                GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      if (isCollapsed) {
-                                        _expandedPlaceIds.add(id);
-                                      } else {
-                                        _expandedPlaceIds.remove(id);
+                                  /* const SizedBox(width: 4), */
+                                  // 💰 Chi phí
+                                  Builder(
+                                    builder: (ctx) {
+                                      final expObj = detail['expense'];
+                                      double amt = 0;
+                                      if (expObj is Map<String, dynamic>) {
+                                        final v = expObj['amount'];
+                                        if (v is num)
+                                          amt = v.toDouble();
+                                        else if (v is String)
+                                          amt = double.tryParse(v) ?? 0;
                                       }
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(5),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF4F6F8),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      isCollapsed
-                                          ? Icons.expand_more_rounded
-                                          : Icons.expand_less_rounded,
-                                      size: 16,
-                                      color: const Color(0xFF64748B),
+                                      return _buildCardActionIcon(
+                                        icon: Icons.attach_money_rounded,
+                                        active: amt > 0,
+                                        badge: null,
+                                        onTap: () => _openPlaceExpenseSheet(
+                                          detail,
+                                          isItineraryDetail: true,
+                                          dayIndex:
+                                              (detail['day'] as int? ?? 1) - 1,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const Spacer(),
+                                  // ▼/▲ Expand / collapse
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        if (isCollapsed) {
+                                          _expandedPlaceIds.add(id);
+                                        } else {
+                                          _expandedPlaceIds.remove(id);
+                                        }
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF4F6F8),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        isCollapsed
+                                            ? Icons.expand_more_rounded
+                                            : Icons.expand_less_rounded,
+                                        size: 16,
+                                        color: const Color(0xFF64748B),
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          // Expanded content (note editor + checklist)
-                          if (!isCollapsed) ...[
-                            /* Builder(
+                            // Expanded content (note editor + checklist)
+                            if (!isCollapsed) ...[
+                              /* Builder(
                               builder: (ctx) {
                                 final List reactions = detail['reactions'] is List
                                     ? detail['reactions'] as List
@@ -13742,41 +14350,44 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 );
                               }
                             ), */
-                            if (detail['noteText'] != null &&
-                                detail['noteText'].toString().trim().isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  0,
-                                  12,
-                                  8,
+                              if (detail['noteText'] != null &&
+                                  detail['noteText']
+                                      .toString()
+                                      .trim()
+                                      .isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    0,
+                                    12,
+                                    8,
+                                  ),
+                                  child: _buildInlinePlaceNotePreview(detail),
                                 ),
-                                child: _buildInlinePlaceNotePreview(detail),
-                              ),
-                            if (detail['todoItems'] is List &&
-                                (detail['todoItems'] as List).isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  0,
-                                  12,
-                                  10,
+                              if (detail['todoItems'] is List &&
+                                  (detail['todoItems'] as List).isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    0,
+                                    12,
+                                    10,
+                                  ),
+                                  child: _buildInlinePlaceChecklistPreview(
+                                    detail,
+                                  ),
                                 ),
-                                child: _buildInlinePlaceChecklistPreview(
-                                  detail,
-                                ),
-                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
         Widget? travelSeparator;
         // Render travel separator at the bottom of item `idx` IF AND ONLY IF the next item (`idx + 1`) is a Place
@@ -13908,10 +14519,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           ),
         );
 
-        return Container(
-          key: ValueKey('item_$id'),
-          child: contentWidget,
-        );
+        return Container(key: ValueKey('item_$id'), child: contentWidget);
       }),
     );
   }
@@ -14218,10 +14826,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           .toLowerCase()
                                           .contains('ai');
 
-                                  if (isAiTrip) {
-                                    return const SizedBox.shrink();
-                                  }
-
                                   final placesOnly = dayDetails
                                       .where(
                                         (d) =>
@@ -14235,7 +14839,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     return const SizedBox.shrink();
                                   }
 
-                                  String optimizeText = 'Tối ưu lộ trình';
+                                  String subText = '';
                                   if (placesCount >= 2) {
                                     int totalDuration = 0;
                                     double totalDistance = 0;
@@ -14251,8 +14855,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         placesOnly[i + 1]['place'] as Map,
                                       );
                                       final info = _getMockTravelInfo(p1, p2);
-                                      totalDuration +=
-                                          info['duration'] as int;
+                                      totalDuration += info['duration'] as int;
                                       final dist =
                                           double.tryParse(
                                             (info['distance'] as String)
@@ -14261,30 +14864,43 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           0.0;
                                       totalDistance += dist;
                                     }
-                                    optimizeText =
-                                        'Tối ưu lộ trình · $totalDuration phút, ${totalDistance.toStringAsFixed(1).replaceAll('.', ',')} km';
+                                    subText =
+                                        ' · $totalDuration phút, ${totalDistance.toStringAsFixed(1).replaceAll('.', ',')} km';
                                   }
 
                                   return GestureDetector(
                                     onTap: () => _optimizeDay(index),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.route_outlined,
-                                          color: Color(0xFF0284C7),
-                                          size: 16,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: const Color(0xFFBFDBFE),
                                         ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          optimizeText,
-                                          style: const TextStyle(
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.auto_awesome_rounded,
                                             color: Color(0xFF0284C7),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
+                                            size: 14,
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            '✨ Tối ưu AI$subText',
+                                            style: const TextStyle(
+                                              color: Color(0xFF0284C7),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   );
                                 },

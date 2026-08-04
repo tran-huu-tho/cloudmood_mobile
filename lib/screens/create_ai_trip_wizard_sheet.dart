@@ -62,7 +62,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     },
     {
       'title': 'Trợ lý AI đang phân tích',
-      'desc': 'Gemini AI đọc hiểu yêu cầu và chọn lọc địa điểm...',
+      'desc': 'OpenAI GPT đọc hiểu yêu cầu và chọn lọc địa điểm...',
     },
     {
       'title': 'AI lên kế hoạch từng ngày',
@@ -476,7 +476,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         days: _days,
         budget: budgetInVND,
         companion: _privacyLevel,
-        pace: _selectedPace,
+        pace: 'Vừa phải',
         categories: _selectedCategories.isNotEmpty ? _selectedCategories : ['Tất cả'],
         amenities: [],
         isAi: true,
@@ -545,7 +545,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       final aiPlan = await DatabaseService().generateAIItinerary(
         destination: finalDestination,
         days: _days,
-        pace: _selectedPace,
+        pace: 'Vừa phải',
         companion: _privacyLevel,
         budget: _selectedBudgetLevel,
         categories: _selectedCategories,
@@ -611,7 +611,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           itineraryId,
           finalDestination,
           _days,
-          _selectedPace,
+          'Vừa phải',
           _selectedCategories,
           true,
           selectedBudgetLevel: _selectedBudgetLevel,
@@ -651,7 +651,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Gemini AI đã tạo lịch trình $_days ngày cho bạn!',
+                      'OpenAI GPT đã tạo lịch trình $_days ngày cho bạn!',
                     ),
                   ),
                 ],
@@ -671,7 +671,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
             itineraryId,
             finalDestination,
             _days,
-            _selectedPace,
+            'Vừa phải',
             _selectedCategories,
             true,
             selectedBudgetLevel: _selectedBudgetLevel,
@@ -828,9 +828,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         totalBudgetVND: budgetInVND,
       );
 
-      int placesPerDay = 5;
-      if (paceStr.contains('Thong thả')) placesPerDay = 4;
-      if (paceStr.contains('Dày đặc')) placesPerDay = 6;
+      int placesPerDay = 9;
 
       final int totalNeeded = days * placesPerDay;
 
@@ -1309,12 +1307,15 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     int totalPlacesForDay,
   ) {
     final slots = [
-      {'startTime': '07:00', 'endTime': '08:30'}, // Cữ 1: Ăn sáng & Cà phê
-      {'startTime': '09:30', 'endTime': '11:00'}, // Cữ 2: Tham quan chính
-      {'startTime': '11:30', 'endTime': '12:30'}, // Cữ 3: Ăn trưa & Nghỉ ngơi
-      {'startTime': '13:30', 'endTime': '15:00'}, // Cữ 4: Vui chơi / Check-in KS
-      {'startTime': '16:00', 'endTime': '17:30'}, // Cữ 5: Ăn chiều hoặc tối
-      {'startTime': '18:30', 'endTime': '22:00'}, // Cữ 6: Tham quan & Vui chơi tối
+      {'startTime': '07:00', 'endTime': '08:00'}, // Slot 0: Ăn sáng / Coffee
+      {'startTime': '08:30', 'endTime': '09:30'}, // Slot 1: Đi chơi 1
+      {'startTime': '10:00', 'endTime': '11:30'}, // Slot 2: Đi chơi 2
+      {'startTime': '12:00', 'endTime': '13:00'}, // Slot 3: Ăn trưa
+      {'startTime': '13:30', 'endTime': '14:30'}, // Slot 4: Đi chơi 3 / Check-in
+      {'startTime': '15:00', 'endTime': '17:00'}, // Slot 5: Đi chơi 4
+      {'startTime': '17:30', 'endTime': '19:00'}, // Slot 6: Ăn tối
+      {'startTime': '19:30', 'endTime': '20:30'}, // Slot 7: Đi chơi 5
+      {'startTime': '21:00', 'endTime': '22:30'}, // Slot 8: Đi chơi 6 / Coffee
     ];
     return slots[placeIndex % slots.length];
   }
@@ -3717,17 +3718,13 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     );
   }
 
-  // STEP 6: Custom Request for Gemini AI
+  // STEP 6: Custom Request for OpenAI GPT
   Widget _buildStep6CustomRequest() {
     final List<String> exampleRequests = [
-      'Đi với người già, không muốn đi bộ nhiều',
-      'Đi cùng em bé, ưu tiên nơi an toàn',
-      'Thích quán yên tĩnh, tránh nơi đông người',
-      'Muốn ăn đặc sản địa phương, không ăn hải sản',
-      'Đi cùng người yêu, thích lãng mạn',
-      'Ưu tiên địa điểm có Wi-Fi và điều hòa',
-      'Muốn một chuyến đi thuần túy thiên nhiên, không ăn uống',
-      'Thích địa điểm có gọc ảnh đẹp để check-in',
+      'Yêu thích thiên nhiên, không khí trong lành và ngắm cảnh',
+      'Thích thưởng thức ẩm thực đặc sản địa phương',
+      'Thích check-in sống ảo, nhiều góc chụp hình đẹp',
+      'Du lịch tâm linh, viếng chùa, đền và cầu bình an',
     ];
 
     return SingleChildScrollView(
@@ -3758,7 +3755,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Tùy chọn — Gemini AI sẽ cả nhân hóa lịch trình theo yêu cầu',
+                      'Tùy chọn — OpenAI GPT sẽ cá nhân hóa lịch trình theo yêu cầu',
                       style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     ),
                   ],
@@ -3773,7 +3770,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
-                  'Gemini AI',
+                  'OpenAI GPT',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
