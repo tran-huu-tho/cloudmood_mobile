@@ -9013,7 +9013,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               ],
             ),
             content: Text(
-              'Bạn vừa báo cáo "$tag". Bạn có muốn AI Gemini tự động sắp xếp lại lịch trình Ngày $dayNum cho hợp lý hơn không?',
+              'Bạn vừa báo cáo "$tag". Bạn có muốn OpenAI GPT tự động sắp xếp lại lịch trình Ngày $dayNum cho hợp lý hơn không?',
               style: const TextStyle(fontSize: 13, height: 1.4),
             ),
             actions: [
