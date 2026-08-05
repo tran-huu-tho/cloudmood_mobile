@@ -74,7 +74,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     },
   ];
 
-
   void _startProgressTimer() {
     _creationProgress = 0.05;
     _activeStepIndex = 0;
@@ -114,7 +113,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     _pageController.dispose();
     super.dispose();
   }
-
 
   void _selectDestination(String destName) {
     setState(() {
@@ -235,8 +233,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
   final List<String> _currencies = ['VND', 'USD', 'EUR', 'JPY', 'KRW', 'THB'];
 
   // Custom Request for Gemini AI (optional free text from user)
-  final TextEditingController _customRequestController = TextEditingController();
-
+  final TextEditingController _customRequestController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -360,7 +358,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     if (cleanDate.isBefore(today)) return;
 
     setState(() {
-      if (!_isSelectingEndDate || _selectedDateRange == null || cleanDate.isBefore(_selectedDateRange!.start)) {
+      if (!_isSelectingEndDate ||
+          _selectedDateRange == null ||
+          cleanDate.isBefore(_selectedDateRange!.start)) {
         _selectedDateRange = DateTimeRange(start: cleanDate, end: cleanDate);
         _lastTappedDate = cleanDate;
         _days = 1;
@@ -446,7 +446,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       final bLower = _selectedBudgetLevel.toLowerCase();
       if (bLower.contains('tiết kiệm') || bLower.contains('tiet kiem')) {
         budgetInVND = 3000000;
-      } else if (bLower.contains('sang trọng') || bLower.contains('sang trong') || bLower.contains('sang')) {
+      } else if (bLower.contains('sang trọng') ||
+          bLower.contains('sang trong') ||
+          bLower.contains('sang')) {
         budgetInVND = 15000000;
       } else {
         budgetInVND = 7000000;
@@ -478,11 +480,12 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         budget: budgetInVND,
         companion: _privacyLevel,
         pace: 'Vừa phải',
-        categories: _selectedCategories.isNotEmpty ? _selectedCategories : ['Tất cả'],
+        categories: _selectedCategories.isNotEmpty
+            ? _selectedCategories
+            : ['Tất cả'],
         amenities: [],
         isAi: true,
       );
-
 
       if (result == null || result['id'] == null) {
         if (mounted) {
@@ -581,10 +584,14 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           if (placeId <= 0) continue;
 
           final timeSlot = _calculatePlaceTimeSlot(pi, places.length);
-          final String startTime = (placeEntry['startTime'] != null && placeEntry['startTime'].toString().contains(':'))
+          final String startTime =
+              (placeEntry['startTime'] != null &&
+                  placeEntry['startTime'].toString().contains(':'))
               ? placeEntry['startTime'].toString()
               : (timeSlot['startTime'] ?? '07:00');
-          final String endTime = (placeEntry['endTime'] != null && placeEntry['endTime'].toString().contains(':'))
+          final String endTime =
+              (placeEntry['endTime'] != null &&
+                  placeEntry['endTime'].toString().contains(':'))
               ? placeEntry['endTime'].toString()
               : (timeSlot['endTime'] ?? '08:30');
 
@@ -633,7 +640,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         _progressTimer?.cancel();
 
         if (mounted) {
-          Navigator.of(context).pop(); // Close wizard sheet cleanly while overlay covers UI
+          Navigator.of(
+            context,
+          ).pop(); // Close wizard sheet cleanly while overlay covers UI
 
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -687,7 +696,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
             await Future.delayed(const Duration(milliseconds: 400));
 
             final updatedResult =
-                await DatabaseService().fetchItineraryById(itineraryId) ?? result;
+                await DatabaseService().fetchItineraryById(itineraryId) ??
+                result;
 
             _progressTimer?.cancel();
 
@@ -724,10 +734,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     }
   }
 
-
-
-
-
   Future<void> _autoPopulatePlacesForAIItinerary(
     int itineraryId,
     String destination,
@@ -755,9 +761,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       );
 
       if (places.isEmpty) {
-        places = await DatabaseService().searchPlaces(
-          destination: searchDest,
-        );
+        places = await DatabaseService().searchPlaces(destination: searchDest);
       }
       if (places.isEmpty) {
         places = await DatabaseService().fetchPlacesByDestination(searchDest);
@@ -835,7 +839,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
       // If filtered places count is less than needed total, fetch all places for destination to supplement!
       if (places.length < totalNeeded) {
-        final allDestPlaces = await DatabaseService().fetchPlacesByDestination(searchDest);
+        final allDestPlaces = await DatabaseService().fetchPlacesByDestination(
+          searchDest,
+        );
         final Set<dynamic> existingIds = places.map((p) => p['id']).toSet();
         for (final p in allDestPlaces) {
           if (places.length >= totalNeeded) break;
@@ -886,7 +892,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       for (int day = 1; day <= days; day++) {
         final dayPlaces = optimizedPlan[day] ?? [];
         int placeIndexForDay = 0;
-        final Set<int> dayAddedPlaceIds = {}; // Scope dedup to the current day only!
+        final Set<int> dayAddedPlaceIds =
+            {}; // Scope dedup to the current day only!
 
         for (int i = 0; i < dayPlaces.length; i++) {
           final place = dayPlaces[i];
@@ -1093,7 +1100,10 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
     // Filter out places that are closed on ALL days of the trip
     final List<dynamic> openPlaces = candidatePlaces.where((place) {
-      final hours = place['regularOpeningHours'] ?? place['openingHours'] ?? place['opening_hours'];
+      final hours =
+          place['regularOpeningHours'] ??
+          place['openingHours'] ??
+          place['opening_hours'];
       if (hours == null) return true;
       for (int d = 0; d < totalDays; d++) {
         final dayDate = startDate.add(Duration(days: d));
@@ -1136,17 +1146,17 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       for (final place in selectedPool) {
         final pLat = _getPlaceLat(place);
         final pLng = _getPlaceLng(place);
-        final hours = place['regularOpeningHours'] ?? place['openingHours'] ?? place['opening_hours'];
+        final hours =
+            place['regularOpeningHours'] ??
+            place['openingHours'] ??
+            place['opening_hours'];
 
         int bestDay = 1;
         double minDistance = double.infinity;
 
         for (int d = 0; d < totalDays; d++) {
           final dayDate = startDate.add(Duration(days: d));
-          final bool isOpenOnDay = TimeUtils.isPlaceOpenOnDate(
-            hours,
-            dayDate,
-          );
+          final bool isOpenOnDay = TimeUtils.isPlaceOpenOnDate(hours, dayDate);
 
           double dist = _calculateHaversineDistance(
             pLat,
@@ -1198,24 +1208,27 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     for (int swapIter = 0; swapIter < 5; swapIter++) {
       bool swappedAny = false;
 
-      final List<Map<String, double>> currentCentroids = List.generate(totalDays, (d) {
-        final dayList = clusters[d + 1] ?? [];
-        double sumLat = 0.0, sumLng = 0.0;
-        int count = 0;
-        for (final p in dayList) {
-          final lat = _getPlaceLat(p);
-          final lng = _getPlaceLng(p);
-          if (lat != 0.0 && lng != 0.0) {
-            sumLat += lat;
-            sumLng += lng;
-            count++;
+      final List<Map<String, double>> currentCentroids = List.generate(
+        totalDays,
+        (d) {
+          final dayList = clusters[d + 1] ?? [];
+          double sumLat = 0.0, sumLng = 0.0;
+          int count = 0;
+          for (final p in dayList) {
+            final lat = _getPlaceLat(p);
+            final lng = _getPlaceLng(p);
+            if (lat != 0.0 && lng != 0.0) {
+              sumLat += lat;
+              sumLng += lng;
+              count++;
+            }
           }
-        }
-        return {
-          'lat': count > 0 ? sumLat / count : 0.0,
-          'lng': count > 0 ? sumLng / count : 0.0,
-        };
-      });
+          return {
+            'lat': count > 0 ? sumLat / count : 0.0,
+            'lng': count > 0 ? sumLng / count : 0.0,
+          };
+        },
+      );
 
       for (int d1 = 1; d1 <= totalDays; d1++) {
         for (int d2 = d1 + 1; d2 <= totalDays; d2++) {
@@ -1233,8 +1246,14 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               final p1 = list1[i];
               final p2 = list2[j];
 
-              final hours1 = p1['regularOpeningHours'] ?? p1['openingHours'] ?? p1['opening_hours'];
-              final hours2 = p2['regularOpeningHours'] ?? p2['openingHours'] ?? p2['opening_hours'];
+              final hours1 =
+                  p1['regularOpeningHours'] ??
+                  p1['openingHours'] ??
+                  p1['opening_hours'];
+              final hours2 =
+                  p2['regularOpeningHours'] ??
+                  p2['openingHours'] ??
+                  p2['opening_hours'];
 
               if (!TimeUtils.isPlaceOpenOnDate(hours1, dayDate2)) continue;
               if (!TimeUtils.isPlaceOpenOnDate(hours2, dayDate1)) continue;
@@ -1244,11 +1263,33 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               final p2Lat = _getPlaceLat(p2);
               final p2Lng = _getPlaceLng(p2);
 
-              final currentCost = _calculateHaversineDistance(p1Lat, p1Lng, c1['lat']!, c1['lng']!) +
-                  _calculateHaversineDistance(p2Lat, p2Lng, c2['lat']!, c2['lng']!);
+              final currentCost =
+                  _calculateHaversineDistance(
+                    p1Lat,
+                    p1Lng,
+                    c1['lat']!,
+                    c1['lng']!,
+                  ) +
+                  _calculateHaversineDistance(
+                    p2Lat,
+                    p2Lng,
+                    c2['lat']!,
+                    c2['lng']!,
+                  );
 
-              final swappedCost = _calculateHaversineDistance(p1Lat, p1Lng, c2['lat']!, c2['lng']!) +
-                  _calculateHaversineDistance(p2Lat, p2Lng, c1['lat']!, c1['lng']!);
+              final swappedCost =
+                  _calculateHaversineDistance(
+                    p1Lat,
+                    p1Lng,
+                    c2['lat']!,
+                    c2['lng']!,
+                  ) +
+                  _calculateHaversineDistance(
+                    p2Lat,
+                    p2Lng,
+                    c1['lat']!,
+                    c1['lng']!,
+                  );
 
               if (swappedCost < currentCost - 1.5) {
                 list1[i] = p2;
@@ -1323,7 +1364,10 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       {'startTime': '08:30', 'endTime': '10:30'}, // Slot 1: Đi chơi 1
       {'startTime': '10:30', 'endTime': '12:30'}, // Slot 2: Đi chơi 2
       {'startTime': '12:30', 'endTime': '13:30'}, // Slot 3: Ăn trưa
-      {'startTime': '13:30', 'endTime': '15:00'}, // Slot 4: Đi chơi 3 / Check-in
+      {
+        'startTime': '13:30',
+        'endTime': '15:00',
+      }, // Slot 4: Đi chơi 3 / Check-in
       {'startTime': '15:00', 'endTime': '16:30'}, // Slot 5: Đi chơi 4
       {'startTime': '16:30', 'endTime': '18:00'}, // Slot 6: Đi chơi 5
       {'startTime': '18:00', 'endTime': '19:00'}, // Slot 7: Ăn tối
@@ -1799,7 +1843,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     }
   }
 
-
   String _getPrimaryButtonText() {
     switch (_currentStep) {
       case 0:
@@ -1818,7 +1861,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         return 'Tiếp tục';
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -1983,7 +2025,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                     _buildStep2Categories(),
                     _buildStep6CustomRequest(),
                   ],
-
                 ),
               ),
 
@@ -3010,8 +3051,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           ),
           const SizedBox(height: 20),
 
-
-
           const SizedBox(height: 24),
           Text(
             'Chuyến đi này tập trung vào:',
@@ -3371,7 +3410,10 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                             SizedBox(height: 2),
                             Text(
                               'Thêm bạn đồng hành để hệ thống tự động gửi thư mời tham gia với phân quyền tương ứng.',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
                             ),
                           ],
                         ),
@@ -3439,7 +3481,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       if (companion.fullName != null &&
                                           companion.fullName!.isNotEmpty)
@@ -3534,7 +3577,11 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                          Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Thêm Email người nhận',
@@ -3560,7 +3607,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
   // STEP 5: Budget & Currency (Single values for total trip)
   Widget _buildStep5Budget() {
     return SingleChildScrollView(
-
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3596,7 +3642,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                       'Mức chọn sẵn',
                       style: TextStyle(
                         fontFamily: 'SDK_SC_Web-Heavy',
-                        color: !_useCustomBudget ? Colors.white : Colors.black87,
+                        color: !_useCustomBudget
+                            ? Colors.white
+                            : Colors.black87,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -3768,13 +3816,19 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                     const SizedBox(height: 6),
                     Text(
                       'Tùy chọn — OpenAI GPT sẽ cá nhân hóa lịch trình theo yêu cầu',
-                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
@@ -3885,16 +3939,18 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                         : const Color(0xFF8E2DE2).withOpacity(0.07),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: const Color(0xFF8E2DE2).withOpacity(
-                        isSelected ? 1.0 : 0.3,
-                      ),
+                      color: const Color(
+                        0xFF8E2DE2,
+                      ).withOpacity(isSelected ? 1.0 : 0.3),
                     ),
                   ),
                   child: Text(
                     example,
                     style: TextStyle(
                       fontSize: 13,
-                      color: isSelected ? Colors.white : const Color(0xFF8E2DE2),
+                      color: isSelected
+                          ? Colors.white
+                          : const Color(0xFF8E2DE2),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -3918,7 +3974,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       ),
     );
   }
-
 
   Widget _buildBudgetPresetCard(String levelName, String desc) {
     String levelKey = 'Vừa phải';

@@ -1915,6 +1915,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ? (int.tryParse(sectionOrDay.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1)
         : null;
 
+    int maxOrder = 0;
+    if (affectedDay != null) {
+      final dayDetails = _details.where((d) => d['day'] == affectedDay).toList();
+      for (final d in dayDetails) {
+        final ord = (d['sortOrder'] as num?)?.toInt() ?? 0;
+        if (ord > maxOrder) maxOrder = ord;
+      }
+    }
+    final int nextSortOrder = maxOrder + 1;
+
     final Map<String, dynamic> tempItem = {
       'id': DateTime.now().millisecondsSinceEpoch,
       'itineraryId': itineraryId,
@@ -1924,7 +1934,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       'day': affectedDay,
       'startTime': calculatedStartTime,
       'endTime': calculatedEndTime,
-      'sortOrder': 9999,
+      'sortOrder': nextSortOrder,
     };
 
     setState(() {
@@ -1939,7 +1949,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
       if (affectedDay != null && _itineraryData['isGuide'] != true) {
         _details.add(tempItem);
-        final dayItems = _details.where((d) => d['day'] == affectedDay).toList();
+        final dayItems = _details
+            .where((d) => d['day'] == affectedDay)
+            .toList();
         final optimized = _optimizeDayTimeSlots(dayItems);
         for (final item in optimized) {
           final idx = _details.indexWhere((d) => d['id'] == item['id']);
@@ -1949,7 +1961,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             _details[idx]['sortOrder'] = item['sortOrder'];
           }
         }
-        final optimizedTempItem = optimized.firstWhere((item) => item['id'] == tempItem['id'], orElse: () => tempItem);
+        final optimizedTempItem = optimized.firstWhere(
+          (item) => item['id'] == tempItem['id'],
+          orElse: () => tempItem,
+        );
         calculatedStartTime = optimizedTempItem['startTime'];
         calculatedEndTime = optimizedTempItem['endTime'];
       } else {
@@ -1980,9 +1995,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         day: affectedDay,
         startTime: calculatedStartTime,
         endTime: calculatedEndTime,
+        sortOrder: tempItem['sortOrder'] ?? nextSortOrder,
       );
 
-      final dayItems = _details.where((d) => d['day'] == affectedDay && d['id'] != tempItem['id']).toList();
+      final dayItems = _details
+          .where((d) => d['day'] == affectedDay && d['id'] != tempItem['id'])
+          .toList();
       final List<Future<bool>> futures = [];
       for (final item in dayItems) {
         final itemId = item['id'] as int;
@@ -2013,7 +2031,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       setState(() {
         if (affectedDay != null && _itineraryData['isGuide'] != true) {
           final idx = _details.indexWhere((d) => d['id'] == tempItem['id']);
-          if (idx != -1) _details[idx] = updatedItem;
+          if (idx != -1) {
+            final oldItem = _details[idx];
+            _details[idx] = {
+              ...oldItem,
+              ...updatedItem,
+              'startTime': updatedItem['startTime'] ?? oldItem['startTime'],
+              'endTime': updatedItem['endTime'] ?? oldItem['endTime'],
+              'sortOrder': (oldItem['sortOrder'] != null && (oldItem['sortOrder'] as num) > 0)
+                  ? oldItem['sortOrder']
+                  : (updatedItem['sortOrder'] ?? nextSortOrder),
+            };
+          }
         } else {
           final idx = _savedPlaces.indexWhere(
             (sp) => sp['id'] == tempItem['id'],
@@ -9070,10 +9099,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     final weather = _getWeatherForPlace(place, startTime, date);
     final String wDesc = (weather['desc'] ?? '').toString().toLowerCase();
-    final bool isRainy =
-        wDesc.contains('mưa') ||
+    final bool isNoRainDesc = wDesc.contains('không mưa') ||
+        wDesc.contains('nắng') ||
+        wDesc.contains('quang đãng') ||
+        wDesc.contains('nhiều mây') ||
+        wDesc.contains('ít mây');
+    final bool hasExplicitRain = (wDesc.contains('mưa') ||
         wDesc.contains('dông') ||
-        ((weather['rainProb'] as num?)?.toInt() ?? 0) >= 60;
+        wDesc.contains('bão') ||
+        wDesc.contains('rào')) && !wDesc.contains('không mưa');
+    final int rainProb = (weather['rainProb'] as num?)?.toInt() ?? 0;
+
+    final bool isRainy = hasExplicitRain || (rainProb >= 75 && !isNoRainDesc);
 
     return Wrap(
       spacing: 6,
@@ -9885,8 +9922,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final int h = int.tryParse(parts[0]) ?? 0;
     final int m = int.tryParse(parts[1]) ?? 0;
     double val = h + (m / 60.0);
-    // If the time is between 00:00 and 05:59, treat it as late night (add 24 hours)
-    if (h >= 0 && h < 6) {
+    // If the time is late night (00:00 to 03:59), add 24 hours. 04:00+ (e.g. 05:30 Chợ nổi) is early morning.
+    if (h >= 0 && h < 4) {
       val += 24.0;
     }
     return val;
@@ -10076,7 +10113,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     for (var item in sorted) {
       final place = item['place'] ?? {};
       final String name = (place['name'] ?? '').toString().toLowerCase();
-      if (name.contains('chợ nổi') || name.contains('cái răng') || name.contains('floating market')) {
+      if (name.contains('chợ nổi') ||
+          name.contains('cái răng') ||
+          name.contains('floating market')) {
         hasFloatingMarket = true;
       } else {
         nonFloatingMarketCount++;
@@ -10089,8 +10128,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       final placeB = b['place'] ?? {};
       final String nameA = (placeA['name'] ?? '').toString().toLowerCase();
       final String nameB = (placeB['name'] ?? '').toString().toLowerCase();
-      final isMarketA = nameA.contains('chợ nổi') || nameA.contains('cái răng') || nameA.contains('floating market');
-      final isMarketB = nameB.contains('chợ nổi') || nameB.contains('cái răng') || nameB.contains('floating market');
+      final isMarketA =
+          nameA.contains('chợ nổi') ||
+          nameA.contains('cái răng') ||
+          nameA.contains('floating market');
+      final isMarketB =
+          nameB.contains('chợ nổi') ||
+          nameB.contains('cái răng') ||
+          nameB.contains('floating market');
       if (isMarketA && !isMarketB) return -1;
       if (!isMarketA && isMarketB) return 1;
 
@@ -10125,7 +10170,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       {'startTime': '08:30', 'endTime': '09:30'}, // Slot 1: Đi chơi 1
       {'startTime': '10:00', 'endTime': '11:30'}, // Slot 2: Đi chơi 2
       {'startTime': '12:00', 'endTime': '13:30'}, // Slot 3: Ăn trưa (90 phút)
-      {'startTime': '14:00', 'endTime': '15:00'}, // Slot 4: Đi chơi 3 / Check-in
+      {
+        'startTime': '14:00',
+        'endTime': '15:00',
+      }, // Slot 4: Đi chơi 3 / Check-in
       {'startTime': '15:30', 'endTime': '17:00'}, // Slot 5: Đi chơi 4
       {'startTime': '17:30', 'endTime': '19:00'}, // Slot 6: Ăn tối (90 phút)
       {'startTime': '19:30', 'endTime': '20:30'}, // Slot 7: Đi chơi 5
@@ -10148,8 +10196,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final List<Map<String, String>> activeMatrix = hasFloatingMarket
         ? canThoSlotMatrix10
         : (nonFloatingMarketCount <= 7
-            ? slotMatrix7
-            : (nonFloatingMarketCount == 8 ? slotMatrix8 : hardSlots));
+              ? slotMatrix7
+              : (nonFloatingMarketCount == 8 ? slotMatrix8 : hardSlots));
 
     int slotIndex = 0;
     for (int i = 0; i < sorted.length; i++) {

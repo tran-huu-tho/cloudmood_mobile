@@ -291,15 +291,16 @@ class DatabaseService {
     // Parse backend error message for user-friendly display
     try {
       final errBody = jsonDecode(response.body);
-      final msg = errBody['message'] ?? errBody['error'] ?? 'Lỗi không xác định';
+      final msg =
+          errBody['message'] ?? errBody['error'] ?? 'Lỗi không xác định';
       throw Exception(msg.toString());
     } catch (e) {
       if (e is Exception) rethrow;
-      throw Exception('Trợ lý AI gặp lỗi (${response.statusCode}). Vui lòng thử lại.');
+      throw Exception(
+        'Trợ lý AI gặp lỗi (${response.statusCode}). Vui lòng thử lại.',
+      );
     }
   }
-
-
 
   /// Shifts day numbers for itinerary details greater than targetDay by offset
   Future<bool> shiftItineraryDetailsDays({
@@ -411,13 +412,16 @@ class DatabaseService {
     String? authorAvatar,
   }) async {
     try {
-      final response = await ApiClient.post('/reviews/public', body: {
-        'placeId': placeId,
-        'rating': rating,
-        'comment': comment,
-        'authorName': authorName,
-        'authorAvatar': authorAvatar,
-      });
+      final response = await ApiClient.post(
+        '/reviews/public',
+        body: {
+          'placeId': placeId,
+          'rating': rating,
+          'comment': comment,
+          'authorName': authorName,
+          'authorAvatar': authorAvatar,
+        },
+      );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       debugPrint('Error submitting review: $e');
@@ -760,9 +764,12 @@ class DatabaseService {
   }
 
   /// Fetches published explore posts (User Guides / Posts)
-  Future<List<Map<String, dynamic>>> fetchExplorePosts({String? destination}) async {
+  Future<List<Map<String, dynamic>>> fetchExplorePosts({
+    String? destination,
+  }) async {
     try {
-      final String endpoint = (destination != null && destination.trim().isNotEmpty)
+      final String endpoint =
+          (destination != null && destination.trim().isNotEmpty)
           ? '/explore?destination=${Uri.encodeComponent(destination.trim())}'
           : '/explore';
       final response = await ApiClient.get(endpoint);
@@ -869,7 +876,9 @@ class DatabaseService {
   /// Search registered users by email query
   Future<List<Map<String, dynamic>>> searchUsersByEmail(String email) async {
     try {
-      final response = await ApiClient.get('/auth/search-users?email=${Uri.encodeComponent(email)}');
+      final response = await ApiClient.get(
+        '/auth/search-users?email=${Uri.encodeComponent(email)}',
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['users'] is List) {
@@ -886,7 +895,11 @@ class DatabaseService {
   // --- API CHIA SẺ & QUẢN LÝ THÀNH VIÊN ---
 
   /// Mời qua Email (EDITOR / VIEWER)
-  Future<Map<String, dynamic>?> inviteByEmail(int itineraryId, String email, {String role = 'EDITOR'}) async {
+  Future<Map<String, dynamic>?> inviteByEmail(
+    int itineraryId,
+    String email, {
+    String role = 'EDITOR',
+  }) async {
     try {
       final response = await ApiClient.post(
         '/itineraries/$itineraryId/invite-email',
@@ -895,7 +908,10 @@ class DatabaseService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body);
       }
-      return {'success': false, 'message': jsonDecode(response.body)['message'] ?? 'Lỗi gửi lời mời'};
+      return {
+        'success': false,
+        'message': jsonDecode(response.body)['message'] ?? 'Lỗi gửi lời mời',
+      };
     } catch (e) {
       debugPrint('Error inviteByEmail: $e');
       return {'success': false, 'message': 'Không thể kết nối đến máy chủ'};
@@ -905,7 +921,9 @@ class DatabaseService {
   /// Lấy Link chia sẻ qua Mạng xã hội (VIEWER)
   Future<Map<String, dynamic>?> getShareLink(int itineraryId) async {
     try {
-      final response = await ApiClient.post('/itineraries/$itineraryId/share-link');
+      final response = await ApiClient.post(
+        '/itineraries/$itineraryId/share-link',
+      );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body);
       }
@@ -919,12 +937,17 @@ class DatabaseService {
   /// Xác nhận lời mời (Token)
   Future<Map<String, dynamic>?> acceptInvite(String token) async {
     try {
-      final response = await ApiClient.get('/itineraries/accept-invite?token=$token');
+      final response = await ApiClient.get(
+        '/itineraries/accept-invite?token=$token',
+      );
       if (response.statusCode == 200) {
         refreshTrigger.value++;
         return jsonDecode(response.body);
       }
-      return {'success': false, 'message': jsonDecode(response.body)['message'] ?? 'Lỗi xác nhận'};
+      return {
+        'success': false,
+        'message': jsonDecode(response.body)['message'] ?? 'Lỗi xác nhận',
+      };
     } catch (e) {
       debugPrint('Error acceptInvite: $e');
       return {'success': false, 'message': 'Không thể kết nối'};
@@ -946,7 +969,11 @@ class DatabaseService {
   }
 
   /// Cập nhật quyền hạn thành viên (OWNER)
-  Future<bool> updateMemberRole(int itineraryId, String targetUserId, String newRole) async {
+  Future<bool> updateMemberRole(
+    int itineraryId,
+    String targetUserId,
+    String newRole,
+  ) async {
     try {
       final response = await ApiClient.put(
         '/itineraries/$itineraryId/members/$targetUserId',
@@ -962,7 +989,9 @@ class DatabaseService {
   /// Xóa thành viên khỏi chuyến đi (OWNER)
   Future<bool> removeMember(int itineraryId, String targetUserId) async {
     try {
-      final response = await ApiClient.delete('/itineraries/$itineraryId/members/$targetUserId');
+      final response = await ApiClient.delete(
+        '/itineraries/$itineraryId/members/$targetUserId',
+      );
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('Error removeMember: $e');
@@ -973,7 +1002,9 @@ class DatabaseService {
   /// Sao chép chuyến đi (Duplicate)
   Future<Map<String, dynamic>?> duplicateItinerary(int itineraryId) async {
     try {
-      final response = await ApiClient.post('/itineraries/$itineraryId/duplicate');
+      final response = await ApiClient.post(
+        '/itineraries/$itineraryId/duplicate',
+      );
       if (response.statusCode == 200 || response.statusCode == 201) {
         refreshTrigger.value++;
         return jsonDecode(response.body);
@@ -988,7 +1019,9 @@ class DatabaseService {
   /// Lấy danh sách chi phí của chuyến đi từ Server
   Future<List<Map<String, dynamic>>> getExpenses(int itineraryId) async {
     try {
-      final response = await ApiClient.get('/itineraries/$itineraryId/expenses');
+      final response = await ApiClient.get(
+        '/itineraries/$itineraryId/expenses',
+      );
       if (response.statusCode == 200) {
         return List<Map<String, dynamic>>.from(jsonDecode(response.body));
       }
@@ -1000,7 +1033,10 @@ class DatabaseService {
   }
 
   /// Thêm chi phí mới vào Server
-  Future<Map<String, dynamic>?> addExpense(int itineraryId, Map<String, dynamic> expenseData) async {
+  Future<Map<String, dynamic>?> addExpense(
+    int itineraryId,
+    Map<String, dynamic> expenseData,
+  ) async {
     try {
       final response = await ApiClient.post(
         '/itineraries/$itineraryId/expenses',
@@ -1019,7 +1055,9 @@ class DatabaseService {
   /// Xóa chi phí trên Server
   Future<bool> deleteExpense(dynamic expenseId) async {
     try {
-      final response = await ApiClient.delete('/itineraries/expenses/$expenseId');
+      final response = await ApiClient.delete(
+        '/itineraries/expenses/$expenseId',
+      );
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('Error deleteExpense: $e');
@@ -1028,7 +1066,10 @@ class DatabaseService {
   }
 
   /// Cập nhật chi phí trên Server
-  Future<Map<String, dynamic>?> updateExpense(dynamic expenseId, Map<String, dynamic> expenseData) async {
+  Future<Map<String, dynamic>?> updateExpense(
+    dynamic expenseId,
+    Map<String, dynamic> expenseData,
+  ) async {
     try {
       final response = await ApiClient.put(
         '/itineraries/expenses/$expenseId',
@@ -1047,7 +1088,9 @@ class DatabaseService {
   /// Lấy danh sách giao dịch thanh toán của chuyến đi từ Server
   Future<List<Map<String, dynamic>>> getSettlements(int itineraryId) async {
     try {
-      final response = await ApiClient.get('/itineraries/$itineraryId/settlements');
+      final response = await ApiClient.get(
+        '/itineraries/$itineraryId/settlements',
+      );
       if (response.statusCode == 200) {
         return List<Map<String, dynamic>>.from(jsonDecode(response.body));
       }
@@ -1059,7 +1102,10 @@ class DatabaseService {
   }
 
   /// Thêm giao dịch thanh toán mới vào Server
-  Future<Map<String, dynamic>?> addSettlement(int itineraryId, Map<String, dynamic> settlementData) async {
+  Future<Map<String, dynamic>?> addSettlement(
+    int itineraryId,
+    Map<String, dynamic> settlementData,
+  ) async {
     try {
       final response = await ApiClient.post(
         '/itineraries/$itineraryId/settlements',
@@ -1078,7 +1124,9 @@ class DatabaseService {
   /// Xóa giao dịch thanh toán trên Server
   Future<bool> deleteSettlement(dynamic settlementId) async {
     try {
-      final response = await ApiClient.delete('/itineraries/settlements/$settlementId');
+      final response = await ApiClient.delete(
+        '/itineraries/settlements/$settlementId',
+      );
       return response.statusCode == 200;
     } catch (e) {
       debugPrint('Error deleteSettlement: $e');
@@ -1113,4 +1161,3 @@ class DatabaseService {
     };
   }
 }
-
