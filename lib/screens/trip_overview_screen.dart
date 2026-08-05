@@ -143,12 +143,152 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   bool _isLoadingExplore = false;
   bool _hasFetchedExplore = false;
 
-  // Pagination for web images
-  int _webImagesPage = 1;
-  bool _isLoadingMoreWebImages = false;
-  List<dynamic> _webImages = [];
-  bool _hasMoreWebImages = true;
-  String _lastWebQuery = '';
+  Map<int, List<LatLng>> _dayRoadPolylines = {};
+  bool _isLoadingRoadRoutes = false;
+
+  double _calculateDistanceKm(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const p = 0.017453292519943295;
+    final a = 0.5 -
+        math.cos((lat2 - lat1) * p) / 2 +
+        math.cos(lat1 * p) *
+            math.cos(lat2 * p) *
+            (1 - math.cos((lon2 - lon1) * p)) /
+            2;
+    return 12742 * math.asin(math.sqrt(a));
+  }
+
+  List<Map<String, dynamic>> _optimizeDayPlacesWithAStar(
+    List<Map<String, dynamic>> dayPlaces,
+  ) {
+    if (dayPlaces.length <= 2) return dayPlaces;
+
+    final List<Map<String, dynamic>> unvisited =
+        List<Map<String, dynamic>>.from(dayPlaces);
+    final List<Map<String, dynamic>> optimized = [];
+
+    optimized.add(unvisited.removeAt(0));
+
+    while (unvisited.isNotEmpty) {
+      final current = optimized.last;
+      final curP = current['place'] ?? {};
+      final curLat = (curP['latitude'] as num?)?.toDouble() ?? 0.0;
+      final curLon = (curP['longitude'] as num?)?.toDouble() ?? 0.0;
+
+      int bestIdx = 0;
+      double minFScore = double.infinity;
+
+      for (int i = 0; i < unvisited.length; i++) {
+        final cand = unvisited[i];
+        final candP = cand['place'] ?? {};
+        final candLat = (candP['latitude'] as num?)?.toDouble() ?? 0.0;
+        final candLon = (candP['longitude'] as num?)?.toDouble() ?? 0.0;
+
+        final double g = _calculateDistanceKm(curLat, curLon, candLat, candLon);
+
+        double h = 0.0;
+        if (unvisited.length > 1) {
+          double minRemaining = double.infinity;
+          for (int k = 0; k < unvisited.length; k++) {
+            if (k != i) {
+              final otherP = unvisited[k]['place'] ?? {};
+              final oLat = (otherP['latitude'] as num?)?.toDouble() ?? 0.0;
+              final oLon = (otherP['longitude'] as num?)?.toDouble() ?? 0.0;
+              final dist = _calculateDistanceKm(candLat, candLon, oLat, oLon);
+              if (dist < minRemaining) minRemaining = dist;
+            }
+          }
+          if (minRemaining != double.infinity) h = minRemaining;
+        }
+
+        final double f = g + 0.5 * h;
+        if (f < minFScore) {
+          minFScore = f;
+          bestIdx = i;
+        }
+      }
+
+      optimized.add(unvisited.removeAt(bestIdx));
+    }
+
+    return optimized;
+  }
+
+  Future<void> _updateRoadPolylines() async {
+    if (_isLoadingRoadRoutes) return;
+    _isLoadingRoadRoutes = true;
+
+    final int numDays = (_itineraryData['days'] as num?)?.toInt() ?? 1;
+    final Map<int, List<LatLng>> newPolylines = {};
+
+    for (int dayIdx = 0; dayIdx < numDays; dayIdx++) {
+      final dayNum = dayIdx + 1;
+      final rawDayPlaces = _details
+          .where(
+            (d) =>
+                (d['day'] as num?)?.toInt() == dayNum &&
+                d['place'] != null,
+          )
+          .toList();
+
+      if (rawDayPlaces.length < 2) continue;
+
+      final optimizedPlaces = _optimizeDayPlacesWithAStar(rawDayPlaces);
+
+      final List<LatLng> waypoints = [];
+      for (var d in optimizedPlaces) {
+        final p = d['place'];
+        if (p != null && p['latitude'] != null && p['longitude'] != null) {
+          final lat = (p['latitude'] as num).toDouble();
+          final lon = (p['longitude'] as num).toDouble();
+          if (lat != 0.0 && lon != 0.0) {
+            waypoints.add(LatLng(lat, lon));
+          }
+        }
+      }
+
+      if (waypoints.length < 2) continue;
+
+      try {
+        final coordsString =
+            waypoints.map((p) => '${p.longitude},${p.latitude}').join(';');
+        final uri = Uri.parse(
+          'https://router.project-osrm.org/route/v1/driving/$coordsString?overview=full&geometries=geojson',
+        );
+
+        final response = await http.get(uri).timeout(const Duration(seconds: 5));
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
+            final coords = data['routes'][0]['geometry']['coordinates'] as List;
+            final List<LatLng> roadPoints = coords.map((c) {
+              final lon = (c[0] as num).toDouble();
+              final lat = (c[1] as num).toDouble();
+              return LatLng(lat, lon);
+            }).toList();
+            newPolylines[dayNum] = roadPoints;
+          } else {
+            newPolylines[dayNum] = waypoints;
+          }
+        } else {
+          newPolylines[dayNum] = waypoints;
+        }
+      } catch (e) {
+        newPolylines[dayNum] = waypoints;
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _dayRoadPolylines = newPolylines;
+        _isLoadingRoadRoutes = false;
+      });
+    }
+  }
 
   String _privacySetting = 'private';
 
@@ -3659,57 +3799,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             },
                           ),
                   ),
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Địa điểm đã lưu của bạn',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
                   const SizedBox(height: 8),
-                  if (_sectionNames.isNotEmpty) ...[
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Tổng quan',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    ),
-                    ..._sectionNames.map((section) {
-                      final color = _sectionColors[section] ?? AppTheme.primary;
-                      return CheckboxListTile(
-                        secondary: Icon(Icons.location_on, color: color),
-                        title: Text(
-                          section,
-                          style: TextStyle(
-                            color: AppTheme.darkText,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        value: _checkedSections?.contains(section) ?? true,
-                        activeColor: AppTheme.primary,
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.trailing,
-                        visualDensity: VisualDensity.compact,
-                        onChanged: (val) {
-                          setSheetState(() {
-                            if (val == true) {
-                              _checkedSections?.add(section);
-                            } else {
-                              _checkedSections?.remove(section);
-                            }
-                          });
-                          setState(() {});
-                        },
-                      );
-                    }),
-                    const Divider(),
-                  ],
+                  const Divider(),
+                  const SizedBox(height: 4),
                   const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
+                    padding: EdgeInsets.only(top: 4, bottom: 4),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -4465,10 +4559,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       ),
                       PolylineLayer(
                         polylines: (() {
+                          if (_dayRoadPolylines.isEmpty && !_isLoadingRoadRoutes) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _updateRoadPolylines();
+                            });
+                          }
+
                           final List<Polyline> polylines = [];
                           final int numDays =
                               (_itineraryData['days'] as num?)?.toInt() ?? 1;
-                          LatLng? lastDayLastPoint;
 
                           for (int dayIdx = 0; dayIdx < numDays; dayIdx++) {
                             final dayNum = dayIdx + 1;
@@ -4477,53 +4576,50 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               continue;
                             }
 
-                            final dayPlaces = _details
-                                .where(
-                                  (d) =>
-                                      (d['day'] as num?)?.toInt() == dayNum &&
-                                      d['place'] != null,
-                                )
-                                .toList();
+                            final color =
+                                _dayColors[dayIdx % _dayColors.length] ?? AppTheme.primary;
+                            final roadPoints = _dayRoadPolylines[dayNum];
 
-                            final List<LatLng> dayPoints = [];
-                            for (var d in dayPlaces) {
-                              final p = d['place'];
-                              if (p != null &&
-                                  p['latitude'] != null &&
-                                  p['longitude'] != null) {
-                                final lat = (p['latitude'] as num).toDouble();
-                                final lon = (p['longitude'] as num).toDouble();
-                                if (lat != 0.0 && lon != 0.0) {
-                                  dayPoints.add(LatLng(lat, lon));
+                            if (roadPoints != null && roadPoints.length >= 2) {
+                              polylines.add(
+                                Polyline(
+                                  points: roadPoints,
+                                  strokeWidth: 4.5,
+                                  color: color.withAlpha(230),
+                                ),
+                              );
+                            } else {
+                              final rawDayPlaces = _details
+                                  .where(
+                                    (d) =>
+                                        (d['day'] as num?)?.toInt() == dayNum &&
+                                        d['place'] != null,
+                                  )
+                                  .toList();
+                              final dayPlaces = _optimizeDayPlacesWithAStar(rawDayPlaces);
+                              final List<LatLng> dayPoints = [];
+                              for (var d in dayPlaces) {
+                                final p = d['place'];
+                                if (p != null &&
+                                    p['latitude'] != null &&
+                                    p['longitude'] != null) {
+                                  final lat = (p['latitude'] as num).toDouble();
+                                  final lon = (p['longitude'] as num).toDouble();
+                                  if (lat != 0.0 && lon != 0.0) {
+                                    dayPoints.add(LatLng(lat, lon));
+                                  }
                                 }
                               }
-                            }
 
-                            if (dayPoints.length >= 2) {
-                              final color =
-                                  _dayColors[dayIdx] ?? AppTheme.primary;
-                              polylines.add(
-                                Polyline(
-                                  points: dayPoints,
-                                  strokeWidth: 4.0,
-                                  color: color.withAlpha(220),
-                                ),
-                              );
-                            }
-
-                            if (lastDayLastPoint != null &&
-                                dayPoints.isNotEmpty) {
-                              polylines.add(
-                                Polyline(
-                                  points: [lastDayLastPoint, dayPoints.first],
-                                  strokeWidth: 2.5,
-                                  color: Colors.grey.withAlpha(180),
-                                ),
-                              );
-                            }
-
-                            if (dayPoints.isNotEmpty) {
-                              lastDayLastPoint = dayPoints.last;
+                              if (dayPoints.length >= 2) {
+                                polylines.add(
+                                  Polyline(
+                                    points: dayPoints,
+                                    strokeWidth: 4.0,
+                                    color: color.withAlpha(220),
+                                  ),
+                                );
+                              }
                             }
                           }
                           return polylines;
@@ -5729,44 +5825,86 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             ),
           ),
 
-          // Zoom Button (Moved outside so it doesn't get clipped by AnimatedContainer)
+          // Zoom In / Out Buttons (+ / -)
           if (_isMapExpanded && _selectedMapPlace == null && !_isSheetHalf)
             Positioned(
               left: 16,
               bottom: 75.0 + 16.0,
-              child: GestureDetector(
-                onTap: _showZoomOptionsBottomSheet,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.search, size: 20, color: Colors.black87),
-                      SizedBox(width: 8),
-                      Text(
-                        'Phóng to vào...',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 8,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          final double currentZoom = _mapController.camera.zoom;
+                          _mapController.move(
+                            _mapController.camera.center,
+                            (currentZoom + 0.8).clamp(1.0, 18.0),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Icon(
+                            Icons.add_rounded,
+                            size: 22,
+                            color: AppTheme.darkText,
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 8,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          final double currentZoom = _mapController.camera.zoom;
+                          _mapController.move(
+                            _mapController.camera.center,
+                            (currentZoom - 0.8).clamp(1.0, 18.0),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Icon(
+                            Icons.remove_rounded,
+                            size: 22,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -9246,60 +9384,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           final int day = (_details[idx]['day'] as num?)?.toInt() ?? 1;
           final dayDetails = _details.where((d) => d['day'] == day).toList();
 
-          final bool isAiTrip =
-              _itineraryData['isAiGenerated'] == true ||
-              _itineraryData['isAiTrip'] == true ||
-              (_itineraryData['title'] ?? '').toString().toLowerCase().contains(
-                'ai',
-              );
-
-          if (isAiTrip) {
-            // For AI trips: Just update this item's time and sort chronologically.
-            // DO NOT wipe or scramble other places' times!
-            dayDetails.sort((a, b) {
-              final aStart = a['startTime']?.toString() ?? '';
-              final bStart = b['startTime']?.toString() ?? '';
-              final aHasTime = aStart.isNotEmpty && aStart.contains(':');
-              final bHasTime = bStart.isNotEmpty && bStart.contains(':');
-
-              if (aHasTime && !bHasTime) return -1;
-              if (!aHasTime && bHasTime) return 1;
-              if (aHasTime && bHasTime) {
-                final aVal = _getSortableTimeValue(aStart);
-                final bVal = _getSortableTimeValue(bStart);
-                if (aVal != bVal) return aVal.compareTo(bVal);
-              }
-              final aOrd = (a['sortOrder'] as num?)?.toInt() ?? 0;
-              final bOrd = (b['sortOrder'] as num?)?.toInt() ?? 0;
-              return aOrd.compareTo(bOrd);
-            });
-
-            for (int i = 0; i < dayDetails.length; i++) {
-              final itemIdx = _details.indexWhere(
-                (d) => d['id'] == dayDetails[i]['id'],
-              );
-              if (itemIdx != -1) {
-                _details[itemIdx]['sortOrder'] = i;
-              }
-              dayDetails[i]['sortOrder'] = i;
+          final updated = _recalculateDayTimeline(
+            dayDetails,
+            pinnedDetailId: detailId,
+          );
+          for (final item in updated) {
+            final itemIdx = _details.indexWhere((d) => d['id'] == item['id']);
+            if (itemIdx != -1) {
+              _details[itemIdx]['startTime'] = item['startTime'];
+              _details[itemIdx]['endTime'] = item['endTime'];
+              _details[itemIdx]['sortOrder'] = item['sortOrder'];
+              _details[itemIdx]['isUserPinned'] = item['isUserPinned'];
             }
-            updatedDayItems = dayDetails;
-          } else {
-            // Manual trip: re-calculate timeline
-            final updated = _recalculateDayTimeline(
-              dayDetails,
-              pinnedDetailId: detailId,
-            );
-            for (final item in updated) {
-              final itemIdx = _details.indexWhere((d) => d['id'] == item['id']);
-              if (itemIdx != -1) {
-                _details[itemIdx]['startTime'] = item['startTime'];
-                _details[itemIdx]['endTime'] = item['endTime'];
-                _details[itemIdx]['sortOrder'] = item['sortOrder'];
-              }
-            }
-            updatedDayItems = updated;
           }
+          updatedDayItems = updated;
         }
       } else {
         final idx = _savedPlaces.indexWhere((sp) => sp['id'] == detailId);
@@ -10108,121 +10206,117 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
 
-    bool hasFloatingMarket = false;
-    int nonFloatingMarketCount = 0;
-    for (var item in sorted) {
-      final place = item['place'] ?? {};
-      final String name = (place['name'] ?? '').toString().toLowerCase();
-      if (name.contains('chợ nổi') ||
-          name.contains('cái răng') ||
-          name.contains('floating market')) {
-        hasFloatingMarket = true;
-      } else {
-        nonFloatingMarketCount++;
-      }
-    }
-
-    // Keep sorting strictly by sortOrder, but put floating market at index 0
+    // Sort items chronologically based on their startTime if set, or sortOrder
     sorted.sort((a, b) {
       final placeA = a['place'] ?? {};
       final placeB = b['place'] ?? {};
       final String nameA = (placeA['name'] ?? '').toString().toLowerCase();
       final String nameB = (placeB['name'] ?? '').toString().toLowerCase();
-      final isMarketA =
-          nameA.contains('chợ nổi') ||
+      final isMarketA = nameA.contains('chợ nổi') ||
           nameA.contains('cái răng') ||
           nameA.contains('floating market');
-      final isMarketB =
-          nameB.contains('chợ nổi') ||
+      final isMarketB = nameB.contains('chợ nổi') ||
           nameB.contains('cái răng') ||
           nameB.contains('floating market');
       if (isMarketA && !isMarketB) return -1;
       if (!isMarketA && isMarketB) return 1;
+
+      final aStart = a['startTime']?.toString() ?? '';
+      final bStart = b['startTime']?.toString() ?? '';
+      final bool aHasTime = aStart.contains(':');
+      final bool bHasTime = bStart.contains(':');
+
+      if (aHasTime && bHasTime) {
+        final aVal = _getSortableTimeValue(aStart);
+        final bVal = _getSortableTimeValue(bStart);
+        if (aVal != bVal) return aVal.compareTo(bVal);
+      } else if (aHasTime && !bHasTime) {
+        return -1;
+      } else if (!aHasTime && bHasTime) {
+        return 1;
+      }
 
       final int orderA = (a['sortOrder'] as num?)?.toInt() ?? 0;
       final int orderB = (b['sortOrder'] as num?)?.toInt() ?? 0;
       return orderA.compareTo(orderB);
     });
 
-    final List<Map<String, String>> slotMatrix7 = [
-      {'startTime': '07:00', 'endTime': '08:00'}, // Ăn sáng
-      {'startTime': '08:30', 'endTime': '10:30'}, // Đi chơi 1
-      {'startTime': '11:30', 'endTime': '13:00'}, // Ăn trưa (90 phút)
-      {'startTime': '13:30', 'endTime': '15:00'}, // Nghỉ ngơi / Cafe
-      {'startTime': '15:30', 'endTime': '17:00'}, // Đi chơi 2
-      {'startTime': '17:30', 'endTime': '19:00'}, // Ăn tối (90 phút)
-      {'startTime': '19:30', 'endTime': '21:30'}, // Đi chơi tối / Cafe
-    ];
+    int currentCursorMinutes = 7 * 60; // Default starts 07:00 AM
 
-    final List<Map<String, String>> slotMatrix8 = [
-      {'startTime': '07:00', 'endTime': '08:00'}, // Ăn sáng
-      {'startTime': '08:30', 'endTime': '10:30'}, // Đi chơi 1
-      {'startTime': '11:00', 'endTime': '12:00'}, // Đi chơi 2
-      {'startTime': '12:30', 'endTime': '14:00'}, // Ăn trưa (90 phút)
-      {'startTime': '14:30', 'endTime': '15:30'}, // Nghỉ ngơi / Cafe
-      {'startTime': '16:00', 'endTime': '17:30'}, // Đi chơi 3
-      {'startTime': '18:00', 'endTime': '19:30'}, // Ăn tối (90 phút)
-      {'startTime': '20:00', 'endTime': '22:00'}, // Đi chơi tối / Cafe
-    ];
-
-    final List<Map<String, String>> hardSlots = [
-      {'startTime': '07:00', 'endTime': '08:00'}, // Slot 0: Ăn sáng
-      {'startTime': '08:30', 'endTime': '09:30'}, // Slot 1: Đi chơi 1
-      {'startTime': '10:00', 'endTime': '11:30'}, // Slot 2: Đi chơi 2
-      {'startTime': '12:00', 'endTime': '13:30'}, // Slot 3: Ăn trưa (90 phút)
-      {
-        'startTime': '14:00',
-        'endTime': '15:00',
-      }, // Slot 4: Đi chơi 3 / Check-in
-      {'startTime': '15:30', 'endTime': '17:00'}, // Slot 5: Đi chơi 4
-      {'startTime': '17:30', 'endTime': '19:00'}, // Slot 6: Ăn tối (90 phút)
-      {'startTime': '19:30', 'endTime': '20:30'}, // Slot 7: Đi chơi 5
-      {'startTime': '21:00', 'endTime': '22:30'}, // Slot 8: Đi chơi 6 / Coffee
-    ];
-
-    final List<Map<String, String>> canThoSlotMatrix10 = [
-      {'startTime': '05:30', 'endTime': '07:15'}, // Chợ nổi sáng sớm
-      {'startTime': '07:30', 'endTime': '08:30'}, // Cà phê sáng
-      {'startTime': '09:00', 'endTime': '10:00'}, // Đi chơi 1
-      {'startTime': '10:30', 'endTime': '11:30'}, // Đi chơi 2
-      {'startTime': '12:00', 'endTime': '13:30'}, // Ăn trưa (90 phút)
-      {'startTime': '14:00', 'endTime': '15:00'}, // Đi chơi 3
-      {'startTime': '15:30', 'endTime': '17:00'}, // Đi chơi 4
-      {'startTime': '17:30', 'endTime': '19:00'}, // Ăn tối (90 phút)
-      {'startTime': '19:30', 'endTime': '20:30'}, // Đi chơi 5
-      {'startTime': '21:00', 'endTime': '22:30'}, // Đi chơi 6
-    ];
-
-    final List<Map<String, String>> activeMatrix = hasFloatingMarket
-        ? canThoSlotMatrix10
-        : (nonFloatingMarketCount <= 7
-              ? slotMatrix7
-              : (nonFloatingMarketCount == 8 ? slotMatrix8 : hardSlots));
-
-    int slotIndex = 0;
     for (int i = 0; i < sorted.length; i++) {
       final item = sorted[i];
-      final place = item['place'] ?? {};
+      final bool hasValidTime = item['startTime'] != null &&
+          item['startTime'].toString().contains(':');
+      final bool isPinned = hasValidTime ||
+          item['isUserPinned'] == true ||
+          item['id'] == pinnedDetailId;
 
-      if (slotIndex < activeMatrix.length) {
-        item['startTime'] = activeMatrix[slotIndex]['startTime'];
-        item['endTime'] = activeMatrix[slotIndex]['endTime'];
-        slotIndex++;
+      if (isPinned && hasValidTime) {
+        // 100% PRIORITY FOR PINNED / PRE-SET PLACE: Keep exact startTime & endTime
+        final startParts = item['startTime'].toString().split(':');
+        final endParts = (item['endTime']?.toString() ?? '').split(':');
+
+        final int sH = int.tryParse(startParts[0]) ?? 8;
+        final int sM = int.tryParse(startParts[1]) ?? 0;
+        final int eH = endParts.length >= 2
+            ? (int.tryParse(endParts[0]) ?? (sH + 1))
+            : (sH + 1);
+        final int eM = endParts.length >= 2
+            ? (int.tryParse(endParts[1]) ?? sM)
+            : sM;
+
+        item['startTime'] =
+            '${sH.toString().padLeft(2, '0')}:${sM.toString().padLeft(2, '0')}';
+        item['endTime'] =
+            '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
+
+        currentCursorMinutes = (eH * 60 + eM + 30);
       } else {
-        final lastEnd = activeMatrix.last['endTime']!;
-        final parts = lastEnd.split(':');
-        int h =
-            (int.tryParse(parts[0]) ?? 22) +
-            ((slotIndex - activeMatrix.length) * 1);
-        h = h % 24;
-        item['startTime'] = '${h.toString().padLeft(2, '0')}:00';
-        item['endTime'] = '${(h + 1).toString().padLeft(2, '0')}:00';
-        slotIndex++;
+        // UNPINNED PLACE: Optimize around currentCursorMinutes and upcoming pinned items
+        int? nextPinnedStartMinutes;
+        for (int j = i + 1; j < sorted.length; j++) {
+          final nextItem = sorted[j];
+          final bool nextHasTime = nextItem['startTime'] != null &&
+              nextItem['startTime'].toString().contains(':');
+          final bool nextPinned = nextHasTime ||
+              nextItem['isUserPinned'] == true ||
+              nextItem['id'] == pinnedDetailId;
+
+          if (nextPinned && nextHasTime) {
+            final parts = nextItem['startTime'].toString().split(':');
+            nextPinnedStartMinutes = (int.tryParse(parts[0]) ?? 12) * 60 +
+                (int.tryParse(parts[1]) ?? 0);
+            break;
+          }
+        }
+
+        int startM = currentCursorMinutes;
+        int duration = 90;
+
+        if (nextPinnedStartMinutes != null &&
+            (startM + duration) > nextPinnedStartMinutes) {
+          if (nextPinnedStartMinutes - startM >= 45) {
+            duration = nextPinnedStartMinutes - startM - 15;
+          }
+        }
+
+        int sH = (startM ~/ 60) % 24;
+        int sM = startM % 60;
+        int eTotal = startM + duration;
+        int eH = (eTotal ~/ 60) % 24;
+        int eM = eTotal % 60;
+
+        item['startTime'] =
+            '${sH.toString().padLeft(2, '0')}:${sM.toString().padLeft(2, '0')}';
+        item['endTime'] =
+            '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
+
+        currentCursorMinutes = eTotal + 30;
       }
 
       item['sortOrder'] = i;
 
-      // Invalidate weather cache for this place so new time slot fetches correct weather forecast
+      final place = item['place'] ?? {};
       final int placeId = (place['id'] as num?)?.toInt() ?? 0;
       if (placeId > 0) {
         _placeWeatherCache.removeWhere((key, _) => key.startsWith('$placeId-'));

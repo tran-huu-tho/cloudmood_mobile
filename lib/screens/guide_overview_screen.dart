@@ -2643,57 +2643,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                             },
                           ),
                   ),
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Địa điểm đã lưu của bạn',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
                   const SizedBox(height: 8),
-                  if (_sectionNames.isNotEmpty) ...[
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Tổng quan',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    ),
-                    ..._sectionNames.map((section) {
-                      final color = _sectionColors[section] ?? AppTheme.primary;
-                      return CheckboxListTile(
-                        secondary: Icon(Icons.location_on, color: color),
-                        title: Text(
-                          section,
-                          style: TextStyle(
-                            color: AppTheme.darkText,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        value: _checkedSections?.contains(section) ?? true,
-                        activeColor: AppTheme.primary,
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.trailing,
-                        visualDensity: VisualDensity.compact,
-                        onChanged: (val) {
-                          setSheetState(() {
-                            if (val == true) {
-                              _checkedSections?.add(section);
-                            } else {
-                              _checkedSections?.remove(section);
-                            }
-                          });
-                          setState(() {});
-                        },
-                      );
-                    }),
-                    const Divider(),
-                  ],
+                  const Divider(),
+                  const SizedBox(height: 4),
                   const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
+                    padding: EdgeInsets.only(top: 4, bottom: 4),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -4573,44 +4527,86 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
             ),
           ),
 
-          // Zoom Button (Moved outside so it doesn't get clipped by AnimatedContainer)
+          // Zoom In / Out Buttons (+ / -)
           if (_isMapExpanded && _selectedMapPlace == null && !_isSheetHalf)
             Positioned(
               left: 16,
               bottom: 75.0 + 16.0,
-              child: GestureDetector(
-                onTap: _showZoomOptionsBottomSheet,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.search, size: 20, color: Colors.black87),
-                      SizedBox(width: 8),
-                      Text(
-                        'Phóng to vào...',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 8,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          final double currentZoom = _mapController.camera.zoom;
+                          _mapController.move(
+                            _mapController.camera.center,
+                            (currentZoom + 0.8).clamp(1.0, 18.0),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Icon(
+                            Icons.add_rounded,
+                            size: 22,
+                            color: AppTheme.darkText,
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 8,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          final double currentZoom = _mapController.camera.zoom;
+                          _mapController.move(
+                            _mapController.camera.center,
+                            (currentZoom - 0.8).clamp(1.0, 18.0),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Icon(
+                            Icons.remove_rounded,
+                            size: 22,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
