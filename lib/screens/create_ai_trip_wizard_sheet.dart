@@ -858,6 +858,16 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         }
       }
 
+      // If STILL less than totalNeeded, cycle/repeat candidates so every day has enough places!
+      if (places.isNotEmpty && places.length < totalNeeded) {
+        final initialLen = places.length;
+        int cycleIdx = 0;
+        while (places.length < totalNeeded) {
+          places.add(places[cycleIdx % initialLen]);
+          cycleIdx++;
+        }
+      }
+
       final DateTime tripStartDate =
           _selectedDateRange?.start ?? DateTime.now();
 
@@ -870,22 +880,23 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
             startDate: tripStartDate,
           );
 
-      final Set<int> addedPlaceIds = {};
       final List<Map<String, dynamic>> bulkDetails = [];
 
       for (int day = 1; day <= days; day++) {
         final dayPlaces = optimizedPlan[day] ?? [];
         int placeIndexForDay = 0;
+        final Set<int> dayAddedPlaceIds = {}; // Scope dedup to the current day only!
+
         for (int i = 0; i < dayPlaces.length; i++) {
           final place = dayPlaces[i];
           final int placeId = (place['id'] is int)
               ? place['id']
               : int.tryParse(place['id'].toString()) ?? 0;
 
-          if (placeId > 0 && !addedPlaceIds.contains(placeId)) {
-            addedPlaceIds.add(placeId);
+          if (placeId > 0 && !dayAddedPlaceIds.contains(placeId)) {
+            dayAddedPlaceIds.add(placeId);
 
-            final timeSlot = _calculatePlaceTimeSlot(placeIndexForDay, dayPlaces.length);
+            final timeSlot = _calculatePlaceTimeSlot(placeIndexForDay, 9);
             final inspiringNote = _generateInspiringAINote(
               place: place,
               day: day,
@@ -1143,9 +1154,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
             centroids[d]['lng']!,
           );
 
-          // Add massive penalty (100,000 km) if closed on this specific day to strictly avoid assigning closed days!
+          // Evenly distribute places across days
           if (!isOpenOnDay) {
-            dist += 100000.0;
+            dist += 5.0;
           }
 
           if (dist < minDistance &&
@@ -1307,15 +1318,15 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     int totalPlacesForDay,
   ) {
     final slots = [
-      {'startTime': '07:00', 'endTime': '08:00'}, // Slot 0: Ăn sáng / Coffee
-      {'startTime': '08:30', 'endTime': '09:30'}, // Slot 1: Đi chơi 1
-      {'startTime': '10:00', 'endTime': '11:30'}, // Slot 2: Đi chơi 2
-      {'startTime': '12:00', 'endTime': '13:00'}, // Slot 3: Ăn trưa
-      {'startTime': '13:30', 'endTime': '14:30'}, // Slot 4: Đi chơi 3 / Check-in
-      {'startTime': '15:00', 'endTime': '17:00'}, // Slot 5: Đi chơi 4
-      {'startTime': '17:30', 'endTime': '19:00'}, // Slot 6: Ăn tối
-      {'startTime': '19:30', 'endTime': '20:30'}, // Slot 7: Đi chơi 5
-      {'startTime': '21:00', 'endTime': '22:30'}, // Slot 8: Đi chơi 6 / Coffee
+      {'startTime': '07:00', 'endTime': '08:30'}, // Slot 0: Ăn sáng / Coffee
+      {'startTime': '08:30', 'endTime': '10:30'}, // Slot 1: Đi chơi 1
+      {'startTime': '10:30', 'endTime': '12:30'}, // Slot 2: Đi chơi 2
+      {'startTime': '12:30', 'endTime': '13:30'}, // Slot 3: Ăn trưa
+      {'startTime': '13:30', 'endTime': '15:00'}, // Slot 4: Đi chơi 3 / Check-in
+      {'startTime': '15:00', 'endTime': '16:30'}, // Slot 5: Đi chơi 4
+      {'startTime': '16:30', 'endTime': '18:00'}, // Slot 6: Đi chơi 5
+      {'startTime': '18:00', 'endTime': '19:00'}, // Slot 7: Ăn tối
+      {'startTime': '19:00', 'endTime': '22:00'}, // Slot 8: Đi chơi 6 / Coffee
     ];
     return slots[placeIndex % slots.length];
   }
