@@ -484,6 +484,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   bool _isReordering = false;
   bool _isUpdatingDatabase = false;
+  final Map<String, String> _segmentTransportModes = {};
 
   @override
   void initState() {
@@ -12711,45 +12712,74 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   Map<String, dynamic> _getMockTravelInfo(
     Map<String, dynamic> p1,
-    Map<String, dynamic> p2,
-  ) {
+    Map<String, dynamic> p2, {
+    String mode = 'motorcycle',
+  }) {
     final double? lat1 = (p1['latitude'] as num?)?.toDouble();
     final double? lon1 = (p1['longitude'] as num?)?.toDouble();
     final double? lat2 = (p2['latitude'] as num?)?.toDouble();
     final double? lon2 = (p2['longitude'] as num?)?.toDouble();
 
+    double dist = 2.3;
     if (lat1 != null && lon1 != null && lat2 != null && lon2 != null) {
       final dx = (lon1 - lon2) * 111.0 * math.cos(lat1 * math.pi / 180.0);
       final dy = (lat1 - lat2) * 111.0;
-      final dist = math.sqrt(dx * dx + dy * dy);
-      final durationMinutes = (dist * 2.0).round();
-      final distStr = dist.toStringAsFixed(1).replaceAll('.', ',');
-      return {
-        'duration': durationMinutes > 0 ? durationMinutes : 5,
-        'distance': distStr,
-      };
+      dist = math.sqrt(dx * dx + dy * dy);
     }
-    return {'duration': 8, 'distance': '3,5'};
+
+    int durationMinutes = 5;
+    IconData icon = Icons.two_wheeler_rounded;
+    String speedStr = '~35 km/h';
+
+    if (mode == 'walking') {
+      durationMinutes = (dist * 12.0).round().clamp(3, 180);
+      icon = Icons.directions_walk_rounded;
+      speedStr = '~5 km/h';
+    } else if (mode == 'transit') {
+      durationMinutes = (dist * 4.0).round().clamp(5, 180) + 8;
+      icon = Icons.directions_transit_rounded;
+      speedStr = '~15 km/h';
+    } else if (mode == 'car') {
+      durationMinutes = (dist * 2.2).round().clamp(2, 120);
+      icon = Icons.directions_car_filled_rounded;
+      speedStr = '~30 km/h';
+    } else {
+      // motorcycle (default)
+      durationMinutes = (dist * 1.8).round().clamp(2, 120);
+      icon = Icons.two_wheeler_rounded;
+      speedStr = '~35 km/h';
+    }
+
+    final distStr = dist.toStringAsFixed(1).replaceAll('.', ',');
+    return {
+      'duration': durationMinutes > 0 ? durationMinutes : 3,
+      'distance': distStr,
+      'speed': speedStr,
+      'icon': icon,
+    };
   }
 
   Widget _buildTravelSeparator(
     Map<String, dynamic> p1,
     Map<String, dynamic> p2,
   ) {
-    final travelInfo = _getMockTravelInfo(p1, p2);
+    final String key = '${p1['id']}_${p2['id']}';
+    final String currentMode = _segmentTransportModes[key] ?? 'motorcycle';
+    final travelInfo = _getMockTravelInfo(p1, p2, mode: currentMode);
     final duration = travelInfo['duration'];
     final distance = travelInfo['distance'];
+    final IconData modeIcon = travelInfo['icon'] as IconData;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => _showTransportModeSheet(),
+            onTap: () => _showTransportModeSheet(p1, p2),
             child: Row(
               children: [
                 Icon(
-                  Icons.directions_run_rounded,
+                  modeIcon,
                   color: Colors.grey[600],
                   size: 16,
                 ),
@@ -12835,8 +12865,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  void _showTransportModeSheet() {
+  void _showTransportModeSheet(
+    Map<String, dynamic> p1,
+    Map<String, dynamic> p2,
+  ) {
     if (!_checkCanEdit()) return;
+    final String key = '${p1['id']}_${p2['id']}';
+    final motoInfo = _getMockTravelInfo(p1, p2, mode: 'motorcycle');
+    final carInfo = _getMockTravelInfo(p1, p2, mode: 'car');
+    final transitInfo = _getMockTravelInfo(p1, p2, mode: 'transit');
+    final walkInfo = _getMockTravelInfo(p1, p2, mode: 'walking');
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -12868,123 +12907,48 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   ),
                   const SizedBox(height: 16),
                   _buildTransportModeOption(
+                    icon: Icons.two_wheeler_rounded,
+                    title: 'Xe máy',
+                    info: '${motoInfo['duration']} phút • ${motoInfo['distance']} km (${motoInfo['speed']})',
+                    onTap: () {
+                      setState(() {
+                        _segmentTransportModes[key] = 'motorcycle';
+                      });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  _buildTransportModeOption(
                     icon: Icons.directions_car_filled_rounded,
-                    title: 'Lái xe',
-                    info: '4 phút • 2,3 km',
-                    onTap: () => Navigator.pop(context),
+                    title: 'Ô tô',
+                    info: '${carInfo['duration']} phút • ${carInfo['distance']} km (${carInfo['speed']})',
+                    onTap: () {
+                      setState(() {
+                        _segmentTransportModes[key] = 'car';
+                      });
+                      Navigator.pop(context);
+                    },
                   ),
                   _buildTransportModeOption(
                     icon: Icons.directions_transit_rounded,
                     title: 'Phương tiện công cộng',
-                    info: '32 phút • 2,3 km',
-                    onTap: () => Navigator.pop(context),
+                    info: '${transitInfo['duration']} phút • ${transitInfo['distance']} km (${transitInfo['speed']})',
+                    onTap: () {
+                      setState(() {
+                        _segmentTransportModes[key] = 'transit';
+                      });
+                      Navigator.pop(context);
+                    },
                   ),
                   _buildTransportModeOption(
                     icon: Icons.directions_walk_rounded,
                     title: 'Đi bộ',
-                    info: '28 phút • 2,3 km',
-                    onTap: () => Navigator.pop(context),
-                  ),
-                  _buildTransportModeOption(
-                    icon: Icons.visibility_off_outlined,
-                    title: 'Ẩn chỉ đường',
-                    info: null,
-                    onTap: () => Navigator.pop(context),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Divider(height: 32),
-                  ),
-                  InkWell(
+                    info: '${walkInfo['duration']} phút • ${walkInfo['distance']} km (${walkInfo['speed']})',
                     onTap: () {
+                      setState(() {
+                        _segmentTransportModes[key] = 'walking';
+                      });
                       Navigator.pop(context);
-                      _showDefaultTransportModeSheet();
                     },
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Thay đổi mặc định cho tất cả các địa điểm',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.darkText,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showDefaultTransportModeSheet() {
-    if (!_checkCanEdit()) return;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ),
-                      const Text(
-                        'Chế độ vận chuyển mặc định',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildDefaultModeOption(
-                    title: 'Phương tiện công cộng + đi bộ khoảng cách ngắn',
-                    isSelected: false,
-                    onTap: () => Navigator.pop(context),
-                  ),
-                  _buildDefaultModeOption(
-                    title: 'Lái xe + đi bộ khoảng cách ngắn',
-                    isSelected: true,
-                    onTap: () => Navigator.pop(context),
                   ),
                 ],
               ),
