@@ -658,8 +658,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   void _onItinerarySocketUpdated(Map<String, dynamic> data) {
     final eventItinId = data['itineraryId']?.toString();
     final currentItinId = _itineraryData['id']?.toString();
+    final updatedByUserId = data['updatedByUserId']?.toString();
+    final currentUserId = AuthService().currentUser.value?.id?.toString();
 
-    if (eventItinId == currentItinId && mounted) {
+    if (eventItinId == currentItinId &&
+        (updatedByUserId == null || updatedByUserId != currentUserId) &&
+        mounted) {
       // Debounce: trì hoãn reload 1.5s để gom nhiều event liên tiếp
       // và tránh flicker khi optimistic update đang áp dụng
       _socketReloadTimer?.cancel();
@@ -1333,6 +1337,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       for (var td in pendingTempDetails) {
         if (!cleanDetails.any((d) => d['id'] == td['id'])) {
           cleanDetails.add(td);
+        }
+      }
+
+      for (var cd in cleanDetails) {
+        final existing = _details.firstWhere(
+          (d) => d['id'] == cd['id'],
+          orElse: () => {},
+        );
+        if (existing.isNotEmpty) {
+          if (cd['incidentReport'] == null && existing['incidentReport'] != null) {
+            cd['incidentReport'] = existing['incidentReport'];
+            cd['incidentTag'] = existing['incidentTag'];
+            cd['incidentNote'] = existing['incidentNote'];
+          }
         }
       }
 
@@ -9019,18 +9037,32 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           label: Text(
                             opt['label'] as String,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13.5,
                               fontWeight: isSel
                                   ? FontWeight.bold
-                                  : FontWeight.normal,
+                                  : FontWeight.w600,
                               color: isSel
                                   ? Colors.white
-                                  : const Color(0xFF334155),
+                                  : const Color(0xFF1E293B),
                             ),
                           ),
                           selected: isSel,
                           selectedColor: AppTheme.primary,
-                          backgroundColor: const Color(0xFFF1F5F9),
+                          showCheckmark: false,
+                          labelPadding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(
+                              color: isSel
+                                  ? AppTheme.primary
+                                  : const Color(0xFFE2E8F0),
+                              width: 1.2,
+                            ),
+                          ),
+                          backgroundColor: const Color(0xFFF8FAFC),
                           onSelected: (val) {
                             if (val) {
                               setSheetState(() {
@@ -9135,7 +9167,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     required String note,
   }) {
     final int detailId = detail['id'] as int;
-    final int dayNum = (detail['day'] as num?)?.toInt() ?? 1;
 
     final String fullReport = note.isNotEmpty ? '$tag - $note' : tag;
 
@@ -9159,58 +9190,465 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       'incidentReport': fullReport,
     });
 
-    if (tag == 'Mưa lớn đột xuất' || tag == 'Đóng cửa bất ngờ') {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome_rounded,
-                  color: AppTheme.primary,
-                  size: 22,
-                ),
-                SizedBox(width: 8),
-                Text('Tối ưu AI tự động?'),
-              ],
-            ),
-            content: Text(
-              'Bạn vừa báo cáo "$tag". Bạn có muốn OpenAI GPT tự động sắp xếp lại lịch trình Ngày $dayNum cho hợp lý hơn không?',
-              style: const TextStyle(fontSize: 13, height: 1.4),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text(
-                  'Để tôi tự kéo',
-                  style: TextStyle(color: Colors.grey),
-                ),
+    // Ask user if they want the system to choose another place
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final place = detail['place'] ?? {};
+      final String placeName = place['name'] ?? 'địa điểm này';
+
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(
+                Icons.swap_horiz_rounded,
+                color: AppTheme.primary,
+                size: 24,
               ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+              SizedBox(width: 8),
+              Text(
+                'Gợi ý địa điểm khác?',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
                 ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _optimizeDay(dayNum - 1);
-                },
-                icon: const Icon(Icons.auto_awesome, size: 16),
-                label: const Text('AI Tối Ưu Ngay'),
               ),
             ],
           ),
-        );
-      });
+          content: Text(
+            'Bạn có muốn hệ thống gợi ý và chọn một địa điểm khác thay thế cho "$placeName" không?',
+            style: const TextStyle(
+              fontSize: 13.5,
+              height: 1.4,
+              color: Color(0xFF334155),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                // "Không": giữ nguyên địa điểm hiện tại
+              },
+              child: const Text(
+                'Không',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                // "Có": hiển thị hộp thoại nhập yêu cầu
+                _showReplacementRequirementDialog(detail);
+              },
+              child: const Text(
+                'Có',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  void _showReplacementRequirementDialog(Map<String, dynamic> detail) {
+    final TextEditingController reqCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Row(
+          children: [
+            Icon(
+              Icons.edit_note_rounded,
+              color: AppTheme.primary,
+              size: 24,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Yêu cầu địa điểm thay thế',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Nhập mong muốn hoặc sở thích của bạn cho địa điểm thay thế:',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF475569),
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reqCtrl,
+              maxLines: 3,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText:
+                    'Ví dụ: Quán cà phê máy lạnh yên tĩnh, nhà hàng đặc sản Miền Tây, điểm check-in...',
+                hintStyle: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                contentPadding: const EdgeInsets.all(12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppTheme.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'Hủy',
+              style: TextStyle(color: Color(0xFF64748B)),
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _processPlaceReplacement(detail, reqCtrl.text.trim());
+            },
+            icon: const Icon(Icons.search_rounded, size: 18),
+            label: const Text(
+              'Tìm & Thay thế',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _processPlaceReplacement(
+    Map<String, dynamic> detail,
+    String userPrompt,
+  ) async {
+    final int detailId = detail['id'] as int;
+    final place = detail['place'] ?? {};
+    final String currentName = place['name'] ?? 'Địa điểm';
+
+    _showPremiumNotification(
+      title: 'Đang tìm địa điểm thay thế',
+      message: 'Hệ thống đang tìm gợi ý phù hợp nhất...',
+      icon: Icons.search_rounded,
+      color: AppTheme.primary,
+    );
+
+    final String dest = _itineraryData['destination'] ?? 'Cần Thơ';
+    List<Map<String, dynamic>> availablePlaces = [];
+
+    if (userPrompt.isNotEmpty) {
+      availablePlaces = await DatabaseService().searchPlaces(
+        destination: dest,
+        query: userPrompt,
+      );
     }
+
+    if (availablePlaces.isEmpty) {
+      if (_allPlaces.isNotEmpty) {
+        availablePlaces = List.from(_allPlaces);
+      } else {
+        availablePlaces = await DatabaseService().fetchPlacesByDestination(dest);
+      }
+    }
+
+    final Set<int> existingPlaceIds = _details
+        .map<int>(
+          (d) => ((d['place']?['id'] ?? d['placeId']) as num?)?.toInt() ?? 0,
+        )
+        .where((id) => id > 0)
+        .toSet();
+
+    List<Map<String, dynamic>> candidates = availablePlaces
+        .where((p) => !existingPlaceIds.contains((p['id'] as num?)?.toInt()))
+        .toList();
+
+    if (candidates.isEmpty) {
+      candidates = availablePlaces;
+    }
+
+    int startHour = 12;
+    final String startStr = (detail['startTime'] ?? '').toString();
+    if (startStr.contains(':')) {
+      startHour = int.tryParse(startStr.split(':')[0]) ?? 12;
+    }
+    final bool isDaytime = startHour < 17; // Morning or Afternoon (< 17:00)
+
+    Map<String, dynamic>? bestMatch;
+    if (userPrompt.isNotEmpty) {
+      final promptLower = userPrompt.toLowerCase().trim();
+      candidates.sort((a, b) {
+        int scoreA = 0;
+        int scoreB = 0;
+
+        final nameA = (a['name'] ?? '').toString().toLowerCase();
+        final nameB = (b['name'] ?? '').toString().toLowerCase();
+        final catA =
+            (a['category']?['name'] ?? a['category'] ?? '').toString().toLowerCase();
+        final catB =
+            (b['category']?['name'] ?? b['category'] ?? '').toString().toLowerCase();
+        final descA =
+            (a['description'] ?? a['address'] ?? '').toString().toLowerCase();
+        final descB =
+            (b['description'] ?? b['address'] ?? '').toString().toLowerCase();
+
+        // 1. Full phrase match in name (+100) or category (+50)
+        if (nameA.contains(promptLower)) scoreA += 100;
+        if (nameB.contains(promptLower)) scoreB += 100;
+        if (catA.contains(promptLower)) scoreA += 50;
+        if (catB.contains(promptLower)) scoreB += 50;
+
+        // 2a. Market Intent: "đi chợ" / "chợ" vs "chợ đêm"
+        final bool isMarketPrompt = promptLower.contains('đi chợ') ||
+            (promptLower.contains('chợ') && !promptLower.contains('đêm'));
+        final bool isNightMarketPrompt = promptLower.contains('chợ đêm') ||
+            promptLower.contains('night market');
+
+        if (isMarketPrompt) {
+          final isDayMarketA = (nameA.contains('chợ') && !nameA.contains('đêm')) ||
+              nameA.contains('siêu thị') ||
+              catA.contains('chợ') ||
+              catA.contains('mua sắm');
+          final isDayMarketB = (nameB.contains('chợ') && !nameB.contains('đêm')) ||
+              nameB.contains('siêu thị') ||
+              catB.contains('chợ') ||
+              catB.contains('mua sắm');
+          if (isDayMarketA) scoreA += 200;
+          if (isDayMarketB) scoreB += 200;
+
+          if (nameA.contains('chợ đêm') || catA.contains('chợ đêm')) scoreA -= 800;
+          if (nameB.contains('chợ đêm') || catB.contains('chợ đêm')) scoreB -= 800;
+        }
+
+        if (isNightMarketPrompt) {
+          if (nameA.contains('chợ đêm') || catA.contains('chợ đêm')) scoreA += 300;
+          if (nameB.contains('chợ đêm') || catB.contains('chợ đêm')) scoreB += 300;
+        }
+
+        // 2b. Time-of-Day constraint (Daytime < 17:00 vs Night)
+        if (isDaytime) {
+          final isNightOnlyA = nameA.contains('chợ đêm') ||
+              nameA.contains('night market') ||
+              nameA.contains('pub') ||
+              nameA.contains('quán nhậu đêm') ||
+              catA.contains('chợ đêm');
+          final isNightOnlyB = nameB.contains('chợ đêm') ||
+              nameB.contains('night market') ||
+              nameB.contains('pub') ||
+              nameB.contains('quán nhậu đêm') ||
+              catB.contains('chợ đêm');
+          if (isNightOnlyA && !isNightMarketPrompt) scoreA -= 1000;
+          if (isNightOnlyB && !isNightMarketPrompt) scoreB -= 1000;
+        } else {
+          if (nameA.contains('chợ đêm') || catA.contains('chợ đêm')) scoreA += 100;
+          if (nameB.contains('chợ đêm') || catB.contains('chợ đêm')) scoreB += 100;
+        }
+
+        // 2c. Keyword domain matching for common intent (Mall / Cafe / Food)
+        if (promptLower.contains('trung tâm thương mại') ||
+            promptLower.contains('tttm') ||
+            promptLower.contains('siêu thị') ||
+            promptLower.contains('shopping') ||
+            promptLower.contains('mua sắm')) {
+          final isMallA = nameA.contains('vincom') ||
+              nameA.contains('lotte') ||
+              nameA.contains('sense city') ||
+              nameA.contains('go!') ||
+              nameA.contains('co.op') ||
+              nameA.contains('mall') ||
+              nameA.contains('siêu thị') ||
+              nameA.contains('trung tâm thương mại');
+          final isMallB = nameB.contains('vincom') ||
+              nameB.contains('lotte') ||
+              nameB.contains('sense city') ||
+              nameB.contains('go!') ||
+              nameB.contains('co.op') ||
+              nameB.contains('mall') ||
+              nameB.contains('siêu thị') ||
+              nameB.contains('trung tâm thương mại');
+          if (isMallA) scoreA += 80;
+          if (isMallB) scoreB += 80;
+        }
+
+        if (promptLower.contains('cà phê') ||
+            promptLower.contains('cafe') ||
+            promptLower.contains('nước')) {
+          final isCafeA = nameA.contains('cà phê') ||
+              nameA.contains('cafe') ||
+              catA.contains('cà phê') ||
+              catA.contains('quán nước');
+          final isCafeB = nameB.contains('cà phê') ||
+              nameB.contains('cafe') ||
+              catB.contains('cà phê') ||
+              catB.contains('quán nước');
+          if (isCafeA) scoreA += 150;
+          if (isCafeB) scoreB += 150;
+          if (nameA.contains('steak') || nameA.contains('wine') || nameA.contains('hải sản') || nameA.contains('nhậu') || nameA.contains('bar')) scoreA -= 500;
+          if (nameB.contains('steak') || nameB.contains('wine') || nameB.contains('hải sản') || nameB.contains('nhậu') || nameB.contains('bar')) scoreB -= 500;
+        }
+
+        if (promptLower.contains('quán ăn') ||
+            promptLower.contains('nhà hàng') ||
+            promptLower.contains('hải sản') ||
+            promptLower.contains('đặc sản') ||
+            promptLower.contains('ăn uống')) {
+          final isFoodA = catA.contains('quán ăn') ||
+              catA.contains('nhà hàng') ||
+              catA.contains('ẩm thực') ||
+              nameA.contains('quán') ||
+              nameA.contains('nhà hàng') ||
+              nameA.contains('hải sản');
+          final isFoodB = catB.contains('quán ăn') ||
+              catB.contains('nhà hàng') ||
+              catB.contains('ẩm thực') ||
+              nameB.contains('quán') ||
+              nameB.contains('nhà hàng') ||
+              nameB.contains('hải sản');
+          if (isFoodA) scoreA += 80;
+          if (isFoodB) scoreB += 80;
+        }
+
+        // 3. Individual word matches (+10 for name, +5 for category)
+        final words = promptLower.split(' ');
+        for (var w in words) {
+          if (w.length < 3) continue;
+          if (nameA.contains(w)) scoreA += 10;
+          if (nameB.contains(w)) scoreB += 10;
+          if (catA.contains(w)) scoreA += 5;
+          if (catB.contains(w)) scoreB += 5;
+          if (descA.contains(w)) scoreA += 2;
+          if (descB.contains(w)) scoreB += 2;
+        }
+
+        final ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
+        final ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
+
+        if (scoreB != scoreA) return scoreB.compareTo(scoreA);
+        return ratingB.compareTo(ratingA);
+      });
+      bestMatch = candidates.isNotEmpty ? candidates.first : null;
+    } else {
+      final String currentCat =
+          (place['category']?['name'] ?? place['category'] ?? '')
+              .toString()
+              .toLowerCase();
+      candidates.sort((a, b) {
+        int scoreA = 0;
+        int scoreB = 0;
+        final catA =
+            (a['category']?['name'] ?? a['category'] ?? '').toString().toLowerCase();
+        final catB =
+            (b['category']?['name'] ?? b['category'] ?? '').toString().toLowerCase();
+        final nameA = (a['name'] ?? '').toString().toLowerCase();
+        final nameB = (b['name'] ?? '').toString().toLowerCase();
+
+        if (catA == currentCat) scoreA += 50;
+        if (catB == currentCat) scoreB += 50;
+
+        if (isDaytime) {
+          if (nameA.contains('chợ đêm') || catA.contains('chợ đêm')) scoreA -= 1000;
+          if (nameB.contains('chợ đêm') || catB.contains('chợ đêm')) scoreB -= 1000;
+        }
+
+        if (scoreB != scoreA) return scoreB.compareTo(scoreA);
+        final ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
+        final ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
+        return ratingB.compareTo(ratingA);
+      });
+      bestMatch = candidates.isNotEmpty ? candidates.first : null;
+    }
+
+    if (bestMatch == null) {
+      _showPremiumNotification(
+        title: 'Không tìm thấy địa điểm phù hợp',
+        message: 'Rất tiếc, chưa tìm thấy địa điểm khác phù hợp hơn.',
+        icon: Icons.error_outline_rounded,
+        color: Colors.orange,
+      );
+      return;
+    }
+
+    final int newPlaceId = (bestMatch['id'] as num).toInt();
+    final String newPlaceName = bestMatch['name'] ?? 'Địa điểm mới';
+
+    setState(() {
+      final idx = _details.indexWhere((d) => d['id'] == detailId);
+      if (idx != -1) {
+        _details[idx]['placeId'] = newPlaceId;
+        _details[idx]['place'] = bestMatch;
+        _details[idx].remove('incidentReport');
+        _details[idx].remove('incidentTag');
+        _details[idx].remove('incidentNote');
+      }
+    });
+
+    await DatabaseService().updateItineraryDetail(detailId, {
+      'placeId': newPlaceId,
+      'incidentReport': null,
+    });
+
+    _showPremiumNotification(
+      title: 'Đã thay thế địa điểm mới',
+      message: 'Thay thế "$currentName" bằng "$newPlaceName".',
+      icon: Icons.swap_horizontal_circle_rounded,
+      color: Colors.green,
+    );
   }
 
   void _clearIncidentReport(Map<String, dynamic> detail) {
@@ -10206,7 +10644,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
 
-    // Sort items chronologically based on their startTime if set, or sortOrder
+    // Sort items sequence based on sortOrder (or Market early morning priority)
     sorted.sort((a, b) {
       final placeA = a['place'] ?? {};
       final placeB = b['place'] ?? {};
@@ -10221,21 +10659,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       if (isMarketA && !isMarketB) return -1;
       if (!isMarketA && isMarketB) return 1;
 
-      final aStart = a['startTime']?.toString() ?? '';
-      final bStart = b['startTime']?.toString() ?? '';
-      final bool aHasTime = aStart.contains(':');
-      final bool bHasTime = bStart.contains(':');
-
-      if (aHasTime && bHasTime) {
-        final aVal = _getSortableTimeValue(aStart);
-        final bVal = _getSortableTimeValue(bStart);
-        if (aVal != bVal) return aVal.compareTo(bVal);
-      } else if (aHasTime && !bHasTime) {
-        return -1;
-      } else if (!aHasTime && bHasTime) {
-        return 1;
-      }
-
       final int orderA = (a['sortOrder'] as num?)?.toInt() ?? 0;
       final int orderB = (b['sortOrder'] as num?)?.toInt() ?? 0;
       return orderA.compareTo(orderB);
@@ -10247,9 +10670,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       final item = sorted[i];
       final bool hasValidTime = item['startTime'] != null &&
           item['startTime'].toString().contains(':');
-      final bool isPinned = hasValidTime ||
-          item['isUserPinned'] == true ||
-          item['id'] == pinnedDetailId;
+      final place = item['place'] ?? {};
+      final String placeName = (place['name'] ?? '').toString().toLowerCase();
+      final bool isMarket = placeName.contains('chợ nổi') ||
+          placeName.contains('cái răng') ||
+          placeName.contains('floating market');
+      final bool isPinned = item['isUserPinned'] == true ||
+          item['id'] == pinnedDetailId ||
+          isMarket;
 
       if (isPinned && hasValidTime) {
         // 100% PRIORITY FOR PINNED / PRE-SET PLACE: Keep exact startTime & endTime
@@ -10315,8 +10743,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
 
       item['sortOrder'] = i;
-
-      final place = item['place'] ?? {};
       final int placeId = (place['id'] as num?)?.toInt() ?? 0;
       if (placeId > 0) {
         _placeWeatherCache.removeWhere((key, _) => key.startsWith('$placeId-'));
@@ -11236,7 +11662,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                   color: AppTheme.darkText,
                                                 ),
                                               ),
-                                              const Spacer(),
+                                              const SizedBox(width: 4),
+                                   if (false) _buildCardActionIcon(
+                                     icon: item['incidentReport'] != null
+                                         ? Icons.report_problem_rounded
+                                         : Icons.chat_bubble_outline_rounded,
+                                     active: item['incidentReport'] != null,
+                                     badge: item['incidentReport'] != null
+                                         ? '!'
+                                         : null,
+                                     onTap: () =>
+                                         _showPlaceIncidentReportSheet(item),
+                                   ),
+                                   const Spacer(),
                                               Container(
                                                 padding:
                                                     const EdgeInsets.symmetric(
@@ -13990,86 +14428,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                 ),
                                               ),
                                             ),
-                                            // Incident Report / Comment Button
-                                            InkWell(
-                                              onTap: () =>
-                                                  _showPlaceIncidentReportSheet(
-                                                    detail,
-                                                  ),
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 7,
-                                                      vertical: 3,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      (detail['incidentReport'] !=
-                                                          null)
-                                                      ? const Color(0xFFFEF2F2)
-                                                      : Colors.grey.withAlpha(
-                                                          18,
-                                                        ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  border: Border.all(
-                                                    color:
-                                                        (detail['incidentReport'] !=
-                                                            null)
-                                                        ? const Color(
-                                                            0xFFEF4444,
-                                                          )
-                                                        : Colors.grey.withAlpha(
-                                                            60,
-                                                          ),
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      detail['incidentReport'] !=
-                                                              null
-                                                          ? Icons
-                                                                .report_problem_rounded
-                                                          : Icons
-                                                                .chat_bubble_outline_rounded,
-                                                      size: 12,
-                                                      color:
-                                                          detail['incidentReport'] !=
-                                                              null
-                                                          ? const Color(
-                                                              0xFFDC2626,
-                                                            )
-                                                          : Colors.grey[600],
-                                                    ),
-                                                    const SizedBox(width: 3),
-                                                    Text(
-                                                      detail['incidentReport'] !=
-                                                              null
-                                                          ? 'Có báo cáo'
-                                                          : 'Phản hồi',
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color:
-                                                            detail['incidentReport'] !=
-                                                                null
-                                                            ? const Color(
-                                                                0xFFDC2626,
-                                                              )
-                                                            : Colors.grey[600],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
                                             // Visited badge
                                             InkWell(
                                               onTap: () => _toggleVisitedDetail(
@@ -14381,27 +14739,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     },
                                   ),
                                   const SizedBox(width: 4),
-                                  // 😊 Biểu cảm
-                                  /* _buildCardActionIcon(
-                                  icon: Icons.add_reaction_outlined,
-                                  active: false,
-                                  badge: null,
-                                  onTap: () {
-                                    _showEmojiPickerSheet(
-                                      detail['id'],
-                                      detail['reactions'] is List
-                                          ? detail['reactions']
-                                          : (detail['reactions'] is String
-                                                ? (json.decode(
-                                                        detail['reactions'],
-                                                      )
-                                                      as List)
-                                                : []),
-                                      true,
-                                    );
-                                  },
-                                ), */
-                                  /* const SizedBox(width: 4), */
+                                  // 💬 Phản hồi / Báo cáo sự cố
+                                  _buildCardActionIcon(
+                                    icon: detail['incidentReport'] != null
+                                        ? Icons.report_problem_rounded
+                                        : Icons.chat_bubble_outline_rounded,
+                                    active: detail['incidentReport'] != null,
+                                    badge: detail['incidentReport'] != null
+                                        ? '!'
+                                        : null,
+                                    onTap: () =>
+                                        _showPlaceIncidentReportSheet(detail),
+                                  ),
+                                  const SizedBox(width: 4),
                                   // 💰 Chi phí
                                   Builder(
                                     builder: (ctx) {
