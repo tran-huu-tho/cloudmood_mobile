@@ -9624,11 +9624,26 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       return;
     }
 
-    final int newPlaceId = (bestMatch['id'] as num).toInt();
+    final dynamic rawId = bestMatch['id'];
+    final int? newPlaceId = rawId is num
+        ? rawId.toInt()
+        : int.tryParse(rawId?.toString() ?? '');
     final String newPlaceName = bestMatch['name'] ?? 'Địa điểm mới';
 
+    if (newPlaceId == null) {
+      _showPremiumNotification(
+        title: 'Không thể thay thế địa điểm',
+        message: 'Không tìm thấy ID địa điểm hợp lệ.',
+        icon: Icons.error_outline_rounded,
+        color: Colors.orange,
+      );
+      return;
+    }
+
     setState(() {
-      final idx = _details.indexWhere((d) => d['id'] == detailId);
+      final idx = _details.indexWhere(
+        (d) => d['id']?.toString() == detailId.toString(),
+      );
       if (idx != -1) {
         _details[idx]['placeId'] = newPlaceId;
         _details[idx]['place'] = bestMatch;
@@ -9636,12 +9651,29 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         _details[idx].remove('incidentTag');
         _details[idx].remove('incidentNote');
       }
+      if (_itineraryData['details'] is List) {
+        final iList = _itineraryData['details'] as List;
+        final iIdx = iList.indexWhere(
+          (d) => d['id']?.toString() == detailId.toString(),
+        );
+        if (iIdx != -1) {
+          iList[iIdx]['placeId'] = newPlaceId;
+          iList[iIdx]['place'] = bestMatch;
+          iList[iIdx].remove('incidentReport');
+          iList[iIdx].remove('incidentTag');
+          iList[iIdx].remove('incidentNote');
+        }
+      }
     });
 
-    await DatabaseService().updateItineraryDetail(detailId, {
+    final success = await DatabaseService().updateItineraryDetail(detailId, {
       'placeId': newPlaceId,
       'incidentReport': null,
     });
+
+    if (success) {
+      _loadData(silent: true);
+    }
 
     _showPremiumNotification(
       title: 'Đã thay thế địa điểm mới',
@@ -9652,9 +9684,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _clearIncidentReport(Map<String, dynamic> detail) {
-    final int detailId = detail['id'] as int;
+    final dynamic rawId = detail['id'];
+    final int detailId = rawId is num ? rawId.toInt() : int.parse(rawId.toString());
     setState(() {
-      final idx = _details.indexWhere((d) => d['id'] == detailId);
+      final idx = _details.indexWhere((d) => d['id']?.toString() == detailId.toString());
       if (idx != -1) {
         _details[idx].remove('incidentReport');
         _details[idx].remove('incidentTag');
