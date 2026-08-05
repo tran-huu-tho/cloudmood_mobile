@@ -443,12 +443,13 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           .trim();
       budgetInVND = int.tryParse(raw) ?? 7000000;
     } else {
-      if (_selectedBudgetLevel == 'Tiết kiệm') {
+      final bLower = _selectedBudgetLevel.toLowerCase();
+      if (bLower.contains('tiết kiệm') || bLower.contains('tiet kiem')) {
         budgetInVND = 3000000;
-      } else if (_selectedBudgetLevel == 'Vừa phải') {
-        budgetInVND = 7000000;
-      } else if (_selectedBudgetLevel == 'Sang trọng') {
+      } else if (bLower.contains('sang trọng') || bLower.contains('sang trong') || bLower.contains('sang')) {
         budgetInVND = 15000000;
+      } else {
+        budgetInVND = 7000000;
       }
     }
 
@@ -3920,7 +3921,16 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
 
   Widget _buildBudgetPresetCard(String levelName, String desc) {
-    final levelKey = levelName.split(' ')[0];
+    String levelKey = 'Vừa phải';
+    if (levelName.contains('Tiết kiệm')) {
+      levelKey = 'Tiết kiệm';
+    } else if (levelName.contains('Sang trọng')) {
+      levelKey = 'Sang trọng';
+    } else if (levelName.contains('Vừa phải')) {
+      levelKey = 'Vừa phải';
+    } else {
+      levelKey = levelName.split(' ')[0];
+    }
     final isSelected = _selectedBudgetLevel == levelKey;
 
     return InkWell(
