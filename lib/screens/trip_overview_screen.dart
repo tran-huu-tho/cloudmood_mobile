@@ -28,6 +28,7 @@ import 'package:visibility_detector/visibility_detector.dart';
 import '../widgets/inline_place_details.dart';
 import '../widgets/save_to_trip_bottom_sheet.dart';
 import '../widgets/place_detail_bottom_sheet.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import '../widgets/explore_post_card.dart';
 import 'explore_post_detail_screen.dart';
@@ -50,8 +51,119 @@ class TripOverviewScreen extends StatefulWidget {
 }
 
 class _TripOverviewScreenState extends State<TripOverviewScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   Set<int> _visitedDetailIds = {};
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      final nextLoc = _getNextLocation();
+      if (nextLoc != null) {
+        _triggerLiveActivityNotification(nextLoc);
+      }
+    }
+  }
+  Future<void> _triggerLiveActivityNotification(Map<String, dynamic>? nextLoc) async {
+    if (nextLoc == null) return;
+    final place = nextLoc['place'] ?? {};
+    final String name = place['name'] ?? 'Điểm đến tiếp theo';
+    final String rawAddress = place['address'] ?? '';
+    final String? startTime = nextLoc['startTime'];
+    final String? endTime = nextLoc['endTime'];
+
+    String cleanAddr = StringUtils.cleanAddress(rawAddress)
+        .replaceAll(RegExp(r'\b\d{5,6}\b'), '')
+        .replaceAll(RegExp(r'\s*,\s*,'), ',')
+        .replaceAll(RegExp(r'^\s*,\s*|\s*,\s*$'), '')
+        .trim();
+
+    String timeInfo = '';
+    if (startTime != null && endTime != null) {
+      timeInfo = '$startTime - $endTime';
+    } else if (startTime != null) {
+      timeInfo = startTime;
+    }
+
+    final int day = (nextLoc['day'] as num?)?.toInt() ?? 1;
+    String dateStr = '';
+    final dynamic startDateRaw = _itineraryData['startDate'] ?? _itineraryData['start_date'];
+    if (startDateRaw != null) {
+      DateTime? startDate;
+      if (startDateRaw is DateTime) {
+        startDate = startDateRaw;
+      } else if (startDateRaw is String) {
+        startDate = DateTime.tryParse(startDateRaw);
+      }
+      if (startDate != null) {
+        final targetDate = startDate.add(Duration(days: day - 1));
+        final String dayStr = targetDate.day.toString().padLeft(2, '0');
+        final String monthStr = targetDate.month.toString().padLeft(2, '0');
+        final String yearStr = targetDate.year.toString();
+        dateStr = '$dayStr/$monthStr/$yearStr';
+      }
+    }
+
+    final String dayAndDateText = dateStr.isNotEmpty
+        ? 'Ngày $day ($dateStr)'
+        : 'Ngày $day';
+
+    try {
+      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+      const initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initializationSettingsDarwin = DarwinInitializationSettings();
+      const initializationSettings = InitializationSettings(
+        android: initializationSettingsAndroid,
+        iOS: initializationSettingsDarwin,
+      );
+
+      await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+      final androidPlugin = flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        await androidPlugin.requestNotificationsPermission();
+      }
+
+      final bodyText = '🗓️ $dayAndDateText • ⏰ ${timeInfo.isNotEmpty ? timeInfo : "Chuẩn bị khởi hành"}${cleanAddr.isNotEmpty ? " • $cleanAddr" : ""}';
+
+      final androidDetails = AndroidNotificationDetails(
+        'cloudmood_live_destination',
+        'Điểm đến tiếp theo',
+        channelDescription:
+            'Thông báo đẩy ghim điểm đến trên thanh trạng thái và màn hình khóa',
+        importance: Importance.max,
+        priority: Priority.high,
+        ongoing: true,
+        autoCancel: false,
+        visibility: NotificationVisibility.public,
+        styleInformation: BigTextStyleInformation(bodyText),
+      );
+
+      const darwinDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      );
+
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: darwinDetails,
+      );
+
+      await flutterLocalNotificationsPlugin.show(
+        8888,
+        '📍 ĐIỂM ĐẾN TIẾP THEO: $name',
+        bodyText,
+        notificationDetails,
+      );
+    } catch (e) {
+      debugPrint('Notification trigger error: $e');
+    }
+  }
 
   Future<void> _loadVisitedDetails() async {
     final prefs = await SharedPreferences.getInstance();
@@ -61,6 +173,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       setState(() {
         _visitedDetailIds = list.map((e) => int.tryParse(e) ?? 0).toSet();
       });
+      _autoScrollToFirstUnvisitedDay();
+    }
+  }
+
+  void _autoScrollToFirstUnvisitedDay() {
+    final nextLoc = _getNextLocation();
+    if (nextLoc != null) {
+      final unvisitedDay = (nextLoc['day'] as num?)?.toInt() ?? 1;
+      final dayIndex = (unvisitedDay - 1).clamp(0, 30);
+      if (dayIndex != _activeDayIndex && mounted) {
+        setState(() {
+          _activeDayIndex = dayIndex;
+        });
+      }
     }
   }
 
@@ -489,6 +615,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _itineraryData = widget.itinerary;
     final currentUser = AuthService().currentUser.value;
     final currentUserIdStr = currentUser?.id?.toString();
@@ -717,7 +844,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     for (int k = 0; k < numDays; k++) {
       final placesCount = _details.where((d) => d['day'] == (k + 1)).length;
       final isCollapsed = _dayCollapsed[k] == true;
-      final dayHeight = isCollapsed ? 90.0 : (120.0 + (placesCount * 250.0));
+      final dayHeight = isCollapsed ? 90.0 : (160.0 + (placesCount * 360.0));
 
       if (currentOffset >= accumulated - 80.0) {
         newlyActiveDay = k;
@@ -749,6 +876,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     final itinId = _itineraryData['id'] is int
         ? _itineraryData['id']
         : int.parse(_itineraryData['id'].toString());
@@ -10711,7 +10839,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           placeName.contains('floating market');
       final bool isPinned = item['isUserPinned'] == true ||
           item['id'] == pinnedDetailId ||
-          isMarket;
+          isMarket ||
+          hasValidTime;
 
       if (isPinned && hasValidTime) {
         // 100% PRIORITY FOR PINNED / PRE-SET PLACE: Keep exact startTime & endTime
@@ -12724,12 +12853,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     if (lat1 != null && lon1 != null && lat2 != null && lon2 != null) {
       final dx = (lon1 - lon2) * 111.0 * math.cos(lat1 * math.pi / 180.0);
       final dy = (lat1 - lat2) * 111.0;
-      dist = math.sqrt(dx * dx + dy * dy);
+      final directDist = math.sqrt(dx * dx + dy * dy);
+      // Multiply by urban road detour factor (1.38) to match real Google Maps driving route distance
+      dist = directDist * 1.38;
     }
 
     int durationMinutes = 5;
     IconData icon = Icons.two_wheeler_rounded;
-    String speedStr = '~35 km/h';
+    String speedStr = '~25-30 km/h';
 
     if (mode == 'walking') {
       durationMinutes = (dist * 12.0).round().clamp(3, 180);
@@ -12740,14 +12871,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       icon = Icons.directions_transit_rounded;
       speedStr = '~15 km/h';
     } else if (mode == 'car') {
-      durationMinutes = (dist * 2.2).round().clamp(2, 120);
+      durationMinutes = (dist * 2.6).round().clamp(2, 120);
       icon = Icons.directions_car_filled_rounded;
-      speedStr = '~30 km/h';
+      speedStr = '~25 km/h';
     } else {
       // motorcycle (default)
-      durationMinutes = (dist * 1.8).round().clamp(2, 120);
+      durationMinutes = (dist * 2.5).round().clamp(2, 120);
       icon = Icons.two_wheeler_rounded;
-      speedStr = '~35 km/h';
+      speedStr = '~25-30 km/h';
     }
 
     final distStr = dist.toStringAsFixed(1).replaceAll('.', ',');
@@ -12799,34 +12930,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: () async {
-              final lat1 = p1['latitude'];
-              final lng1 = p1['longitude'];
-              final lat2 = p2['latitude'];
-              final lng2 = p2['longitude'];
-
-              if (lat1 != null &&
-                  lng1 != null &&
-                  lat2 != null &&
-                  lng2 != null) {
-                final url = Uri.parse(
-                  'https://www.google.com/maps/dir/?api=1&origin=$lat1,$lng1&destination=$lat2,$lng2',
-                );
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(url, mode: LaunchMode.externalApplication);
-                } else if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Không thể mở Google Maps')),
-                  );
-                }
-              } else if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Không đủ thông tin toạ độ để chỉ đường'),
-                  ),
-                );
-              }
-            },
+            onTap: () => _showDirectionsDialog(p1, p2),
             child: const Text(
               'Chỉ đường',
               style: TextStyle(
@@ -12952,6 +13056,288 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   ),
                 ],
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openExternalGoogleMaps(
+    Map<String, dynamic> p1,
+    Map<String, dynamic> p2,
+  ) async {
+    final lat1 = (p1['latitude'] as num?)?.toDouble();
+    final lng1 = (p1['longitude'] as num?)?.toDouble();
+    final lat2 = (p2['latitude'] as num?)?.toDouble();
+    final lng2 = (p2['longitude'] as num?)?.toDouble();
+
+    final String name1 = (p1['name'] ?? '').toString().trim();
+    final String name2 = (p2['name'] ?? '').toString().trim();
+    final String address1 = (p1['address'] ?? '').toString().trim();
+    final String address2 = (p2['address'] ?? '').toString().trim();
+
+    String originParam = '';
+    if (name1.isNotEmpty) {
+      originParam = name1;
+      if (address1.isNotEmpty && !name1.contains(address1)) {
+        originParam += ', $address1';
+      }
+    } else if (lat1 != null && lng1 != null) {
+      originParam = '$lat1,$lng1';
+    }
+
+    String destParam = '';
+    if (name2.isNotEmpty) {
+      destParam = name2;
+      if (address2.isNotEmpty && !name2.contains(address2)) {
+        destParam += ', $address2';
+      }
+    } else if (lat2 != null && lng2 != null) {
+      destParam = '$lat2,$lng2';
+    }
+
+    final encodedOrigin = Uri.encodeComponent(originParam);
+    final encodedDest = Uri.encodeComponent(destParam);
+
+    final urlsToTry = <String>[
+      'https://www.google.com/maps/dir/?api=1&origin=$encodedOrigin&destination=$encodedDest&travelmode=driving',
+      if (lat1 != null && lng1 != null && lat2 != null && lng2 != null)
+        'https://www.google.com/maps/dir/?api=1&origin=$lat1,$lng1&destination=$lat2,$lng2&travelmode=driving',
+      if (lat2 != null && lng2 != null)
+        'google.navigation:q=$lat2,$lng2&mode=d',
+    ];
+
+    bool launched = false;
+    for (final urlStr in urlsToTry) {
+      try {
+        final uri = Uri.parse(urlStr);
+        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+          launched = true;
+          break;
+        }
+      } catch (_) {}
+    }
+
+    if (!launched && mounted) {
+      _showPremiumNotification(
+        title: 'Mở Google Maps thất bại',
+        message: 'Vui lòng kiểm tra lại ứng dụng Google Maps trên thiết bị.',
+        icon: Icons.error_outline_rounded,
+        color: Colors.orange,
+      );
+    }
+  }
+
+  void _showDirectionsDialog(
+    Map<String, dynamic> p1,
+    Map<String, dynamic> p2,
+  ) {
+    final String p1Name = p1['name'] ?? 'Điểm đi';
+    final String p2Name = p2['name'] ?? 'Điểm đến';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.directions_rounded,
+                        color: AppTheme.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tùy chọn chỉ đường',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.darkText,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$p1Name ➔ $p2Name',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Option 1: Map CloudMood (In-App Map)
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    final lat1 = (p1['latitude'] as num?)?.toDouble();
+                    final lng1 = (p1['longitude'] as num?)?.toDouble();
+                    final lat2 = (p2['latitude'] as num?)?.toDouble();
+                    final lng2 = (p2['longitude'] as num?)?.toDouble();
+
+                    if (lat1 != null && lng1 != null && lat2 != null && lng2 != null) {
+                      final midLat = (lat1 + lat2) / 2;
+                      final midLng = (lng1 + lng2) / 2;
+                      _mapController.move(LatLng(midLat, midLng), 13.5);
+                    }
+                    _showPremiumNotification(
+                      title: 'Đã hiển thị trên bản đồ CloudMood',
+                      message: 'Tuyến đường từ "$p1Name" đến "$p2Name".',
+                      icon: Icons.map_rounded,
+                      color: AppTheme.primary,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppTheme.primary.withOpacity(0.2),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.map_rounded,
+                          color: AppTheme.primary,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Xem trên Bản đồ CloudMood',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.darkText,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Định vị và xem tuyến đường trực tiếp trong app',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 16,
+                          color: AppTheme.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Option 2: Open External Google Maps
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openExternalGoogleMaps(p1, p2);
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEA4335).withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFEA4335).withOpacity(0.2),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.navigation_rounded,
+                          color: Color(0xFFEA4335),
+                          size: 28,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Mở ứng dụng Google Maps',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.darkText,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'Bắt đầu dẫn đường GPS giọng nói trên Google Maps',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.open_in_new_rounded,
+                          size: 18,
+                          color: Color(0xFFEA4335),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -15057,43 +15443,50 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   });
 
                   if (_itineraryScrollController.hasClients) {
-                    // Calculate exact cumulative height offset based on preceding days & place counts
-                    double calculatedOffset = 0.0;
-                    for (int k = 0; k < index; k++) {
-                      final placesCount = _details
-                          .where((d) => d['day'] == (k + 1))
-                          .length;
-                      final isCollapsed = _dayCollapsed[k] == true;
-                      if (isCollapsed) {
-                        calculatedOffset += 90.0;
-                      } else {
-                        calculatedOffset += 110.0 + (placesCount * 260.0);
+                    final key = _dayKeys[index];
+                    if (key?.currentContext != null) {
+                      await Scrollable.ensureVisible(
+                        key!.currentContext!,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        alignment: 0.0,
+                      );
+                    } else {
+                      // Calculate exact cumulative height offset based on preceding days & place counts
+                      double calculatedOffset = 0.0;
+                      for (int k = 0; k < index; k++) {
+                        final placesCount = _details
+                            .where((d) => d['day'] == (k + 1))
+                            .length;
+                        final isCollapsed = _dayCollapsed[k] == true;
+                        if (isCollapsed) {
+                          calculatedOffset += 90.0;
+                        } else {
+                          calculatedOffset += 160.0 + (placesCount * 360.0);
+                        }
                       }
-                    }
 
-                    final double maxExtent =
-                        _itineraryScrollController.position.maxScrollExtent;
-                    final double targetOffset = calculatedOffset.clamp(
-                      0.0,
-                      maxExtent,
-                    );
+                      final double maxExtent =
+                          _itineraryScrollController.position.maxScrollExtent;
+                      final double targetOffset = calculatedOffset.clamp(
+                        0.0,
+                        maxExtent,
+                      );
 
-                    await _itineraryScrollController.animateTo(
-                      targetOffset,
-                      duration: const Duration(milliseconds: 350),
-                      curve: Curves.easeInOut,
-                    );
+                      _itineraryScrollController.jumpTo(targetOffset);
 
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      await WidgetsBinding.instance.endOfFrame;
+                      await Future.delayed(const Duration(milliseconds: 50));
                       final updatedKey = _dayKeys[index];
                       if (updatedKey?.currentContext != null) {
-                        Scrollable.ensureVisible(
+                        await Scrollable.ensureVisible(
                           updatedKey!.currentContext!,
-                          duration: const Duration(milliseconds: 150),
+                          duration: const Duration(milliseconds: 250),
                           curve: Curves.easeInOut,
+                          alignment: 0.0,
                         );
                       }
-                    });
+                    }
                   }
                   Future.delayed(const Duration(milliseconds: 400), () {
                     _isProgrammaticScrolling = false;
