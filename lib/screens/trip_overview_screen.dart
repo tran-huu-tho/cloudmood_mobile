@@ -65,6 +65,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
   Future<void> _triggerLiveActivityNotification(Map<String, dynamic>? nextLoc) async {
     if (nextLoc == null) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final primaryId = prefs.getInt('primary_itinerary_id');
+    final currentItinId = (_itineraryData['id'] is num)
+        ? (_itineraryData['id'] as num).toInt()
+        : int.tryParse(_itineraryData['id']?.toString() ?? '') ?? 0;
+
+    // Strictly enforce: system notifications only fire for the primary selected trip!
+    if (primaryId == null || currentItinId != primaryId) {
+      return;
+    }
     final place = nextLoc['place'] ?? {};
     final String name = place['name'] ?? 'Điểm đến tiếp theo';
     final String rawAddress = place['address'] ?? '';
@@ -1831,12 +1842,23 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   Future<void> _changeTripStartDate() async {
-    if (!_checkCanEdit()) return;
     final currentStartStr = _itineraryData['startDate'] as String?;
     final currentDays = (_itineraryData['days'] as num?)?.toInt() ?? 1;
     final currentStart = currentStartStr != null
         ? DateTime.tryParse(currentStartStr) ?? DateTime.now()
         : DateTime.now();
+
+    final Set<int> completedDayIndexes = {};
+    final Set<int> inProgressDayIndexes = {};
+    for (int i = 0; i < currentDays; i++) {
+      final dayDetails = _details.where((d) => d['day'] == (i + 1)).toList();
+      if (dayDetails.isNotEmpty &&
+          dayDetails.every((d) => _visitedDetailIds.contains(d['id']))) {
+        completedDayIndexes.add(i);
+      } else if (dayDetails.any((d) => _visitedDetailIds.contains(d['id']))) {
+        inProgressDayIndexes.add(i);
+      }
+    }
 
     showModalBottomSheet(
       context: context,
@@ -1846,14 +1868,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         return TripDatePickerSheet(
           initialStartDate: currentStart,
           initialDays: currentDays,
-          onSave: (newStartDate, newDays) async {
-            final itId = _itineraryData['id'] as int;
-            await DatabaseService().updateItinerary(itId, {
-              'startDate': newStartDate.toIso8601String().substring(0, 10),
-              'days': newDays,
-            });
-            await _loadData();
-          },
+          isReadOnly: true,
+          completedDayIndexes: completedDayIndexes,
+          inProgressDayIndexes: inProgressDayIndexes,
         );
       },
     );
@@ -9119,6 +9136,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     ),
                     const SizedBox(height: 16),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const Icon(
                           Icons.rate_review_rounded,
@@ -9126,14 +9144,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           size: 22,
                         ),
                         const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'Báo cáo thực tế & Phản hồi',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F172A),
-                            ),
+                        const Text(
+                          'Đánh giá và bình luận tại',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
+                            fontFamily: 'SDK_SC_Web-Heavy',
                           ),
                         ),
                       ],
@@ -9142,9 +9159,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     Text(
                       name,
                       style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w500,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                        fontFamily: 'SDK_SC_Web-Heavy',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -9154,6 +9172,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF334155),
+                        fontFamily: 'SDK_SC_Web-Heavy',
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -9167,6 +9186,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             opt['label'] as String,
                             style: TextStyle(
                               fontSize: 13.5,
+                              fontFamily: 'SDK_SC_Web-Heavy',
                               fontWeight: isSel
                                   ? FontWeight.bold
                                   : FontWeight.w600,
@@ -9206,12 +9226,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     TextField(
                       controller: noteCtrl,
                       maxLines: 3,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF0F172A),
+                        fontFamily: 'SDK_SC_Web-Heavy',
+                      ),
                       decoration: InputDecoration(
                         hintText:
                             'Nhập chi tiết ghi chú (ví dụ: Quán nghỉ đến ngày 5/8, đường ngập mưa...)',
                         hintStyle: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF94A3B8),
+                          fontFamily: 'SDK_SC_Web-Heavy',
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -9245,7 +9271,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             ),
                             label: const Text(
                               'Xóa báo cáo',
-                              style: TextStyle(color: Colors.redAccent),
+                              style: TextStyle(
+                                color: Colors.redAccent,
+                                fontFamily: 'SDK_SC_Web-Heavy',
+                              ),
                             ),
                           ),
                         const Spacer(),
@@ -9274,8 +9303,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             size: 18,
                           ),
                           label: const Text(
-                            'Lưu phản hồi',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                            'Lưu đánh giá',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'SDK_SC_Web-Heavy',
+                            ),
                           ),
                         ),
                       ],
@@ -15431,6 +15463,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           ...List.generate(totalDays, (index) {
             final isSelected = _activeDayIndex == index;
             final label = _getDayLabel(index);
+            final dayDetails =
+                _details.where((d) => d['day'] == (index + 1)).toList();
+            final bool isCompletedDay = dayDetails.isNotEmpty &&
+                dayDetails.every((d) => _visitedDetailIds.contains(d['id']));
+            final bool isInProgressDay = !isCompletedDay &&
+                dayDetails.any((d) => _visitedDetailIds.contains(d['id']));
+
             return Padding(
               padding: const EdgeInsets.only(right: 8.0),
               child: GestureDetector(
@@ -15494,20 +15533,44 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: 14,
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     color: isSelected ? AppTheme.darkText : Colors.grey[100],
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : AppTheme.darkText,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isCompletedDay) ...[
+                        Icon(
+                          Icons.check_circle_rounded,
+                          size: 14,
+                          color: isSelected
+                              ? Colors.greenAccent
+                              : const Color(0xFF10B981),
+                        ),
+                        const SizedBox(width: 5),
+                      ] else if (isInProgressDay) ...[
+                        Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 14,
+                          color: isSelected
+                              ? Colors.lightBlueAccent
+                              : AppTheme.primary,
+                        ),
+                        const SizedBox(width: 5),
+                      ],
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : AppTheme.darkText,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

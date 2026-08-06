@@ -761,6 +761,11 @@ class _ProfileDashboardState extends State<ProfileDashboard>
   late DateTime _currentMonth;
   List<Map<String, dynamic>> _customNotes = [];
 
+  String _itinerarySearchQuery = '';
+  String _itineraryFilterRole = 'ALL';
+  final TextEditingController _itinerarySearchController =
+      TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -778,13 +783,37 @@ class _ProfileDashboardState extends State<ProfileDashboard>
   @override
   void dispose() {
     DatabaseService.refreshTrigger.removeListener(_loadData);
+    _itinerarySearchController.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+
+  int? _primaryItineraryId;
+
+  Future<void> _loadPrimaryItineraryId() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _primaryItineraryId = prefs.getInt('primary_itinerary_id');
+      });
+    }
+  }
+
+  Future<void> _setPrimaryItinerary(int id) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('primary_itinerary_id', id);
+    if (mounted) {
+      setState(() {
+        _primaryItineraryId = id;
+      });
+    }
   }
 
   Future<void> _loadData() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
+
+    await _loadPrimaryItineraryId();
 
     final itineraries = await DatabaseService().fetchUserItineraries(
       widget.user.id,
@@ -797,6 +826,15 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     );
 
     if (!mounted) return;
+    if (_primaryItineraryId == null && itineraries.isNotEmpty) {
+      final firstId = (itineraries.first['id'] as num?)?.toInt() ?? 0;
+      if (firstId != 0) {
+        _primaryItineraryId = firstId;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('primary_itinerary_id', firstId);
+      }
+    }
+
     setState(() {
       _itineraries = itineraries;
       _guides = guides;
@@ -1208,7 +1246,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         } catch (_) {
           childWidget = defaultIcon;
         }
-      } else if (coverStr.startsWith('http://') || coverStr.startsWith('https://')) {
+      } else if (coverStr.startsWith('http://') ||
+          coverStr.startsWith('https://')) {
         childWidget = Image.network(
           coverStr,
           fit: BoxFit.cover,
@@ -1310,12 +1349,16 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     if (confirm == true) {
       // Optimistic UI Update: Remove from screen INSTANTLY (0ms!)
       final removedItineraries = _itineraries.where((it) {
-        final id = (it['id'] is int) ? it['id'] : int.tryParse(it['id']?.toString() ?? '');
+        final id = (it['id'] is int)
+            ? it['id']
+            : int.tryParse(it['id']?.toString() ?? '');
         return id == itineraryId;
       }).toList();
 
       final removedGuides = _guides.where((g) {
-        final id = (g['id'] is int) ? g['id'] : int.tryParse(g['id']?.toString() ?? '');
+        final id = (g['id'] is int)
+            ? g['id']
+            : int.tryParse(g['id']?.toString() ?? '');
         return id == itineraryId;
       }).toList();
 
@@ -1450,13 +1493,42 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         final int tripUserId = (trip['userId'] is num)
             ? (trip['userId'] as num).toInt()
             : int.tryParse(trip['userId']?.toString() ?? '') ?? 0;
-        final bool isOwner = tripUserId == widget.user.id ||
+        final bool isOwner =
+            tripUserId == widget.user.id ||
             (ownerMember != null &&
                 (ownerMember['userId'] == widget.user.id ||
                     ownerMember['user']?['id'] == widget.user.id));
 
+        // Check date overlap with other itineraries
+        bool hasDateOverlap = false;
+        final List<Map<String, dynamic>> conflictingTrips = [];
+        final s1Str = trip['startDate'] as String?;
+        final s1 = s1Str != null ? DateTime.tryParse(s1Str) : null;
+        final days1 = (trip['days'] as num?)?.toInt() ?? 1;
+        if (s1 != null) {
+          final e1 = s1.add(Duration(days: days1 - 1));
+          for (final other in _itineraries) {
+            if (other['id'] == trip['id']) continue;
+            final s2Str = other['startDate'] as String?;
+            final s2 = s2Str != null ? DateTime.tryParse(s2Str) : null;
+            final days2 = (other['days'] as num?)?.toInt() ?? 1;
+            if (s2 != null) {
+              final e2 = s2.add(Duration(days: days2 - 1));
+              if (!s1.isAfter(e2) && !s2.isAfter(e1)) {
+                hasDateOverlap = true;
+                conflictingTrips.add(other);
+              }
+            }
+          }
+        }
+
+        final int tripId = (trip['id'] as num?)?.toInt() ?? 0;
+        final bool isPrimary =
+            (_primaryItineraryId != null && _primaryItineraryId == tripId) ||
+                (_primaryItineraryId == null && index == 0);
+
         return Container(
-          margin: const EdgeInsets.only(bottom: 14),
+          margin: const EdgeInsets.only(bottom: 16),
           child: Slidable(
             key: ValueKey('itinerary_${trip['id']}'),
             startActionPane: ActionPane(
@@ -1536,7 +1608,22 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               },
               child: Container(
                 padding: const EdgeInsets.all(16),
-                decoration: AppTheme.premiumCardDecoration(),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: isPrimary
+                      ? Border.all(color: AppTheme.primary, width: 2)
+                      : Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                  boxShadow: isPrimary
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.primary.withValues(alpha: 0.18),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : AppTheme.premiumCardDecoration().boxShadow,
+                ),
                 child: Row(
                   children: [
                     _buildItineraryThumbnail(trip, isGuide: false),
@@ -1578,16 +1665,24 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Row(
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 7,
+                            runSpacing: 7,
                             children: [
+                              if (isPrimary)
+                                _buildTripChip(
+                                  'Đang chọn',
+                                  Icons.stars_rounded,
+                                  const Color(0xFFDCFCE7),
+                                  const Color(0xFF15803D),
+                                ),
                               _buildTripChip(
                                 '${trip['days'] ?? '?'} ngày',
                                 Icons.calendar_today_rounded,
                                 AppTheme.primaryContainer,
                                 AppTheme.primary,
                               ),
-                              const SizedBox(width: 6),
                               if (isOwner)
                                 _buildTripChip(
                                   'Chủ sở hữu',
@@ -1604,6 +1699,19 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                                   const Color(0xFFF3E8FF),
                                   const Color(0xFF7C3AED),
                                 ),
+                              if (hasDateOverlap)
+                                GestureDetector(
+                                  onTap: () => _showConflictResolverSheet(
+                                    trip,
+                                    conflictingTrips,
+                                  ),
+                                  child: _buildTripChip(
+                                    'Trùng lịch',
+                                    Icons.warning_amber_rounded,
+                                    const Color(0xFFFEF3C7),
+                                    const Color(0xFFD97706),
+                                  ),
+                                ),
                             ],
                           ),
                         ],
@@ -1617,6 +1725,266 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 ),
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showConflictResolverSheet(
+    Map<String, dynamic> trip,
+    List<Map<String, dynamic>> conflictingTrips,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFEF3C7),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFD97706),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Xử lý Trùng lịch trình',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                            fontFamily: 'SDK_SC_Web-Heavy',
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Phát hiện lịch trình bị trùng thời gian khởi hành.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: Colors.grey[600],
+                            fontFamily: 'SDK_SC_Web-Heavy',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 14),
+              Text(
+                'Chuyến đi này trùng lịch với:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.darkText,
+                  fontFamily: 'SDK_SC_Web-Heavy',
+                ),
+              ),
+              const SizedBox(height: 10),
+              ...conflictingTrips.map((cTrip) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.flight_takeoff_rounded,
+                        size: 18,
+                        color: AppTheme.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cTrip['title'] as String? ?? 'Hành trình',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.darkText,
+                                fontFamily: 'SDK_SC_Web-Heavy',
+                              ),
+                            ),
+                            Text(
+                              '${cTrip['startDate'] ?? 'Chưa đặt ngày'} • ${cTrip['days'] ?? 1} ngày',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: Colors.grey[600],
+                                fontFamily: 'SDK_SC_Web-Heavy',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 14),
+              Text(
+                'Giải pháp đề xuất:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.darkText,
+                  fontFamily: 'SDK_SC_Web-Heavy',
+                ),
+              ),
+              const SizedBox(height: 6),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.star_rounded,
+                    color: Color(0xFF2563EB),
+                    size: 20,
+                  ),
+                ),
+                title: Text(
+                  'Chọn làm Lịch trình Chính',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkText,
+                    fontFamily: 'SDK_SC_Web-Heavy',
+                  ),
+                ),
+                subtitle: Text(
+                  'Đặt chuyến đi này làm ưu tiên theo dõi & nhận thông báo.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: Colors.grey[600],
+                    fontFamily: 'SDK_SC_Web-Heavy',
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final int selectedTripId =
+                      (trip['id'] as num?)?.toInt() ?? 0;
+                  await _setPrimaryItinerary(selectedTripId);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Đã chọn "${trip['title']}" làm Lịch trình Chính!',
+                        ),
+                        backgroundColor: AppTheme.primary,
+                      ),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.edit_calendar_rounded,
+                    color: Color(0xFFD97706),
+                    size: 20,
+                  ),
+                ),
+                title: Text(
+                  'Điều chỉnh thời gian chuyến đi',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkText,
+                    fontFamily: 'SDK_SC_Web-Heavy',
+                  ),
+                ),
+                subtitle: Text(
+                  'Mở chi tiết để thay đổi ngày bắt đầu hoặc số ngày đi.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: Colors.grey[600],
+                    fontFamily: 'SDK_SC_Web-Heavy',
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => TripOverviewScreen(itinerary: trip),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    foregroundColor: const Color(0xFF475569),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Đóng',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontFamily: 'SDK_SC_Web-Heavy',
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -2516,21 +2884,23 @@ class _ProfileDashboardState extends State<ProfileDashboard>
 
   Widget _buildTripChip(String label, IconData icon, Color bg, Color fg) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10, color: fg),
-          const SizedBox(width: 4),
+          Icon(icon, size: 11.5, color: fg),
+          const SizedBox(width: 5),
           Text(
             label,
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
               color: fg,
+              fontFamily: 'SDK_SC_Web-Heavy',
             ),
           ),
         ],
@@ -2602,7 +2972,8 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         final int guideUserId = (guide['userId'] is num)
             ? (guide['userId'] as num).toInt()
             : int.tryParse(guide['userId']?.toString() ?? '') ?? 0;
-        final bool isOwner = guideUserId == widget.user.id ||
+        final bool isOwner =
+            guideUserId == widget.user.id ||
             (ownerMember != null &&
                 (ownerMember['userId'] == widget.user.id ||
                     ownerMember['user']?['id'] == widget.user.id));
@@ -2892,7 +3263,9 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 iconColor: AppTheme.amber,
                 title: 'Trợ giúp & Hỗ trợ',
                 onTap: () async {
-                  final url = Uri.parse('https://www.facebook.com/dungnguyen060904');
+                  final url = Uri.parse(
+                    'https://www.facebook.com/dungnguyen060904',
+                  );
                   try {
                     await launchUrl(url, mode: LaunchMode.externalApplication);
                   } catch (e) {

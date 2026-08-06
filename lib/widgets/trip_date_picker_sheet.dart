@@ -4,13 +4,19 @@ import '../theme/app_theme.dart';
 class TripDatePickerSheet extends StatefulWidget {
   final DateTime initialStartDate;
   final int initialDays;
-  final Function(DateTime startDate, int days) onSave;
+  final Function(DateTime startDate, int days)? onSave;
+  final bool isReadOnly;
+  final Set<int> completedDayIndexes;
+  final Set<int> inProgressDayIndexes;
 
   const TripDatePickerSheet({
     super.key,
     required this.initialStartDate,
     required this.initialDays,
-    required this.onSave,
+    this.onSave,
+    this.isReadOnly = true,
+    this.completedDayIndexes = const {},
+    this.inProgressDayIndexes = const {},
   });
 
   @override
@@ -50,6 +56,7 @@ class _TripDatePickerSheetState extends State<TripDatePickerSheet> {
   }
 
   void _onDateCellTapped(DateTime cellDate) {
+    if (widget.isReadOnly) return;
     final tappedDate = DateTime(cellDate.year, cellDate.month, cellDate.day);
     setState(() {
       if (_selectedDateRange == null || _lastTappedDate == null) {
@@ -153,28 +160,49 @@ class _TripDatePickerSheetState extends State<TripDatePickerSheet> {
                     color: AppTheme.darkText,
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    widget.onSave(startDate, daysCount);
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
+                if (widget.isReadOnly)
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      foregroundColor: const Color(0xFF475569),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                    child: const Text(
+                      'Đóng',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  )
+                else
+                  ElevatedButton(
+                    onPressed: () {
+                      widget.onSave?.call(startDate, daysCount);
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    child: const Text(
+                      'Lưu',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                   ),
-                  child: const Text(
-                    'Lưu',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
               ],
             ),
           ),
@@ -299,9 +327,16 @@ class _TripDatePickerSheetState extends State<TripDatePickerSheet> {
           cellDate.isAfter(_selectedDateRange!.start) &&
           cellDate.isBefore(_selectedDateRange!.end);
 
+      bool isTripDate = isStart || isEnd || isInRange;
+      int dayIdx = _selectedDateRange != null
+          ? cellDate.difference(_selectedDateRange!.start).inDays
+          : -1;
+      bool isDayCompleted = isTripDate && widget.completedDayIndexes.contains(dayIdx);
+      bool isDayInProgress = isTripDate && !isDayCompleted && widget.inProgressDayIndexes.contains(dayIdx);
+
       dayCells.add(
         GestureDetector(
-          onTap: isBeforeToday ? null : () => _onDateCellTapped(cellDate),
+          onTap: (widget.isReadOnly || isBeforeToday) ? null : () => _onDateCellTapped(cellDate),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
@@ -326,21 +361,58 @@ class _TripDatePickerSheetState extends State<TripDatePickerSheet> {
                     ]
                   : null,
             ),
-            child: Center(
-              child: Text(
-                '$day',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: (isStart || isEnd)
-                      ? FontWeight.bold
-                      : (isInRange ? FontWeight.w700 : FontWeight.w500),
-                  color: isBeforeToday
-                      ? Colors.grey[300]
-                      : (isStart || isEnd)
-                          ? Colors.white
-                          : (isInRange ? const Color(0xFF0F172A) : AppTheme.darkText),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Center(
+                  child: Text(
+                    '$day',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: (isStart || isEnd)
+                          ? FontWeight.bold
+                          : (isInRange ? FontWeight.w700 : FontWeight.w500),
+                      color: isBeforeToday
+                          ? Colors.grey[300]
+                          : (isStart || isEnd)
+                              ? Colors.white
+                              : (isInRange ? const Color(0xFF0F172A) : AppTheme.darkText),
+                    ),
+                  ),
                 ),
-              ),
+                if (isDayCompleted)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1),
+                      ),
+                      child: const Icon(
+                        Icons.check,
+                        size: 9,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                else if (isDayInProgress)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
