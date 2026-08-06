@@ -83,7 +83,17 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
         return CloudmoodHomeScreen(
           onProfileTap: () {
             setState(() {
-              _currentIndex = 4; // Switch to profile tab
+              _currentIndex = 4; // Profile tab
+            });
+          },
+          onExplorePlacesTap: () {
+            setState(() {
+              _currentIndex = 1; // Places tab
+            });
+          },
+          onExploreGuidesTap: () {
+            setState(() {
+              _currentIndex = 3; // Forum/Guides tab
             });
           },
         );
@@ -98,6 +108,16 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
           onProfileTap: () {
             setState(() {
               _currentIndex = 4;
+            });
+          },
+          onExplorePlacesTap: () {
+            setState(() {
+              _currentIndex = 1;
+            });
+          },
+          onExploreGuidesTap: () {
+            setState(() {
+              _currentIndex = 3;
             });
           },
         );

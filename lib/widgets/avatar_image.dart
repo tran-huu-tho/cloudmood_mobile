@@ -27,7 +27,9 @@ class AvatarImage extends StatelessWidget {
     // Check if the avatar is base64
     if (avatarUrl!.startsWith('data:image') || !avatarUrl!.startsWith('http')) {
       try {
-        final base64Part = avatarUrl!.contains(',') ? avatarUrl!.split(',')[1] : avatarUrl!;
+        final base64Part = avatarUrl!.contains(',')
+            ? avatarUrl!.split(',')[1]
+            : avatarUrl!;
         final bytes = base64Decode(base64Part);
         return Image.memory(
           bytes,

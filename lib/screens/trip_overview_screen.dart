@@ -67,6 +67,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     if (nextLoc == null) return;
 
     final prefs = await SharedPreferences.getInstance();
+    final bool notifEnabled = prefs.getBool('notif_enabled') ?? true;
+    if (!notifEnabled) {
+      return;
+    }
+
     final primaryId = prefs.getInt('primary_itinerary_id');
     final currentItinId = (_itineraryData['id'] is num)
         ? (_itineraryData['id'] as num).toInt()

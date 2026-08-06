@@ -198,128 +198,132 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
-      children: [
-        // Drag Handle
-        Center(
-          child: Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 4),
-            width: 48,
-            height: 5,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(10),
+        children: [
+          // Drag Handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 4),
+              width: 48,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
-        ),
-        // Header
-        Padding(
-          padding: const EdgeInsets.only(
-            top: 8,
-            left: 16,
-            right: 16,
-            bottom: 12,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: categoryColor,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: categoryColor.withValues(alpha: 0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child:
-                    widget.overrideText != null &&
-                        (categoryIcon == null ||
-                            categoryIcon.codePoint ==
-                                Icons.looks_one_rounded.codePoint)
-                    ? Text(
-                        widget.overrideText!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      )
-                    : Icon(
-                        categoryIcon ?? Icons.place,
-                        color: Colors.white,
-                        size: 16,
+          // Header
+          Padding(
+            padding: const EdgeInsets.only(
+              top: 8,
+              left: 16,
+              right: 16,
+              bottom: 12,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: categoryColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: categoryColor.withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
                       ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  widget.place['name'] ?? '',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 22,
-                    letterSpacing: -0.5,
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child:
+                      widget.overrideText != null &&
+                          (categoryIcon == null ||
+                              categoryIcon.codePoint ==
+                                  Icons.looks_one_rounded.codePoint)
+                      ? Text(
+                          widget.overrideText!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        )
+                      : Icon(
+                          categoryIcon ?? Icons.place,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.place['name'] ?? '',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 22,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  padding: const EdgeInsets.all(6),
-                  constraints: const BoxConstraints(),
-                  icon: const Icon(
-                    Icons.close,
-                    color: Colors.black54,
-                    size: 20,
+                const SizedBox(width: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    shape: BoxShape.circle,
                   ),
-                  onPressed: () => Navigator.pop(context),
+                  child: IconButton(
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.black54,
+                      size: 20,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
                 ),
-              ),
+              ],
+            ),
+          ),
+          // Tabs
+          TabBar(
+            controller: _tabController,
+            labelColor: AppTheme.primary,
+            unselectedLabelColor: Colors.grey[500],
+            indicatorColor: AppTheme.primary,
+            indicatorWeight: 3,
+            indicatorSize: TabBarIndicatorSize.tab,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 15,
+            ),
+            dividerColor: Colors.grey[200],
+            tabs: const [
+              Tab(text: 'Giới thiệu'),
+              Tab(text: 'Đánh giá'),
+              Tab(text: 'Ảnh'),
             ],
           ),
-        ),
-        // Tabs
-        TabBar(
-          controller: _tabController,
-          labelColor: AppTheme.primary,
-          unselectedLabelColor: Colors.grey[500],
-          indicatorColor: AppTheme.primary,
-          indicatorWeight: 3,
-          indicatorSize: TabBarIndicatorSize.tab,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 15,
+          // Content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildIntroTab(),
+                _buildReviewsTab(),
+                _buildPhotosTab(),
+              ],
+            ),
           ),
-          unselectedLabelStyle: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 15,
-          ),
-          dividerColor: Colors.grey[200],
-          tabs: const [
-            Tab(text: 'Giới thiệu'),
-            Tab(text: 'Đánh giá'),
-            Tab(text: 'Ảnh'),
-          ],
-        ),
-        // Content
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [_buildIntroTab(), _buildReviewsTab(), _buildPhotosTab()],
-          ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
   }
 
   Widget _buildIntroTab() {
@@ -436,7 +440,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                                   const SizedBox.shrink(),
                             )
                           : Image.network(
-                              imageUrl.startsWith('/') ? '${ApiClient.baseUrl}$imageUrl' : imageUrl,
+                              imageUrl.startsWith('/')
+                                  ? '${ApiClient.baseUrl}$imageUrl'
+                                  : imageUrl,
                               width: 90,
                               height: 90,
                               fit: BoxFit.cover,
@@ -844,17 +850,22 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
         final double rVal = (r['rating'] as num?)?.toDouble() ?? 5.0;
         totalRatingSum += rVal;
         final int star = rVal.round();
-        if (star >= 5) count5++;
-        else if (star == 4) count4++;
-        else if (star == 3) count3++;
-        else if (star == 2) count2++;
-        else if (star <= 1) count1++;
+        if (star >= 5)
+          count5++;
+        else if (star == 4)
+          count4++;
+        else if (star == 3)
+          count3++;
+        else if (star == 2)
+          count2++;
+        else if (star <= 1)
+          count1++;
       }
       rating = totalRatingSum / userRatingCount;
     } else {
       final double? dbRating = (widget.place['rating'] as num?)?.toDouble();
       final int? dbCount = (widget.place['userRatingCount'] as num?)?.toInt();
-      
+
       if (dbRating != null && dbRating > 0 && dbCount != null && dbCount > 0) {
         rating = dbRating;
         userRatingCount = dbCount;
@@ -937,10 +948,12 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       Text(
                         userRatingCount > 0
                             ? (rating >= 4.5
-                                ? 'Tuyệt vời'
-                                : (rating >= 4.0
-                                    ? 'Rất tốt'
-                                    : (rating >= 3.0 ? 'Khá tốt' : 'Trung bình')))
+                                  ? 'Tuyệt vời'
+                                  : (rating >= 4.0
+                                        ? 'Rất tốt'
+                                        : (rating >= 3.0
+                                              ? 'Khá tốt'
+                                              : 'Trung bình')))
                             : 'Chưa có đánh giá',
                         style: const TextStyle(
                           fontSize: 16,
@@ -950,7 +963,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        userRatingCount > 0 ? '$userRatingCount đánh giá' : '0 đánh giá',
+                        userRatingCount > 0
+                            ? '$userRatingCount đánh giá'
+                            : '0 đánh giá',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Colors.white70,
@@ -1088,7 +1103,10 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     ),
                     label: const Text(
                       'Xem thêm trên Tripadvisor',
-                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.darkText,
@@ -1207,8 +1225,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
-                  const Text('Chọn số sao đánh giá:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+
+                  const Text(
+                    'Chọn số sao đánh giá:',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1217,8 +1238,12 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       return IconButton(
                         iconSize: 34,
                         icon: Icon(
-                          starVal <= selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
-                          color: starVal <= selectedRating ? Colors.amber : Colors.grey[400],
+                          starVal <= selectedRating
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          color: starVal <= selectedRating
+                              ? Colors.amber
+                              : Colors.grey[400],
                         ),
                         onPressed: () {
                           setSheetState(() => selectedRating = starVal);
@@ -1228,8 +1253,18 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                   ),
                   Center(
                     child: Text(
-                      '${selectedRating.toInt()} / 5 sao (${selectedRating >= 5 ? "Tuyệt vời" : selectedRating >= 4 ? "Rất tốt" : selectedRating >= 3 ? "Khá tốt" : "Bình thường"})',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber[800], fontSize: 13),
+                      '${selectedRating.toInt()} / 5 sao (${selectedRating >= 5
+                          ? "Tuyệt vời"
+                          : selectedRating >= 4
+                          ? "Rất tốt"
+                          : selectedRating >= 3
+                          ? "Khá tốt"
+                          : "Bình thường"})',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber[800],
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1239,7 +1274,10 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     decoration: const InputDecoration(
                       labelText: 'Tên người đánh giá',
                       border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1250,7 +1288,10 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     decoration: const InputDecoration(
                       labelText: 'Viết nhận xét của bạn...',
                       border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -1263,20 +1304,26 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                         final name = nameController.text.trim();
                         if (comment.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Vui lòng nhập nhận xét của bạn.')),
+                            const SnackBar(
+                              content: Text('Vui lòng nhập nhận xét của bạn.'),
+                            ),
                           );
                           return;
                         }
 
                         Navigator.pop(context);
 
-                        final placeId = int.tryParse(widget.place['id'].toString());
+                        final placeId = int.tryParse(
+                          widget.place['id'].toString(),
+                        );
                         if (placeId != null) {
                           final ok = await DatabaseService().addPlaceReview(
                             placeId: placeId,
                             rating: selectedRating,
                             comment: comment,
-                            authorName: name.isNotEmpty ? name : 'Người dùng CloudMood',
+                            authorName: name.isNotEmpty
+                                ? name
+                                : 'Người dùng CloudMood',
                             authorAvatar: currentUser?.avatar,
                           );
 
@@ -1285,7 +1332,9 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Cảm ơn bạn đã gửi đánh giá thành công!'),
+                                  content: Text(
+                                    'Cảm ơn bạn đã gửi đánh giá thành công!',
+                                  ),
                                   backgroundColor: Colors.green,
                                 ),
                               );
@@ -1310,7 +1359,13 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text('Gửi đánh giá', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      child: const Text(
+                        'Gửi đánh giá',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
                     ),
                   ),
                 ],

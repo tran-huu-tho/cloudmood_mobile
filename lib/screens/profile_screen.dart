@@ -139,6 +139,37 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _darkModeEnabled = AppTheme.isDarkMode;
+    _loadNotifSetting();
+  }
+
+  Future<void> _loadNotifSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _notifEnabled = prefs.getBool('notif_enabled') ?? true;
+      });
+    }
+  }
+
+  Future<void> _setNotifSetting(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notif_enabled', enabled);
+    if (mounted) {
+      setState(() {
+        _notifEnabled = enabled;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            enabled
+                ? '🔔 Đã BẬT nhận thông báo hành trình!'
+                : '🔕 Đã TẮT nhận thông báo hành trình!',
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: enabled ? AppTheme.primary : Colors.grey[700],
+        ),
+      );
+    }
   }
 
   @override
@@ -569,7 +600,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
           user: user,
           notifEnabled: _notifEnabled,
           darkModeEnabled: _darkModeEnabled,
-          onNotifChanged: (v) => setState(() => _notifEnabled = v),
+          onNotifChanged: (v) => _setNotifSetting(v),
           onDarkModeChanged: (v) {
             setState(() => _darkModeEnabled = v);
             AppTheme.toggleTheme(v);
@@ -1525,7 +1556,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
         final int tripId = (trip['id'] as num?)?.toInt() ?? 0;
         final bool isPrimary =
             (_primaryItineraryId != null && _primaryItineraryId == tripId) ||
-                (_primaryItineraryId == null && index == 0);
+            (_primaryItineraryId == null && index == 0);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -1817,6 +1848,16 @@ class _ProfileDashboardState extends State<ProfileDashboard>
               ),
               const SizedBox(height: 10),
               ...conflictingTrips.map((cTrip) {
+                String formattedDate = 'Chưa đặt ngày';
+                final rawDate = cTrip['startDate'] as String?;
+                if (rawDate != null) {
+                  final d = DateTime.tryParse(rawDate);
+                  if (d != null) {
+                    formattedDate =
+                        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+                  }
+                }
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
@@ -1847,7 +1888,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                               ),
                             ),
                             Text(
-                              '${cTrip['startDate'] ?? 'Chưa đặt ngày'} • ${cTrip['days'] ?? 1} ngày',
+                              '$formattedDate • ${cTrip['days'] ?? 1} ngày',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: Colors.grey[600],
@@ -1905,8 +1946,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                 ),
                 onTap: () async {
                   Navigator.pop(context);
-                  final int selectedTripId =
-                      (trip['id'] as num?)?.toInt() ?? 0;
+                  final int selectedTripId = (trip['id'] as num?)?.toInt() ?? 0;
                   await _setPrimaryItinerary(selectedTripId);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1918,46 +1958,6 @@ class _ProfileDashboardState extends State<ProfileDashboard>
                       ),
                     );
                   }
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.edit_calendar_rounded,
-                    color: Color(0xFFD97706),
-                    size: 20,
-                  ),
-                ),
-                title: Text(
-                  'Điều chỉnh thời gian chuyến đi',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.darkText,
-                    fontFamily: 'SDK_SC_Web-Heavy',
-                  ),
-                ),
-                subtitle: Text(
-                  'Mở chi tiết để thay đổi ngày bắt đầu hoặc số ngày đi.',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: Colors.grey[600],
-                    fontFamily: 'SDK_SC_Web-Heavy',
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => TripOverviewScreen(itinerary: trip),
-                    ),
-                  );
                 },
               ),
               const SizedBox(height: 12),
@@ -2341,7 +2341,16 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     final dateStr =
         '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-    for (var trip in _itineraries) {
+    final targetItineraries = _itineraries.where((trip) {
+      final int tripId = (trip['id'] as num?)?.toInt() ?? 0;
+      if (_primaryItineraryId != null) {
+        return tripId == _primaryItineraryId;
+      }
+      return _itineraries.isNotEmpty &&
+          tripId == (_itineraries.first['id'] as num?)?.toInt();
+    }).toList();
+
+    for (var trip in targetItineraries) {
       if (trip['startDate'] == null) continue;
       try {
         final DateTime tripStart = DateTime.parse(
@@ -3564,6 +3573,84 @@ class _SavedPostsTabState extends State<SavedPostsTab> {
     }
   }
 
+  Widget _buildMediaItem(
+    Map<String, dynamic> item, {
+    double? height,
+    double? width,
+    BoxFit fit = BoxFit.cover,
+  }) {
+    final String rawUrl = (item['url'] ?? '').toString();
+    final String mType = (item['mediaType'] ?? '').toString().toLowerCase();
+    final bool isVideo =
+        mType == 'video' ||
+        rawUrl.toLowerCase().endsWith('.mp4') ||
+        rawUrl.toLowerCase().endsWith('.mov') ||
+        rawUrl.toLowerCase().endsWith('.avi') ||
+        rawUrl.toLowerCase().endsWith('.mkv') ||
+        rawUrl.toLowerCase().endsWith('.webm') ||
+        rawUrl.contains('/video/upload/');
+
+    if (isVideo) {
+      String thumbUrl = rawUrl;
+      if (rawUrl.contains('/video/upload/')) {
+        thumbUrl = rawUrl.replaceAll(
+          RegExp(r'\.(mp4|mov|avi|mkv|webm)$', caseSensitive: false),
+          '.jpg',
+        );
+      }
+
+      return SizedBox(
+        height: height ?? 200,
+        width: width ?? double.infinity,
+        child: Stack(
+          alignment: Alignment.center,
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              thumbUrl,
+              height: height ?? 200,
+              width: width ?? double.infinity,
+              fit: fit,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: Colors.black87,
+                height: height ?? 200,
+                width: width ?? double.infinity,
+              ),
+            ),
+            Container(color: Colors.black26),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: AppTheme.primary,
+                  size: 26,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Image.network(
+        rawUrl,
+        height: height ?? 200,
+        width: width ?? double.infinity,
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: Colors.grey[200],
+          height: height ?? 200,
+          width: width ?? double.infinity,
+          child: const Icon(Icons.broken_image_rounded, color: Colors.grey),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading && _posts.isEmpty) {
@@ -3618,14 +3705,15 @@ class _SavedPostsTabState extends State<SavedPostsTab> {
           final author = post['user'] ?? {};
           final place = post['place'];
           final media = post['media'] as List? ?? [];
-          final bool hasMedia = media.isNotEmpty;
+          final count = post['_count'] ?? {};
+          final bool isLiked = post['isLiked'] ?? false;
 
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             elevation: 1,
             color: Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
             ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
@@ -3639,115 +3727,237 @@ class _SavedPostsTabState extends State<SavedPostsTab> {
                 _fetchSavedPosts();
               },
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Author & Unsave Button
                     Row(
                       children: [
-                        AvatarImage(avatarUrl: author['avatar'], size: 32),
-                        const SizedBox(width: 8),
+                        AvatarImage(avatarUrl: author['avatar'], size: 40),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 author['fullName'] ?? 'Người dùng',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                  fontSize: 14,
+                                  color: AppTheme.darkText,
                                 ),
                               ),
+                              const SizedBox(height: 2),
                               Text(
                                 _formatTimeAgo(post['createdAt']),
                                 style: TextStyle(
-                                  color: Colors.grey[500],
+                                  color: AppTheme.subtitleText,
                                   fontSize: 11,
                                 ),
                               ),
                             ],
                           ),
                         ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.bookmark_rounded,
+                            color: AppTheme.primary,
+                            size: 22,
+                          ),
+                          onPressed: () async {
+                            final postId = post['id'];
+                            try {
+                              setState(() {
+                                _posts.removeAt(index);
+                              });
+                              await ApiClient.post('/forum/$postId/save');
+                            } catch (e) {
+                              _fetchSavedPosts();
+                            }
+                          },
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(8),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 12),
+
+                    // Post content
+                    Text(
+                      post['content'] ?? '',
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.darkText,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Tagged Place
+                    if (place != null) ...[
+                      InkWell(
+                        onTap: () =>
+                            PlaceDetailBottomSheet.show(context, place),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryContainer.withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                post['content'] ?? '',
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black87,
-                                  height: 1.4,
+                              const Icon(
+                                Icons.place_rounded,
+                                color: AppTheme.primary,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  place['name'] ?? '',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primary,
+                                  ),
                                 ),
                               ),
-                              if (place != null) ...[
-                                const SizedBox(height: 6),
-                                InkWell(
-                                  onTap: () => PlaceDetailBottomSheet.show(
-                                    context,
-                                    place,
-                                  ),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Media Grid/Carousel (Video + Image support)
+                    if (media.isNotEmpty) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: media.length == 1
+                            ? _buildMediaItem(
+                                media[0] as Map<String, dynamic>,
+                                height: 200,
+                                width: double.infinity,
+                              )
+                            : GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 8,
+                                      mainAxisSpacing: 8,
+                                      childAspectRatio: 1.3,
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.primaryContainer
-                                          .withOpacity(0.4),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                itemCount: media.length > 4 ? 4 : media.length,
+                                itemBuilder: (context, mIdx) {
+                                  final item =
+                                      media[mIdx] as Map<String, dynamic>;
+                                  if (mIdx == 3 && media.length > 4) {
+                                    return Stack(
+                                      fit: StackFit.expand,
                                       children: [
-                                        const Icon(
-                                          Icons.place_rounded,
-                                          color: AppTheme.primary,
-                                          size: 12,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Flexible(
-                                          child: Text(
-                                            place['name'] ?? '',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppTheme.primary,
+                                        _buildMediaItem(item),
+                                        Container(
+                                          color: Colors.black.withOpacity(0.5),
+                                          child: Center(
+                                            child: Text(
+                                              '+${media.length - 3}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ],
-                                    ),
+                                    );
+                                  }
+                                  return _buildMediaItem(item);
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // Footer Stats (Likes, Comments, Views)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  isLiked
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_outline_rounded,
+                                  color: isLiked
+                                      ? Colors.redAccent
+                                      : AppTheme.subtitleText,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${count['likes'] ?? post['likeCount'] ?? 0}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isLiked
+                                        ? Colors.redAccent
+                                        : AppTheme.subtitleText,
                                   ),
                                 ),
                               ],
-                            ],
-                          ),
-                        ),
-                        if (hasMedia) ...[
-                          const SizedBox(width: 12),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              media[0]['url'],
-                              width: 64,
-                              height: 64,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const SizedBox.shrink(),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 16),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  color: AppTheme.subtitleText,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${count['comments'] ?? post['commentCount'] ?? 0}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.subtitleText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.visibility_outlined,
+                              size: 16,
+                              color: AppTheme.subtitleText,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${post['viewCount'] ?? 0} lượt xem',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.subtitleText,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ],

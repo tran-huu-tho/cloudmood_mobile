@@ -10,11 +10,20 @@ import '../services/api_client.dart';
 import '../widgets/avatar_image.dart';
 import '../widgets/place_detail_bottom_sheet.dart';
 import 'explore_post_detail_screen.dart';
+import 'places_screen.dart';
+import 'forum_screen.dart';
 
 class CloudmoodHomeScreen extends StatefulWidget {
   final VoidCallback onProfileTap;
+  final VoidCallback? onExplorePlacesTap;
+  final VoidCallback? onExploreGuidesTap;
 
-  const CloudmoodHomeScreen({super.key, required this.onProfileTap});
+  const CloudmoodHomeScreen({
+    super.key,
+    required this.onProfileTap,
+    this.onExplorePlacesTap,
+    this.onExploreGuidesTap,
+  });
 
   @override
   State<CloudmoodHomeScreen> createState() => _CloudmoodHomeScreenState();
@@ -168,8 +177,12 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
             final int code = (codes[i] as num?)?.toInt() ?? 0;
             final double maxT = (maxTemps[i] as num?)?.toDouble() ?? 25.0;
             final double minT = (minTemps[i] as num?)?.toDouble() ?? 20.0;
-            final int rainProb = i < rainProbs.length ? (rainProbs[i] as num?)?.toInt() ?? 0 : 0;
-            final double rainSum = i < rainSums.length ? (rainSums[i] as num?)?.toDouble() ?? 0.0 : 0.0;
+            final int rainProb = i < rainProbs.length
+                ? (rainProbs[i] as num?)?.toInt() ?? 0
+                : 0;
+            final double rainSum = i < rainSums.length
+                ? (rainSums[i] as num?)?.toDouble() ?? 0.0
+                : 0.0;
 
             final weatherMeta = _getWeatherMetaForCode(code);
 
@@ -229,11 +242,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       icon = Icons.thunderstorm_rounded;
       color = const Color(0xFF7C3AED);
     }
-    return {
-      'desc': desc,
-      'icon': icon,
-      'color': color,
-    };
+    return {'desc': desc, 'icon': icon, 'color': color};
   }
 
   Widget _buildWeatherWidget() {
@@ -427,7 +436,8 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                         ),
                       ),
                     ),
-                    if (_isLoadingForecast && (_forecastData == null || _forecastData!.isEmpty))
+                    if (_isLoadingForecast &&
+                        (_forecastData == null || _forecastData!.isEmpty))
                       Container(
                         height: 110,
                         alignment: Alignment.center,
@@ -436,7 +446,9 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppTheme.primary,
+                            ),
                           ),
                         ),
                       )
@@ -456,22 +468,34 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                             if (isToday) {
                               dayOfWeekLabel = 'Hôm nay';
                             } else {
-                              final List<String> weekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+                              final List<String> weekdays = [
+                                'T2',
+                                'T3',
+                                'T4',
+                                'T5',
+                                'T6',
+                                'T7',
+                                'CN',
+                              ];
                               dayOfWeekLabel = weekdays[date.weekday - 1];
                             }
-                            final String dateStr = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}";
+                            final String dateStr =
+                                "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}";
 
                             return Container(
                               width: 78,
-                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 6,
+                              ),
                               decoration: BoxDecoration(
-                                color: isToday 
-                                    ? AppTheme.primary.withOpacity(0.06) 
+                                color: isToday
+                                    ? AppTheme.primary.withOpacity(0.06)
                                     : Colors.white.withOpacity(0.55),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: isToday 
-                                      ? AppTheme.primary.withOpacity(0.2) 
+                                  color: isToday
+                                      ? AppTheme.primary.withOpacity(0.2)
                                       : Colors.grey.withOpacity(0.12),
                                   width: 1,
                                 ),
@@ -484,7 +508,9 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                                     style: TextStyle(
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.w800,
-                                      color: isToday ? AppTheme.primary : AppTheme.darkText,
+                                      color: isToday
+                                          ? AppTheme.primary
+                                          : AppTheme.darkText,
                                     ),
                                   ),
                                   const SizedBox(height: 1),
@@ -589,8 +615,6 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
     );
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -623,11 +647,11 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                 const SizedBox(height: 24),
 
                 // Featured Places Section
-                const FeaturedPlacesSection(),
+                FeaturedPlacesSection(onSeeMore: widget.onExplorePlacesTap),
                 const SizedBox(height: 28),
 
                 // 3. Featured Guides
-                const FeaturedGuidesSection(),
+                FeaturedGuidesSection(onSeeMore: widget.onExploreGuidesTap),
 
                 // Bottom padding for floating nav
                 const SizedBox(height: 110),
@@ -929,7 +953,8 @@ class MoodSelectorWidget extends StatelessWidget {
 
 /// Featured Guides Section
 class FeaturedGuidesSection extends StatelessWidget {
-  const FeaturedGuidesSection({super.key});
+  final VoidCallback? onSeeMore;
+  const FeaturedGuidesSection({super.key, this.onSeeMore});
 
   @override
   Widget build(BuildContext context) {
@@ -947,15 +972,22 @@ class FeaturedGuidesSection extends StatelessWidget {
               ? (b['likes'] as List).length
               : (int.tryParse(b['likes']?.toString() ?? '0') ?? 0);
           final int viewsA =
-              int.tryParse(a['views']?.toString() ?? a['viewCount']?.toString() ?? '0') ?? 0;
+              int.tryParse(
+                a['views']?.toString() ?? a['viewCount']?.toString() ?? '0',
+              ) ??
+              0;
           final int viewsB =
-              int.tryParse(b['views']?.toString() ?? b['viewCount']?.toString() ?? '0') ?? 0;
+              int.tryParse(
+                b['views']?.toString() ?? b['viewCount']?.toString() ?? '0',
+              ) ??
+              0;
           final int scoreA = likesA * 10 + viewsA;
           final int scoreB = likesB * 10 + viewsB;
           return scoreB.compareTo(scoreA);
         });
 
-        if (snapshot.connectionState == ConnectionState.waiting && posts.isEmpty) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            posts.isEmpty) {
           return const SizedBox(
             height: 320,
             child: Center(
@@ -980,21 +1012,29 @@ class FeaturedGuidesSection extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Hướng dẫn nổi bật', style: AppTheme.sectionTitleStyle),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Xem thêm →',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primary,
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      if (onSeeMore != null) {
+                        onSeeMore!();
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Xem thêm →',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
                   ),
@@ -1011,16 +1051,45 @@ class FeaturedGuidesSection extends StatelessWidget {
                 itemCount: posts.length,
                 itemBuilder: (context, index) {
                   final post = posts[index];
-                  final String title = (post['title'] ?? 'Cẩm nang du lịch').toString();
-                  final String desc = (post['description'] ?? post['content'] ?? post['summary'] ?? '').toString();
-                  final String image = (post['coverImage'] ?? post['image'] ?? post['imageUrl'] ?? '').toString().isNotEmpty
-                      ? (post['coverImage'] ?? post['image'] ?? post['imageUrl']).toString()
+                  final String title = (post['title'] ?? 'Cẩm nang du lịch')
+                      .toString();
+                  final String desc =
+                      (post['description'] ??
+                              post['content'] ??
+                              post['summary'] ??
+                              '')
+                          .toString();
+                  final String image =
+                      (post['coverImage'] ??
+                              post['image'] ??
+                              post['imageUrl'] ??
+                              '')
+                          .toString()
+                          .isNotEmpty
+                      ? (post['coverImage'] ??
+                                post['image'] ??
+                                post['imageUrl'])
+                            .toString()
                       : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80';
-                  final String authorName = (post['author']?['fullName'] ?? 'Cloudmood Guide').toString();
+                  final String authorName =
+                      (post['author']?['fullName'] ?? 'Cloudmood Guide')
+                          .toString();
                   final String? avatar = post['author']?['avatar']?.toString();
-                  final int likesCount = (post['likes'] is List) ? (post['likes'] as List).length : 0;
-                  final int viewsCount = int.tryParse(post['views']?.toString() ?? post['viewCount']?.toString() ?? '0') ?? 0;
-                  final String category = (post['destination'] ?? post['categoryName'] ?? 'Cẩm nang').toString();
+                  final int likesCount = (post['likes'] is List)
+                      ? (post['likes'] as List).length
+                      : 0;
+                  final int viewsCount =
+                      int.tryParse(
+                        post['views']?.toString() ??
+                            post['viewCount']?.toString() ??
+                            '0',
+                      ) ??
+                      0;
+                  final String category =
+                      (post['destination'] ??
+                              post['categoryName'] ??
+                              'Cẩm nang')
+                          .toString();
 
                   return GestureDetector(
                     onTap: () {
@@ -1191,8 +1260,10 @@ class FeaturedGuidesSection extends StatelessWidget {
                                   children: [
                                     CircleAvatar(
                                       radius: 12,
-                                      backgroundColor: AppTheme.primaryContainer,
-                                      backgroundImage: (avatar != null && avatar.isNotEmpty)
+                                      backgroundColor:
+                                          AppTheme.primaryContainer,
+                                      backgroundImage:
+                                          (avatar != null && avatar.isNotEmpty)
                                           ? NetworkImage(avatar)
                                           : null,
                                       child: (avatar == null || avatar.isEmpty)
@@ -1271,21 +1342,42 @@ class WeekendTripsSection extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Chuyến đi cuối tuần', style: AppTheme.sectionTitleStyle),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Xem thêm →',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.accent,
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => Scaffold(
+                        appBar: AppBar(
+                          title: const Text(
+                            'Chuyến đi gợi ý',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppTheme.darkText,
+                          elevation: 0.5,
+                        ),
+                        body: const CloudmoodPlacesScreen(),
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Xem thêm →',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.accent,
+                    ),
                   ),
                 ),
               ),
@@ -1834,7 +1926,8 @@ class _CustomBottomNavBarLegacy extends StatelessWidget {
 
 /// Featured Places Section
 class FeaturedPlacesSection extends StatelessWidget {
-  const FeaturedPlacesSection({super.key});
+  final VoidCallback? onSeeMore;
+  const FeaturedPlacesSection({super.key, this.onSeeMore});
 
   @override
   Widget build(BuildContext context) {
@@ -1868,21 +1961,29 @@ class FeaturedPlacesSection extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Địa điểm nổi bật', style: AppTheme.sectionTitleStyle),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Xem thêm →',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primary,
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      if (onSeeMore != null) {
+                        onSeeMore!();
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Xem thêm →',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primary,
+                        ),
                       ),
                     ),
                   ),

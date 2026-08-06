@@ -44,9 +44,10 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
     super.initState();
     _fetchFeed();
     _setupSocket();
-    
+
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
         if (!_isLoading && _hasMore) {
           _fetchFeed(loadMore: true);
         }
@@ -157,7 +158,9 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        final fetchedPosts = data.map((e) => Map<String, dynamic>.from(e)).toList();
+        final fetchedPosts = data
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
 
         setState(() {
           if (refresh || !loadMore) {
@@ -191,8 +194,13 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Yêu cầu đăng nhập', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('Bạn cần đăng nhập tài khoản để thực hiện chức năng $actionName.'),
+        title: const Text(
+          'Yêu cầu đăng nhập',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Bạn cần đăng nhập tài khoản để thực hiện chức năng $actionName.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -202,16 +210,22 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
             onPressed: () {
               Navigator.pop(context);
               Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => CloudmoodLoginScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => CloudmoodLoginScreen()),
               );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Đăng nhập', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Đăng nhập',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -332,10 +346,18 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
         decoration: InputDecoration(
           hintText: 'Tìm kiếm bài viết hoặc địa điểm...',
           hintStyle: TextStyle(fontSize: 13, color: Colors.grey[500]),
-          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.subtitleText, size: 20),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: AppTheme.subtitleText,
+            size: 20,
+          ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.clear_rounded, color: AppTheme.subtitleText, size: 18),
+                  icon: Icon(
+                    Icons.clear_rounded,
+                    color: AppTheme.subtitleText,
+                    size: 18,
+                  ),
                   onPressed: () {
                     _searchController.clear();
                     _fetchFeed(refresh: true);
@@ -343,7 +365,10 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
         onChanged: (value) {
           setState(() {}); // Làm mới để hiện/ẩn nút Clear
@@ -366,7 +391,9 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
               color: AppTheme.primary,
               child: CustomScrollView(
                 controller: _scrollController,
-                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
                 slivers: [
                   // ── Header ──────────────────────────────────────────────
                   SliverToBoxAdapter(
@@ -409,7 +436,10 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                                 return;
                               }
                               final result = await Navigator.of(context).push(
-                                MaterialPageRoute(builder: (context) => const CreatePostScreen()),
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const CreatePostScreen(),
+                                ),
                               );
                               if (result == true) {
                                 _fetchFeed(refresh: true);
@@ -421,9 +451,16 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
                             ),
-                            icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                            icon: const Icon(
+                              Icons.add_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                             label: const Text(
                               'Đăng bài',
                               style: TextStyle(
@@ -439,9 +476,7 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                   ),
 
                   // ── Search Bar ──────────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: _buildSearchBar(),
-                  ),
+                  SliverToBoxAdapter(child: _buildSearchBar()),
 
                   // ── Posts List ──────────────────────────────────────────
                   if (_posts.isEmpty && !_isLoading)
@@ -451,30 +486,43 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.forum_outlined, size: 64, color: Colors.grey),
+                            Icon(
+                              Icons.forum_outlined,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
                             SizedBox(height: 16),
-                            Text('Chưa có bài đăng nào.', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                            Text(
+                              'Chưa có bài đăng nào.',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     )
                   else
                     SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          if (index >= _posts.length) {
-                            if (_hasMore) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 24),
-                                child: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
-                              );
-                            }
-                            return const SizedBox(height: 100); // Khoảng trống tránh thanh điều hướng
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        if (index >= _posts.length) {
+                          if (_hasMore) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 24),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                            );
                           }
-                          return _buildPostCard(_posts[index]);
-                        },
-                        childCount: _posts.length + 1,
-                      ),
+                          return const SizedBox(
+                            height: 100,
+                          ); // Khoảng trống tránh thanh điều hướng
+                        }
+                        return _buildPostCard(_posts[index]);
+                      }, childCount: _posts.length + 1),
                     ),
                 ],
               ),
@@ -497,7 +545,10 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                       );
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primary,
                         borderRadius: BorderRadius.circular(20),
@@ -506,17 +557,25 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                             color: AppTheme.primary.withOpacity(0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
-                          )
+                          ),
                         ],
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.arrow_upward_rounded, size: 16, color: Colors.white),
+                          Icon(
+                            Icons.arrow_upward_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'Có bài đăng mới',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -551,8 +610,13 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                   fit: BoxFit.contain,
                   width: double.infinity,
                   height: double.infinity,
-                  errorBuilder: (context, error, stackTrace) =>
-                      const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 48)),
+                  errorBuilder: (context, error, stackTrace) => const Center(
+                    child: Icon(
+                      Icons.broken_image,
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                  ),
                 ),
               ),
               Positioned(
@@ -564,7 +628,11 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -576,10 +644,16 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
     }
   }
 
-  Widget _buildMediaItem(Map<String, dynamic> item, {double? height, double? width, BoxFit fit = BoxFit.cover}) {
+  Widget _buildMediaItem(
+    Map<String, dynamic> item, {
+    double? height,
+    double? width,
+    BoxFit fit = BoxFit.cover,
+  }) {
     final String rawUrl = (item['url'] ?? '').toString();
     final String mType = (item['mediaType'] ?? '').toString().toLowerCase();
-    final bool isVideo = mType == 'video' ||
+    final bool isVideo =
+        mType == 'video' ||
         rawUrl.toLowerCase().endsWith('.mp4') ||
         rawUrl.toLowerCase().endsWith('.mov') ||
         rawUrl.toLowerCase().endsWith('.avi') ||
@@ -591,7 +665,10 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
     if (isVideo) {
       String thumbUrl = rawUrl;
       if (rawUrl.contains('/video/upload/')) {
-        thumbUrl = rawUrl.replaceAll(RegExp(r'\.(mp4|mov|avi|mkv|webm)$', caseSensitive: false), '.jpg');
+        thumbUrl = rawUrl.replaceAll(
+          RegExp(r'\.(mp4|mov|avi|mkv|webm)$', caseSensitive: false),
+          '.jpg',
+        );
       }
 
       childWidget = SizedBox(
@@ -612,9 +689,7 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                 width: width ?? double.infinity,
               ),
             ),
-            Container(
-              color: Colors.black26,
-            ),
+            Container(color: Colors.black26),
             const Center(
               child: Icon(
                 Icons.play_circle_fill_rounded,
@@ -655,7 +730,8 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
     final bool isSaved = post['isSaved'] ?? false;
 
     final currentUser = AuthService().currentUser.value;
-    final bool isOwner = currentUser != null &&
+    final bool isOwner =
+        currentUser != null &&
         currentUser.id.toString() == author['id']?.toString();
 
     return Container(
@@ -668,7 +744,7 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
             color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Material(
@@ -679,7 +755,8 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
           onTap: () async {
             final result = await Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => PostDetailScreen(postId: post['id'] as int),
+                builder: (context) =>
+                    PostDetailScreen(postId: post['id'] as int),
               ),
             );
             if (result == true) {
@@ -701,10 +778,7 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                 // 1. Author Info
                 Row(
                   children: [
-                    AvatarImage(
-                      avatarUrl: author['avatar'],
-                      size: 40,
-                    ),
+                    AvatarImage(avatarUrl: author['avatar'], size: 40),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -749,8 +823,12 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                       children: [
                         IconButton(
                           icon: Icon(
-                            isSaved ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
-                            color: isSaved ? AppTheme.primary : AppTheme.subtitleText,
+                            isSaved
+                                ? Icons.bookmark_rounded
+                                : Icons.bookmark_outline_rounded,
+                            color: isSaved
+                                ? AppTheme.primary
+                                : AppTheme.subtitleText,
                             size: 20,
                           ),
                           onPressed: () => _toggleSave(post),
@@ -759,7 +837,11 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                         ),
                         if (isOwner)
                           PopupMenuButton<String>(
-                            icon: Icon(Icons.more_vert, color: AppTheme.subtitleText, size: 20),
+                            icon: Icon(
+                              Icons.more_vert,
+                              color: AppTheme.subtitleText,
+                              size: 20,
+                            ),
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             onSelected: (value) {
@@ -784,9 +866,16 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                                 value: 'delete',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                                    Icon(
+                                      Icons.delete_outline_rounded,
+                                      size: 18,
+                                      color: Colors.redAccent,
+                                    ),
                                     SizedBox(width: 8),
-                                    Text('Xóa bài', style: TextStyle(color: Colors.redAccent)),
+                                    Text(
+                                      'Xóa bài',
+                                      style: TextStyle(color: Colors.redAccent),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -816,14 +905,21 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                   GestureDetector(
                     onTap: () => _showPlaceDetail(place),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryContainer.withOpacity(0.4),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.place_rounded, size: 16, color: AppTheme.primary),
+                          const Icon(
+                            Icons.place_rounded,
+                            size: 16,
+                            color: AppTheme.primary,
+                          ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
@@ -848,16 +944,21 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: media.length == 1
-                        ? _buildMediaItem(media[0] as Map<String, dynamic>, height: 200, width: double.infinity)
+                        ? _buildMediaItem(
+                            media[0] as Map<String, dynamic>,
+                            height: 200,
+                            width: double.infinity,
+                          )
                         : GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 8,
-                              mainAxisSpacing: 8,
-                              childAspectRatio: 1.3,
-                            ),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 8,
+                                  mainAxisSpacing: 8,
+                                  childAspectRatio: 1.3,
+                                ),
                             itemCount: media.length > 4 ? 4 : media.length,
                             itemBuilder: (context, index) {
                               final item = media[index] as Map<String, dynamic>;
@@ -900,12 +1001,19 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                           onTap: () => _toggleLike(post),
                           borderRadius: BorderRadius.circular(20),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             child: Row(
                               children: [
                                 Icon(
-                                  isLiked ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
-                                  color: isLiked ? Colors.redAccent : AppTheme.subtitleText,
+                                  isLiked
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_outline_rounded,
+                                  color: isLiked
+                                      ? Colors.redAccent
+                                      : AppTheme.subtitleText,
                                   size: 20,
                                 ),
                                 const SizedBox(width: 6),
@@ -914,7 +1022,9 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: isLiked ? Colors.redAccent : AppTheme.subtitleText,
+                                    color: isLiked
+                                        ? Colors.redAccent
+                                        : AppTheme.subtitleText,
                                   ),
                                 ),
                               ],
@@ -939,13 +1049,17 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                                 post['isLiked'] = result['isLiked'];
                                 post['isSaved'] = result['isSaved'];
                                 post['_count']['likes'] = result['likeCount'];
-                                post['_count']['comments'] = result['commentCount'];
+                                post['_count']['comments'] =
+                                    result['commentCount'];
                               });
                             }
                           },
                           borderRadius: BorderRadius.circular(20),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             child: Row(
                               children: [
                                 Icon(
@@ -972,7 +1086,11 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                     // View Count
                     Row(
                       children: [
-                        Icon(Icons.visibility_outlined, size: 16, color: AppTheme.subtitleText),
+                        Icon(
+                          Icons.visibility_outlined,
+                          size: 16,
+                          color: AppTheme.subtitleText,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '${post['viewCount'] ?? 0} lượt xem',
@@ -998,8 +1116,13 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xóa bài viết', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text('Bạn có chắc chắn muốn xóa bài viết này không? Hành động này không thể hoàn tác và bài viết cũng sẽ biến mất khỏi mục đã lưu của người khác.'),
+        title: const Text(
+          'Xóa bài viết',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Bạn có chắc chắn muốn xóa bài viết này không? Hành động này không thể hoàn tác và bài viết cũng sẽ biến mất khỏi mục đã lưu của người khác.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1009,9 +1132,17 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Xóa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Xóa',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -1036,9 +1167,9 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
     } catch (e) {
       debugPrint('Error deleting post: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Xóa bài viết thất bại.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Xóa bài viết thất bại.')));
       }
     }
   }
@@ -1058,14 +1189,20 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             final media = post['media'] as List? ?? [];
-            final bool hasExistingMedia = media.isNotEmpty && !clearExistingMedia;
+            final bool hasExistingMedia =
+                media.isNotEmpty && !clearExistingMedia;
 
             return Container(
               decoration: const BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.fromLTRB(16, 20, 16, MediaQuery.of(context).viewInsets.bottom + 20),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                20,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1076,7 +1213,10 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                       children: [
                         const Text(
                           'Chỉnh sửa bài viết',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.close),
@@ -1090,30 +1230,45 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                       maxLines: 4,
                       decoration: InputDecoration(
                         hintText: 'Bạn đang nghĩ gì?',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         contentPadding: const EdgeInsets.all(12),
                       ),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.place_outlined, color: AppTheme.primary, size: 20),
+                        const Icon(
+                          Icons.place_outlined,
+                          color: AppTheme.primary,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: selectedPlace != null
                               ? Text(
                                   selectedPlace!['name'] ?? '',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primary,
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 )
                               : Text(
                                   'Chưa gắn thẻ địa điểm',
-                                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 13,
+                                  ),
                                 ),
                         ),
                         if (selectedPlace != null)
                           IconButton(
-                            icon: const Icon(Icons.cancel_rounded, color: Colors.grey),
+                            icon: const Icon(
+                              Icons.cancel_rounded,
+                              color: Colors.grey,
+                            ),
                             onPressed: () {
                               setModalState(() {
                                 selectedPlace = null;
@@ -1123,7 +1278,9 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                         else
                           TextButton(
                             onPressed: () async {
-                              final place = await _showPlaceSearchInModal(context);
+                              final place = await _showPlaceSearchInModal(
+                                context,
+                              );
                               if (place != null) {
                                 setModalState(() {
                                   selectedPlace = place;
@@ -1138,7 +1295,13 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
 
                     // Quản lý hình ảnh/video cũ và mới
                     if (hasExistingMedia) ...[
-                      const Text('Hình ảnh/video hiện tại:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text(
+                        'Hình ảnh/video hiện tại:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       SizedBox(
                         height: 60,
@@ -1147,8 +1310,16 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                           itemCount: media.length,
                           itemBuilder: (context, idx) {
                             final mType = media[idx]['mediaType'] ?? '';
-                            final url = (media[idx]['url'] ?? '').toString().toLowerCase();
-                            final isVid = mType == 'video' || url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.avi') || url.endsWith('.mkv') || url.endsWith('.webm');
+                            final url = (media[idx]['url'] ?? '')
+                                .toString()
+                                .toLowerCase();
+                            final isVid =
+                                mType == 'video' ||
+                                url.endsWith('.mp4') ||
+                                url.endsWith('.mov') ||
+                                url.endsWith('.avi') ||
+                                url.endsWith('.mkv') ||
+                                url.endsWith('.webm');
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: ClipRRect(
@@ -1159,7 +1330,11 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                                         height: 60,
                                         color: Colors.black87,
                                         child: const Center(
-                                          child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 28),
+                                          child: Icon(
+                                            Icons.play_circle_fill_rounded,
+                                            color: Colors.white,
+                                            size: 28,
+                                          ),
                                         ),
                                       )
                                     : Image.network(
@@ -1180,14 +1355,30 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                             clearExistingMedia = true;
                           });
                         },
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 16),
-                        label: const Text('Xóa ảnh/video cũ', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.redAccent,
+                          size: 16,
+                        ),
+                        label: const Text(
+                          'Xóa ảnh/video cũ',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
                     ],
 
                     // Danh sách ảnh mới được chọn
                     if (selectedEditFiles.isNotEmpty) ...[
-                      const Text('Ảnh/video mới chọn thêm:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const Text(
+                        'Ảnh/video mới chọn thêm:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       SizedBox(
                         height: 60,
@@ -1195,9 +1386,12 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                           scrollDirection: Axis.horizontal,
                           itemCount: selectedEditFiles.length,
                           itemBuilder: (context, idx) {
-                            final path = selectedEditFiles[idx].path.toLowerCase();
-                            final mime = (selectedEditFiles[idx].mimeType ?? '').toLowerCase();
-                            final isVideo = mime.startsWith('video') ||
+                            final path = selectedEditFiles[idx].path
+                                .toLowerCase();
+                            final mime = (selectedEditFiles[idx].mimeType ?? '')
+                                .toLowerCase();
+                            final isVideo =
+                                mime.startsWith('video') ||
                                 path.contains('video') ||
                                 path.endsWith('.mp4') ||
                                 path.endsWith('.mov') ||
@@ -1217,7 +1411,11 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                                             height: 60,
                                             color: Colors.black87,
                                             child: const Center(
-                                              child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 28),
+                                              child: Icon(
+                                                Icons.play_circle_fill_rounded,
+                                                color: Colors.white,
+                                                size: 28,
+                                              ),
                                             ),
                                           )
                                         : Image.file(
@@ -1225,16 +1423,22 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                                             width: 60,
                                             height: 60,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Container(
-                                                width: 60,
-                                                height: 60,
-                                                color: Colors.black87,
-                                                child: const Center(
-                                                  child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 28),
-                                                ),
-                                              );
-                                            },
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                                  return Container(
+                                                    width: 60,
+                                                    height: 60,
+                                                    color: Colors.black87,
+                                                    child: const Center(
+                                                      child: Icon(
+                                                        Icons
+                                                            .play_circle_fill_rounded,
+                                                        color: Colors.white,
+                                                        size: 28,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
                                           ),
                                   ),
                                 ),
@@ -1253,7 +1457,11 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                                         shape: BoxShape.circle,
                                       ),
                                       padding: const EdgeInsets.all(2),
-                                      child: const Icon(Icons.close, color: Colors.white, size: 12),
+                                      child: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 12,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1270,30 +1478,47 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                       children: [
                         TextButton.icon(
                           onPressed: () async {
-                            final List<XFile> images = await picker.pickMultiImage();
+                            final List<XFile> images = await picker
+                                .pickMultiImage();
                             if (images.isNotEmpty) {
                               setModalState(() {
-                                clearExistingMedia = true; // Thêm ảnh mới sẽ thay thế ảnh cũ
+                                clearExistingMedia =
+                                    true; // Thêm ảnh mới sẽ thay thế ảnh cũ
                                 selectedEditFiles.addAll(images);
                               });
                             }
                           },
-                          icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-                          label: const Text('Thêm ảnh mới', style: TextStyle(fontSize: 12)),
+                          icon: const Icon(
+                            Icons.add_photo_alternate_outlined,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Thêm ảnh mới',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         TextButton.icon(
                           onPressed: () async {
-                            final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
+                            final XFile? video = await picker.pickVideo(
+                              source: ImageSource.gallery,
+                            );
                             if (video != null) {
                               setModalState(() {
-                                clearExistingMedia = true; // Thêm video mới sẽ thay thế ảnh cũ
+                                clearExistingMedia =
+                                    true; // Thêm video mới sẽ thay thế ảnh cũ
                                 selectedEditFiles.add(video);
                               });
                             }
                           },
-                          icon: const Icon(Icons.video_library_outlined, size: 18),
-                          label: const Text('Thêm video mới', style: TextStyle(fontSize: 12)),
+                          icon: const Icon(
+                            Icons.video_library_outlined,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Thêm video mới',
+                            style: TextStyle(fontSize: 12),
+                          ),
                         ),
                       ],
                     ),
@@ -1307,7 +1532,9 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                           final contentText = textController.text.trim();
                           if (contentText.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Nội dung không được để trống')),
+                              const SnackBar(
+                                content: Text('Nội dung không được để trống'),
+                              ),
                             );
                             return;
                           }
@@ -1315,9 +1542,17 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        child: const Text('Lưu thay đổi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Lưu thay đổi',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -1333,7 +1568,11 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
 
     final progressNotifier = ValueNotifier<double>(0.0);
     final statusNotifier = ValueNotifier<String>('Đang tải lên thay đổi...');
-    showUploadProgressDialog(context, progressNotifier: progressNotifier, statusNotifier: statusNotifier);
+    showUploadProgressDialog(
+      context,
+      progressNotifier: progressNotifier,
+      statusNotifier: statusNotifier,
+    );
 
     try {
       final uri = Uri.parse('${ApiClient.baseUrl}/forum/${post['id']}');
@@ -1370,7 +1609,11 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
 
       // Add selected files
       for (var file in selectedEditFiles) {
-        final multipartFile = await http.MultipartFile.fromPath('media', file.path, filename: file.name);
+        final multipartFile = await http.MultipartFile.fromPath(
+          'media',
+          file.path,
+          filename: file.name,
+        );
         request.files.add(multipartFile);
       }
 
@@ -1406,9 +1649,9 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
           }
         } catch (_) {}
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMsg)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(errorMsg)));
         }
       }
     } catch (e) {
@@ -1423,7 +1666,9 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
     }
   }
 
-  Future<Map<String, dynamic>?> _showPlaceSearchInModal(BuildContext parentContext) async {
+  Future<Map<String, dynamic>?> _showPlaceSearchInModal(
+    BuildContext parentContext,
+  ) async {
     final searchController = TextEditingController();
     List<Map<String, dynamic>> results = [];
     bool isSearching = false;
@@ -1434,8 +1679,13 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Text('Tìm kiếm địa điểm', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text(
+                'Tìm kiếm địa điểm',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               content: SizedBox(
                 width: double.maxFinite,
                 height: 350,
@@ -1450,7 +1700,9 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                           icon: const Icon(Icons.clear),
                           onPressed: () => searchController.clear(),
                         ),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       onChanged: (val) async {
                         if (val.trim().isEmpty) {
@@ -1463,14 +1715,18 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                           isSearching = true;
                         });
                         try {
-                          final response = await ApiClient.get('/places', query: {
-                            'query': val.trim(),
-                            'limit': '5',
-                          });
+                          final response = await ApiClient.get(
+                            '/places',
+                            query: {'query': val.trim(), 'limit': '5'},
+                          );
                           if (response.statusCode == 200) {
-                            final List<dynamic> data = jsonDecode(response.body);
+                            final List<dynamic> data = jsonDecode(
+                              response.body,
+                            );
                             setDialogState(() {
-                              results = data.map((e) => Map<String, dynamic>.from(e)).toList();
+                              results = data
+                                  .map((e) => Map<String, dynamic>.from(e))
+                                  .toList();
                               isSearching = false;
                             });
                           } else {
@@ -1488,28 +1744,46 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                     const SizedBox(height: 12),
                     Expanded(
                       child: isSearching
-                          ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: AppTheme.primary,
+                              ),
+                            )
                           : results.isEmpty
-                              ? Center(
-                                  child: Text(
-                                    searchController.text.isEmpty
-                                        ? 'Nhập từ khóa để tìm'
-                                        : 'Không tìm thấy địa điểm',
-                                    style: TextStyle(color: Colors.grey[600]),
+                          ? Center(
+                              child: Text(
+                                searchController.text.isEmpty
+                                    ? 'Nhập từ khóa để tìm'
+                                    : 'Không tìm thấy địa điểm',
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: results.length,
+                              itemBuilder: (context, idx) {
+                                final p = results[idx];
+                                return ListTile(
+                                  leading: const Icon(
+                                    Icons.place,
+                                    color: AppTheme.primary,
                                   ),
-                                )
-                              : ListView.builder(
-                                  itemCount: results.length,
-                                  itemBuilder: (context, idx) {
-                                    final p = results[idx];
-                                    return ListTile(
-                                      leading: const Icon(Icons.place, color: AppTheme.primary),
-                                      title: Text(p['name'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                                      subtitle: Text(p['address'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-                                      onTap: () => Navigator.pop(context, p),
-                                    );
-                                  },
-                                ),
+                                  title: Text(
+                                    p['name'] ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    p['address'] ?? '',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  onTap: () => Navigator.pop(context, p),
+                                );
+                              },
+                            ),
                     ),
                   ],
                 ),

@@ -6,36 +6,37 @@ class ExplorePostCard extends StatelessWidget {
   final Map<String, dynamic> post;
   final VoidCallback onTap;
 
-  const ExplorePostCard({
-    Key? key,
-    required this.post,
-    required this.onTap,
-  }) : super(key: key);
+  const ExplorePostCard({Key? key, required this.post, required this.onTap})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final title = post['title'] ?? '';
-    final coverImage = (post['coverImage'] != null && post['coverImage'].toString().isNotEmpty && !post['coverImage'].toString().contains('via.placeholder.com'))
+    final coverImage =
+        (post['coverImage'] != null &&
+            post['coverImage'].toString().isNotEmpty &&
+            !post['coverImage'].toString().contains('via.placeholder.com'))
         ? post['coverImage']
         : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80';
     final viewCount = post['viewCount'] ?? 0;
     final likeCount = post['likeCount'] ?? 0;
-    
+
     // Author or Platform
     final isPlatform = post['postType'] == 'PLATFORM_CURATION';
     final platformName = post['platformName'] ?? '';
     final platformLogo = post['platformLogo'] ?? '';
-    
-    final authorName = isPlatform 
-        ? platformName 
+
+    final authorName = isPlatform
+        ? platformName
         : (post['author']?['fullName'] ?? 'Người dùng Ẩn danh');
-    
+
     final authorAvatar = post['author']?['avatar']?.toString() ?? '';
-    final avatarUrl = isPlatform 
-        ? platformLogo 
-        : (authorAvatar.isNotEmpty && !authorAvatar.contains('via.placeholder.com')
-            ? authorAvatar
-            : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80');
+    final avatarUrl = isPlatform
+        ? platformLogo
+        : (authorAvatar.isNotEmpty &&
+                  !authorAvatar.contains('via.placeholder.com')
+              ? authorAvatar
+              : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80');
 
     final numberFormat = NumberFormat.compact();
 
@@ -71,7 +72,11 @@ class ExplorePostCard extends StatelessWidget {
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           color: Colors.grey.shade800,
-                          child: const Icon(Icons.image_not_supported_outlined, color: Colors.white54, size: 40),
+                          child: const Icon(
+                            Icons.image_not_supported_outlined,
+                            color: Colors.white54,
+                            size: 40,
+                          ),
                         );
                       },
                     ),
@@ -100,9 +105,14 @@ class ExplorePostCard extends StatelessWidget {
                     top: 14,
                     left: 14,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: isPlatform ? const Color(0xFF4F46E5).withAlpha(210) : Colors.black.withAlpha(100),
+                        color: isPlatform
+                            ? const Color(0xFF4F46E5).withAlpha(210)
+                            : Colors.black.withAlpha(100),
                         borderRadius: BorderRadius.circular(30),
                         border: Border.all(
                           color: Colors.white.withAlpha(50),
@@ -113,13 +123,19 @@ class ExplorePostCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            isPlatform ? Icons.verified_rounded : Icons.explore_rounded,
+                            isPlatform
+                                ? Icons.verified_rounded
+                                : Icons.explore_rounded,
                             color: Colors.white,
                             size: 14,
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            isPlatform ? (platformName.isNotEmpty ? platformName : 'Chính thức') : 'Khám phá',
+                            isPlatform
+                                ? (platformName.isNotEmpty
+                                      ? platformName
+                                      : 'Chính thức')
+                                : 'Khám phá',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 11,
@@ -171,7 +187,10 @@ class ExplorePostCard extends StatelessWidget {
                               height: 26,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white.withAlpha(200), width: 1.2),
+                                border: Border.all(
+                                  color: Colors.white.withAlpha(200),
+                                  width: 1.2,
+                                ),
                               ),
                               child: ClipOval(
                                 child: Image.network(
@@ -179,7 +198,11 @@ class ExplorePostCard extends StatelessWidget {
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => Container(
                                     color: Colors.white24,
-                                    child: const Icon(Icons.person, size: 14, color: Colors.white),
+                                    child: const Icon(
+                                      Icons.person,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -203,7 +226,11 @@ class ExplorePostCard extends StatelessWidget {
                             // Like count
                             Row(
                               children: [
-                                const Icon(Icons.favorite_rounded, color: Colors.redAccent, size: 15),
+                                const Icon(
+                                  Icons.favorite_rounded,
+                                  color: Colors.redAccent,
+                                  size: 15,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   numberFormat.format(likeCount),
@@ -220,7 +247,11 @@ class ExplorePostCard extends StatelessWidget {
                             // View count
                             Row(
                               children: [
-                                const Icon(Icons.remove_red_eye_rounded, color: Colors.white70, size: 15),
+                                const Icon(
+                                  Icons.remove_red_eye_rounded,
+                                  color: Colors.white70,
+                                  size: 15,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   numberFormat.format(viewCount),
