@@ -476,18 +476,197 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
     );
   }
 
+  Widget _buildSkeletonLoading(BuildContext context) {
+    final titleText = widget.title.isNotEmpty ? widget.title : 'Đang tải bài viết...';
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. Cover Image Skeleton
+                Container(
+                  height: 250,
+                  width: double.infinity,
+                  color: const Color(0xFFE2E8F0),
+                ),
+                const SizedBox(height: 16),
+                // 2. Title Skeleton / Title Text
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titleText,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+                // 3. Author Card Skeleton
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.border.withAlpha(100)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE2E8F0),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 14,
+                              width: 140,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              height: 11,
+                              width: 90,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // 4. Place Cards Skeleton
+                for (int i = 0; i < 2; i++)
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.border.withAlpha(100)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFE2E8F0),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              height: 16,
+                              width: 160,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Container(
+                          height: 14,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 14,
+                          width: 220,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Floating Glass Back Button
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(235),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white,
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(35),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => Navigator.pop(context),
+                  child: const Padding(
+                    padding: EdgeInsets.all(10.0),
+                    child: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Color(0xFF0F172A),
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(widget.title),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 0,
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
+      return _buildSkeletonLoading(context);
     }
 
     if (_post == null) {
@@ -504,23 +683,40 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
         ? _post!['coverImage']
         : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80';
     final title = _post!['title'] ?? '';
-    final description = _post!['description'] ?? '';
+    String rawDescription = (_post!['description'] ?? '').toString().trim();
+    if (rawDescription.isEmpty && widget.initialItinerary != null) {
+      rawDescription = (widget.initialItinerary!['description'] ?? '').toString().trim();
+    }
+    if (rawDescription.isEmpty && _post!['originalItinerary'] != null) {
+      rawDescription = (_post!['originalItinerary']?['description'] ?? '').toString().trim();
+    }
+    final description = (rawDescription.isNotEmpty &&
+            rawDescription.toLowerCase() != 'public' &&
+            rawDescription.toLowerCase() != 'private' &&
+            rawDescription.toLowerCase() != 'friends' &&
+            rawDescription.toLowerCase() != 'null' &&
+            rawDescription.toLowerCase() != 'undefined')
+        ? rawDescription
+        : '';
 
-    final isPlatform = _post!['postType'] == 'PLATFORM_CURATION';
-    final platformName = _post!['platformName'] ?? '';
-    final platformLogo = _post!['platformLogo'] ?? '';
+    final rawPlatformName = (_post!['platformName'] ?? '').toString().trim();
+    final rawPlatformLogo = (_post!['platformLogo'] ?? '').toString().trim();
+    final hasPlatform = rawPlatformName.isNotEmpty || rawPlatformLogo.isNotEmpty;
+    final isPlatform = hasPlatform;
 
-    final authorName = isPlatform
-        ? platformName
-        : (_post!['author']?['fullName'] ?? 'Người dùng Ẩn danh');
+    final authorName = hasPlatform
+        ? (rawPlatformName.isNotEmpty ? rawPlatformName : 'Đối tác du lịch')
+        : (_post!['author']?['fullName'] ?? 'Cloud Mood');
 
     final authorAvatar = _post!['author']?['avatar']?.toString() ?? '';
-    final avatarUrl = isPlatform
-        ? platformLogo
-        : (authorAvatar.isNotEmpty &&
-                  !authorAvatar.contains('via.placeholder.com')
-              ? authorAvatar
-              : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80');
+    String avatarUrl = '';
+    if (hasPlatform) {
+      if (rawPlatformLogo.isNotEmpty) {
+        avatarUrl = rawPlatformLogo.startsWith('/') ? '${ApiClient.baseUrl}$rawPlatformLogo' : rawPlatformLogo;
+      }
+    } else if (authorAvatar.isNotEmpty && !authorAvatar.contains('via.placeholder.com')) {
+      avatarUrl = authorAvatar.startsWith('/') ? '${ApiClient.baseUrl}$authorAvatar' : authorAvatar;
+    }
 
     final itemsRaw = _post!['items'] as List? ?? [];
 
@@ -543,109 +739,47 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // 1. Hero Header with Cover Image and Overlaid Title
-          SliverAppBar(
-            expandedHeight: 280,
-            pinned: true,
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            leading: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(90),
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-            ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withAlpha(90),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.arrow_circle_down_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    onPressed: () {},
-                  ),
-                ),
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(
-                left: 56,
-                bottom: 16,
-                right: 56,
-              ),
-              title: Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  shadows: [
-                    Shadow(
-                      offset: Offset(0, 1),
-                      blurRadius: 4.0,
-                      color: Colors.black87,
-                    ),
-                  ],
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
+      body: Stack(
+        children: [
+          CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // 1. Hero Header Cover Image
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 250,
+                  width: double.infinity,
+                  child: Image.network(
                     coverImage,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) =>
                         Container(color: Colors.grey[800]),
                   ),
-                  // Dark Gradient Overlay for readability
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black.withAlpha(60),
-                          Colors.transparent,
-                          Colors.black.withAlpha(220),
-                        ],
-                        stops: const [0.0, 0.4, 1.0],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
+              ),
+
+          // 2. Post Title (Black Text)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                  height: 1.3,
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
           ),
 
-          // 2. Author / Platform Info Row
+          // 3. Author / Platform Info Card
           SliverToBoxAdapter(
             child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              margin: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -658,208 +792,306 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                 ],
                 border: Border.all(color: AppTheme.border.withAlpha(120)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppTheme.primary.withAlpha(100),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: ClipOval(
-                      child: isPlatform
-                          ? Container(
-                              color: AppTheme.primaryContainer,
-                              child: const Icon(
-                                Icons.verified_rounded,
-                                color: AppTheme.primary,
-                                size: 20,
-                              ),
-                            )
-                          : Image.network(
-                              avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: Colors.grey[200],
-                                child: const Icon(
-                                  Icons.person,
-                                  color: Colors.grey,
+                  // Top Row: Avatar + Name/Source + Optional "Mở bài viết" button
+                  Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppTheme.primary.withAlpha(100),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: avatarUrl.isNotEmpty
+                              ? Image.network(
+                                  avatarUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color: const Color(0xFFEEF2FF),
+                                    child: const Icon(
+                                      Icons.travel_explore_rounded,
+                                      color: Color(0xFF4F46E5),
+                                      size: 22,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  color: const Color(0xFFEEF2FF),
+                                  child: const Icon(
+                                    Icons.travel_explore_rounded,
+                                    color: Color(0xFF4F46E5),
+                                    size: 22,
+                                  ),
                                 ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hasPlatform
+                                  ? (authorName.toLowerCase().startsWith('từ ') || authorName.toLowerCase().startsWith('theo ')
+                                        ? authorName
+                                        : 'Từ $authorName')
+                                  : authorName,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.darkText,
                               ),
                             ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isPlatform
-                              ? (authorName.toLowerCase().startsWith('từ ')
-                                    ? authorName
-                                    : 'Từ $authorName')
-                              : authorName,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.darkText,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isPlatform
-                              ? 'Nguồn tổng hợp từ đối tác'
-                              : 'Tác giả bài viết',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppTheme.subtitleText,
-                          ),
-                        ),
-                        if (!isPlatform) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Icon(
-                                _privacyIcon,
-                                size: 12,
-                                color: _privacyColor,
+                            const SizedBox(height: 2),
+                            Text(
+                              hasPlatform
+                                  ? 'Nguồn đối tác du lịch uy tín'
+                                  : 'Tác giả bài viết',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.subtitleText,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _privacyText,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: _privacyColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (isPlatform)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryContainer.withAlpha(120),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Mở bài viết',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
+                            ),
+                          ],
                         ),
                       ),
-                    )
-                  else
-                    Row(
-                      children: [
-                        InkWell(
-                          onTap: _toggleLike,
-                          borderRadius: BorderRadius.circular(20),
+                      if (isPlatform)
+                        GestureDetector(
+                          onTap: () async {
+                            final rawUrl = (_post!['originalUrl'] ?? _post!['sourceUrl'] ?? _post!['url'] ?? '').toString();
+                            if (rawUrl.isNotEmpty) {
+                              final uri = Uri.tryParse(rawUrl);
+                              if (uri != null && await canLaunchUrl(uri)) {
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              }
+                            }
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                              horizontal: 12,
+                              vertical: 7,
                             ),
                             decoration: BoxDecoration(
-                              color: _isLiked
-                                  ? Colors.red.withAlpha(20)
-                                  : Colors.grey.shade100,
+                              color: AppTheme.primaryContainer.withAlpha(140),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  _isLiked
-                                      ? Icons.favorite_rounded
-                                      : Icons.favorite_border_rounded,
-                                  color: _isLiked
-                                      ? Colors.red
-                                      : Colors.grey[600],
-                                  size: 16,
+                                  Icons.open_in_new_rounded,
+                                  size: 13,
+                                  color: AppTheme.primary,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '$_likeCount',
+                                  'Mở bài viết',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: _isLiked
-                                        ? Colors.red
-                                        : Colors.grey[800],
+                                    color: AppTheme.primary,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+                  const SizedBox(height: 12),
+                  // Bottom Row: Stats (Heart / Like, Views, Privacy Badge)
+                  Row(
+                    children: [
+                      // Like button (Thả tim)
+                      InkWell(
+                        onTap: _toggleLike,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
+                            horizontal: 12,
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
+                            color: _isLiked
+                                ? Colors.red.withAlpha(20)
+                                : Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.remove_red_eye_rounded,
+                                _isLiked
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                color: _isLiked
+                                    ? Colors.red
+                                    : Colors.grey[600],
                                 size: 16,
-                                color: Colors.grey[600],
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 5),
                               Text(
-                                '$_viewCount',
+                                '$_likeCount',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.grey[800],
+                                  color: _isLiked
+                                      ? Colors.red
+                                      : Colors.grey[800],
                                 ),
                               ),
                             ],
                           ),
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      // View count (Lượt xem)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.remove_red_eye_rounded,
+                              size: 16,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              '$_viewCount',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!isPlatform) ...[
+                        const Spacer(),
+                        Row(
+                          children: [
+                            Icon(
+                              _privacyIcon,
+                              size: 13,
+                              color: _privacyColor,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _privacyText,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _privacyColor,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
-                    ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
 
-          // 3. Description Section
-          if (description.isNotEmpty && !isPlatform)
+          // 3. Guide Introduction / Description Section
+          if (description.isNotEmpty)
             SliverToBoxAdapter(
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.border.withAlpha(100)),
-                ),
-                child: Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.darkText,
-                    height: 1.5,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFF8FAFC),
+                      Color(0xFFEFF6FF),
+                    ],
                   ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFFDBEAFE),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF3B82F6).withAlpha(12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2563EB).withAlpha(20),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.auto_stories_rounded,
+                            color: Color(0xFF2563EB),
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Lời giới thiệu cẩm nang',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.only(left: 12),
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          left: BorderSide(
+                            color: Color(0xFF3B82F6),
+                            width: 3,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        description,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          color: Color(0xFF334155),
+                          height: 1.6,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1186,10 +1418,78 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                 builder: (context, setLocalState) {
                                   final reviews = place['reviews'] as List;
 
+                                  if (reviews.length == 1) {
+                                    final review = reviews[0];
+                                    return Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: AppTheme.border.withAlpha(80),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            '“',
+                                            style: TextStyle(
+                                              fontSize: 32,
+                                              color: AppTheme.primary,
+                                              height: 1.0,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  review['comment'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.black87,
+                                                    height: 1.35,
+                                                  ),
+                                                  maxLines: 4,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    _buildReviewStars(
+                                                      (review['rating'] ?? 5).toDouble(),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Flexible(
+                                                      child: Text(
+                                                        '${review['authorName'] ?? 'Người dùng'} (Tripadvisor)',
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w600,
+                                                          color: AppTheme.primary,
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+
                                   return Column(
                                     children: [
                                       SizedBox(
-                                        height: 140,
+                                        height: 110,
                                         child: PageView.builder(
                                           controller: PageController(
                                             viewportFraction: 1.0,
@@ -1233,6 +1533,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                                       crossAxisAlignment:
                                                           CrossAxisAlignment
                                                               .start,
+                                                      mainAxisSize: MainAxisSize.min,
                                                       children: [
                                                         Text(
                                                           review['comment'] ??
@@ -1248,7 +1549,7 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
                                                           overflow: TextOverflow
                                                               .ellipsis,
                                                         ),
-                                                        const Spacer(),
+                                                        const SizedBox(height: 8),
                                                         Row(
                                                           mainAxisAlignment:
                                                               MainAxisAlignment
@@ -2014,7 +2315,46 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      Positioned(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(235),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(35),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => Navigator.pop(context),
+              child: const Padding(
+                padding: EdgeInsets.all(10.0),
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Color(0xFF0F172A),
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+  floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
             context,

@@ -1,3 +1,4 @@
+import '../services/api_client.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'package:intl/intl.dart';
@@ -22,21 +23,24 @@ class ExplorePostCard extends StatelessWidget {
     final likeCount = post['likeCount'] ?? 0;
 
     // Author or Platform
-    final isPlatform = post['postType'] == 'PLATFORM_CURATION';
-    final platformName = post['platformName'] ?? '';
-    final platformLogo = post['platformLogo'] ?? '';
+    final rawPlatformName = (post['platformName'] ?? '').toString().trim();
+    final rawPlatformLogo = (post['platformLogo'] ?? '').toString().trim();
+    final hasPlatform = rawPlatformName.isNotEmpty || rawPlatformLogo.isNotEmpty;
+    final isPlatform = hasPlatform;
 
-    final authorName = isPlatform
-        ? platformName
-        : (post['author']?['fullName'] ?? 'Người dùng Ẩn danh');
+    final authorName = hasPlatform
+        ? (rawPlatformName.isNotEmpty ? rawPlatformName : 'Đối tác du lịch')
+        : (post['author']?['fullName'] ?? 'Cloud Mood');
 
     final authorAvatar = post['author']?['avatar']?.toString() ?? '';
-    final avatarUrl = isPlatform
-        ? platformLogo
-        : (authorAvatar.isNotEmpty &&
-                  !authorAvatar.contains('via.placeholder.com')
-              ? authorAvatar
-              : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80');
+    String avatarUrl = '';
+    if (hasPlatform) {
+      if (rawPlatformLogo.isNotEmpty) {
+        avatarUrl = rawPlatformLogo.startsWith('/') ? '${ApiClient.baseUrl}$rawPlatformLogo' : rawPlatformLogo;
+      }
+    } else if (authorAvatar.isNotEmpty && !authorAvatar.contains('via.placeholder.com')) {
+      avatarUrl = authorAvatar.startsWith('/') ? '${ApiClient.baseUrl}$authorAvatar' : authorAvatar;
+    }
 
     final numberFormat = NumberFormat.compact();
 
@@ -123,7 +127,7 @@ class ExplorePostCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            isPlatform
+                            hasPlatform
                                 ? Icons.verified_rounded
                                 : Icons.explore_rounded,
                             color: Colors.white,
@@ -131,10 +135,10 @@ class ExplorePostCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            isPlatform
-                                ? (platformName.isNotEmpty
-                                      ? platformName
-                                      : 'Chính thức')
+                            hasPlatform
+                                ? (rawPlatformName.isNotEmpty
+                                      ? rawPlatformName
+                                      : 'Đối tác')
                                 : 'Khám phá',
                             style: const TextStyle(
                               color: Colors.white,

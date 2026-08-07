@@ -57,7 +57,8 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   bool _isLoadingExplore = false;
   bool _hasFetchedExplore = false;
   String _exploreSearchQuery = '';
-  final TextEditingController _exploreSearchController = TextEditingController();
+  final TextEditingController _exploreSearchController =
+      TextEditingController();
 
   // Pagination for web images
   int _webImagesPage = 1;
@@ -1950,7 +1951,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   void _showDeleteItineraryDialog() {
     final currentUserIdStr = AuthService().currentUser.value?.id?.toString();
     final ownerIdStr = _itineraryData['userId']?.toString();
-    final bool isOwner = (ownerIdStr != null && currentUserIdStr == ownerIdStr) || (_itineraryData['userId'] == null);
+    final bool isOwner =
+        (ownerIdStr != null && currentUserIdStr == ownerIdStr) ||
+        (_itineraryData['userId'] == null);
 
     if (!isOwner) {
       if (mounted) {
@@ -1970,7 +1973,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Xóa hướng dẫn'),
-          content: const Text('Bạn có chắc chắn muốn xóa hướng dẫn này không? Hành động này không thể hoàn tác.'),
+          content: const Text(
+            'Bạn có chắc chắn muốn xóa hướng dẫn này không? Hành động này không thể hoàn tác.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -1979,7 +1984,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
             TextButton(
               onPressed: () async {
                 Navigator.of(context).pop(); // Close confirmation dialog
-                
+
                 final int itineraryId = _itineraryData['id'] is int
                     ? _itineraryData['id'] as int
                     : int.parse(_itineraryData['id'].toString());
@@ -1993,7 +1998,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                   ),
                 );
 
-                final success = await DatabaseService().deleteItinerary(itineraryId);
+                final success = await DatabaseService().deleteItinerary(
+                  itineraryId,
+                );
 
                 if (mounted) {
                   Navigator.of(context).pop(); // Close loading dialog
@@ -2005,11 +2012,15 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
-                    Navigator.of(context).pop(true); // Return true to signal deletion to previous screen
+                    Navigator.of(context).pop(
+                      true,
+                    ); // Return true to signal deletion to previous screen
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Không thể xóa hướng dẫn. Vui lòng thử lại.'),
+                        content: Text(
+                          'Không thể xóa hướng dẫn. Vui lòng thử lại.',
+                        ),
                         duration: Duration(seconds: 2),
                         behavior: SnackBarBehavior.floating,
                       ),
@@ -2019,7 +2030,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
               },
               child: const Text(
                 'Xóa',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -4682,7 +4696,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
     final rawTodo = item['todoItems'] ?? item['todoitems'];
     final isChecklist = text.startsWith('[TODO]') || rawTodo != null;
     if (isChecklist) return false;
-    return text.trim().isEmpty || text == 'Ghi chú mới' || text == 'Thêm ghi chú tại đây';
+    return text.trim().isEmpty ||
+        text == 'Ghi chú mới' ||
+        text == 'Thêm ghi chú tại đây';
   }
 
   bool _isEmptyChecklist(Map<String, dynamic> item) {
@@ -6839,7 +6855,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                 place,
                 timeChip: extraInfo != null
                     ? Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(8),
@@ -6849,7 +6868,8 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                           children: [
                             Icon(
                               Icons.access_time_rounded,
-                              color: extraInfo.toLowerCase().contains('đóng cửa')
+                              color:
+                                  extraInfo.toLowerCase().contains('đóng cửa')
                                   ? Colors.red
                                   : AppTheme.subtitleText,
                               size: 13,
@@ -6861,10 +6881,16 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: extraInfo.toLowerCase().contains('đóng cửa')
+                                  color:
+                                      extraInfo.toLowerCase().contains(
+                                        'đóng cửa',
+                                      )
                                       ? Colors.red
                                       : const Color(0xFF475569),
-                                  fontWeight: extraInfo.toLowerCase().contains('đóng cửa')
+                                  fontWeight:
+                                      extraInfo.toLowerCase().contains(
+                                        'đóng cửa',
+                                      )
                                       ? FontWeight.w600
                                       : FontWeight.bold,
                                   fontSize: 10,
@@ -6883,7 +6909,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
     );
   }
 
-  Widget _buildSavedPlaceCard(Map<String, dynamic> detail, int index, int sIdx) {
+  Widget _buildSavedPlaceCard(
+    Map<String, dynamic> detail,
+    int index,
+    int sIdx,
+  ) {
     final int id = detail['id'] as int;
     final bool isCollapsed = !_expandedPlaceIds.contains(id);
 
@@ -7234,7 +7264,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   Widget _buildOverviewTab() {
     Map<String, dynamic>? nextStopDetail;
     for (var d in _details) {
-      if (d['placeId'] != null && d['place'] != null && !_visitedPlaceIds.contains(d['id'])) {
+      if (d['placeId'] != null &&
+          d['place'] != null &&
+          !_visitedPlaceIds.contains(d['id'])) {
         nextStopDetail = d;
         break;
       }
@@ -7245,7 +7277,8 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
       final place = nextStopDetail['place'] ?? {};
       final String name = place['name'] ?? 'Địa điểm';
       final String image = place['image'] ?? '';
-      final String categoryName = place['category']?['name'] ?? 'Điểm tham quan';
+      final String categoryName =
+          place['category']?['name'] ?? 'Điểm tham quan';
       final int day = nextStopDetail['day'] as int? ?? 1;
       final int detailId = nextStopDetail['id'] as int;
 
@@ -7312,7 +7345,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                         runSpacing: 6,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(8),
@@ -7328,7 +7364,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                           ),
                           if (extraInfo != null)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(8),
@@ -7338,7 +7377,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                 children: [
                                   Icon(
                                     Icons.access_time_rounded,
-                                    color: extraInfo.toLowerCase().contains('đóng cửa')
+                                    color:
+                                        extraInfo.toLowerCase().contains(
+                                          'đóng cửa',
+                                        )
                                         ? Colors.red
                                         : AppTheme.subtitleText,
                                     size: 12,
@@ -7347,7 +7389,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                   Text(
                                     extraInfo,
                                     style: TextStyle(
-                                      color: extraInfo.toLowerCase().contains('đóng cửa')
+                                      color:
+                                          extraInfo.toLowerCase().contains(
+                                            'đóng cửa',
+                                          )
                                           ? Colors.red
                                           : const Color(0xFF475569),
                                       fontWeight: FontWeight.bold,
@@ -7371,7 +7416,8 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                       width: 70,
                       height: 70,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const Icon(Icons.image, size: 70),
+                      errorBuilder: (_, _, _) =>
+                          const Icon(Icons.image, size: 70),
                     ),
                   ),
               ],
@@ -7393,7 +7439,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                     icon: const Icon(Icons.directions_rounded, size: 18),
                     label: const Text(
                       'Đường đi',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                     onPressed: () async {
                       final lat = place['latitude'];
@@ -7407,7 +7456,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                       );
                       try {
                         if (await canLaunchUrl(url)) {
-                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                          await launchUrl(
+                            url,
+                            mode: LaunchMode.externalApplication,
+                          );
                         } else {
                           await launchUrl(url);
                         }
@@ -7429,10 +7481,16 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
-                    icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                    icon: const Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 18,
+                    ),
                     label: const Text(
                       'Đã đi qua',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                     onPressed: () => _toggleVisited(detailId),
                   ),
@@ -7460,11 +7518,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
         ),
         child: Column(
           children: [
-            const Icon(
-              Icons.stars_rounded,
-              color: Colors.amber,
-              size: 44,
-            ),
+            const Icon(Icons.stars_rounded, color: Colors.amber, size: 44),
             const SizedBox(height: 12),
             Text(
               'Hành trình hoàn thành!',
@@ -7478,10 +7532,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
             const Text(
               'Bạn đã ghé thăm tất cả các địa điểm trong chuyến đi này. Chúc bạn có những trải nghiệm tuyệt vời!',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
           ],
         ),
@@ -8201,7 +8252,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                         }
                                       }
                                       if (prevPlaceRaw != null) {
-                                            travelSeparator = _buildTravelSeparator(
+                                        travelSeparator = _buildTravelSeparator(
                                           Map<String, dynamic>.from(
                                             prevPlaceRaw,
                                           ),
@@ -8213,8 +8264,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                       }
                                     }
 
-                                    final customColor = _sectionColors[detail['section']] ?? const Color(0xFF2563EB);
-                                    final customIcon = _sectionIcons[detail['section']];
+                                    final customColor =
+                                        _sectionColors[detail['section']] ??
+                                        const Color(0xFF2563EB);
+                                    final customIcon =
+                                        _sectionIcons[detail['section']];
                                     int placeNumber = 0;
                                     for (int i = 0; i <= sIdx; i++) {
                                       if (sectionDetails[i]['place'] != null) {
@@ -8235,7 +8289,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                               left: 15,
                                               child: Container(
                                                 width: 2,
-                                                color: customColor.withOpacity(0.3),
+                                                color: customColor.withOpacity(
+                                                  0.3,
+                                                ),
                                               ),
                                             ),
                                           // Bottom line (for Place)
@@ -8247,7 +8303,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                               left: 15,
                                               child: Container(
                                                 width: 2,
-                                                color: customColor.withOpacity(0.3),
+                                                color: customColor.withOpacity(
+                                                  0.3,
+                                                ),
                                               ),
                                             ),
                                           // Numbered / Icon circle (for Place)
@@ -8259,41 +8317,62 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                                 width: 24,
                                                 height: 24,
                                                 decoration: BoxDecoration(
-                                                  color: _visitedPlaceIds.contains(detail['id'])
+                                                  color:
+                                                      _visitedPlaceIds.contains(
+                                                        detail['id'],
+                                                      )
                                                       ? Colors.green
                                                       : customColor,
                                                   shape: BoxShape.circle,
-                                                  border: Border.all(color: Colors.white, width: 2),
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 2,
+                                                  ),
                                                   boxShadow: [
                                                     BoxShadow(
-                                                      color: Colors.black.withOpacity(0.1),
+                                                      color: Colors.black
+                                                          .withOpacity(0.1),
                                                       blurRadius: 4,
-                                                      offset: const Offset(0, 2),
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
                                                 alignment: Alignment.center,
-                                                child: _visitedPlaceIds.contains(detail['id'])
+                                                child:
+                                                    _visitedPlaceIds.contains(
+                                                      detail['id'],
+                                                    )
                                                     ? const Icon(
                                                         Icons.check_rounded,
                                                         color: Colors.white,
                                                         size: 12,
                                                       )
                                                     : ((customIcon == null ||
-                                                            customIcon.codePoint == Icons.looks_one_rounded.codePoint)
-                                                        ? Text(
-                                                            '$placeNumber',
-                                                            style: const TextStyle(
-                                                              color: Colors.white,
-                                                              fontWeight: FontWeight.bold,
-                                                              fontSize: 10,
-                                                            ),
-                                                          )
-                                                        : Icon(
-                                                            customIcon,
-                                                            color: Colors.white,
-                                                            size: 11,
-                                                          )),
+                                                              customIcon
+                                                                      .codePoint ==
+                                                                  Icons
+                                                                      .looks_one_rounded
+                                                                      .codePoint)
+                                                          ? Text(
+                                                              '$placeNumber',
+                                                              style: const TextStyle(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                fontSize: 10,
+                                                              ),
+                                                            )
+                                                          : Icon(
+                                                              customIcon,
+                                                              color:
+                                                                  Colors.white,
+                                                              size: 11,
+                                                            )),
                                               ),
                                             ),
                                           // Continuous line (for Note)
@@ -8457,8 +8536,6 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                 ),
                               ),
                             ],
-
-
 
                             // Saved places list moved to the top of accordion content
                           ],
@@ -9231,18 +9308,20 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                               width: 24,
                                               height: 24,
                                               child: Checkbox(
-                                                value: _selectedItemIds.contains(
-                                                  detail['id'],
-                                                ),
+                                                value: _selectedItemIds
+                                                    .contains(detail['id']),
                                                 onChanged: _isSelectionMode
                                                     ? (_) {}
                                                     : (val) {
                                                         setState(() {
-                                                          _isSelectionMode = true;
+                                                          _isSelectionMode =
+                                                              true;
                                                           if (val == true) {
-                                                            _selectedItemIds.add(
-                                                              detail['id'] as int,
-                                                            );
+                                                            _selectedItemIds
+                                                                .add(
+                                                                  detail['id']
+                                                                      as int,
+                                                                );
                                                           } else {
                                                             _selectedItemIds
                                                                 .remove(
@@ -9276,7 +9355,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                     detail['reactions'] is List
                                         ? detail['reactions']
                                         : (detail['reactions'] is String
-                                              ? (json.decode(detail['reactions'])
+                                              ? (json.decode(
+                                                      detail['reactions'],
+                                                    )
                                                     as List)
                                               : []),
                                     true,
@@ -9293,13 +9374,17 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                             if (place['latitude'] != null &&
                                 place['longitude'] != null) {
                               final lat = (place['latitude'] as num).toDouble();
-                              final lon = (place['longitude'] as num).toDouble();
+                              final lon = (place['longitude'] as num)
+                                  .toDouble();
                               setState(() {
                                 _isMapExpanded = true;
                                 _selectedMapPlace = detail;
                               });
                               // Offset latitude by -0.005 so marker is in the upper visible half
-                              _mapController.move(LatLng(lat - 0.005, lon), 15.0);
+                              _mapController.move(
+                                LatLng(lat - 0.005, lon),
+                                15.0,
+                              );
                             }
                           },
                         ),
@@ -9386,9 +9471,11 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
           }
         }
 
-        final bool hasPrevPlace = idx > 0 &&
+        final bool hasPrevPlace =
+            idx > 0 &&
             dayDetails.sublist(0, idx).any((d) => d['place'] != null);
-        final bool hasNextPlace = idx < dayDetails.length - 1 &&
+        final bool hasNextPlace =
+            idx < dayDetails.length - 1 &&
             dayDetails.sublist(idx + 1).any((d) => d['place'] != null);
 
         return ReorderableDelayedDragStartListener(
@@ -9981,7 +10068,9 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                             errorBorder: InputBorder.none,
                             disabledBorder: InputBorder.none,
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                            ),
                           ),
                           style: TextStyle(
                             color: AppTheme.darkText,
@@ -10037,99 +10126,112 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
               ),
             ),
           )
-        else () {
-          final filteredPosts = _explorePosts.where((post) {
-            if (_exploreSearchQuery.isEmpty) return true;
-            final q = _exploreSearchQuery.toLowerCase();
-            final title = (post['title'] ?? '').toString().toLowerCase();
-            final desc = (post['description'] ?? post['content'] ?? '').toString().toLowerCase();
-            final authorName = (post['user']?['name'] ?? post['author']?['name'] ?? '').toString().toLowerCase();
-            bool matchesPlace = false;
-            if (post['items'] is List) {
-              for (var item in (post['items'] as List)) {
-                final pName = (item['place']?['name'] ?? '').toString().toLowerCase();
-                if (pName.contains(q)) {
-                  matchesPlace = true;
-                  break;
+        else
+          () {
+            final filteredPosts = _explorePosts.where((post) {
+              if (_exploreSearchQuery.isEmpty) return true;
+              final q = _exploreSearchQuery.toLowerCase();
+              final title = (post['title'] ?? '').toString().toLowerCase();
+              final desc = (post['description'] ?? post['content'] ?? '')
+                  .toString()
+                  .toLowerCase();
+              final authorName =
+                  (post['user']?['name'] ?? post['author']?['name'] ?? '')
+                      .toString()
+                      .toLowerCase();
+              bool matchesPlace = false;
+              if (post['items'] is List) {
+                for (var item in (post['items'] as List)) {
+                  final pName = (item['place']?['name'] ?? '')
+                      .toString()
+                      .toLowerCase();
+                  if (pName.contains(q)) {
+                    matchesPlace = true;
+                    break;
+                  }
                 }
               }
-            }
-            return title.contains(q) || desc.contains(q) || authorName.contains(q) || matchesPlace;
-          }).toList();
+              return title.contains(q) ||
+                  desc.contains(q) ||
+                  authorName.contains(q) ||
+                  matchesPlace;
+            }).toList();
 
-          if (filteredPosts.isEmpty) {
-            return SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(40.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryContainer.withAlpha(80),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        _exploreSearchQuery.isNotEmpty ? Icons.search_off_rounded : Icons.explore_off_rounded,
-                        size: 40,
-                        color: AppTheme.primary.withAlpha(180),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      _exploreSearchQuery.isNotEmpty
-                          ? 'Không tìm thấy bài viết phù hợp'
-                          : 'Chưa có bài viết khám phá nào',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.darkText,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _exploreSearchQuery.isNotEmpty
-                          ? 'Thử tìm kiếm với từ khóa khác xem sao nhé!'
-                          : 'Hãy quay lại sau để cập nhật các kinh nghiệm mới nhất nhé!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.subtitleText,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          return SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final post = filteredPosts[index];
-                return ExplorePostCard(
-                  post: post,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ExplorePostDetailScreen(
-                          postId: post['id'] as int,
-                          title: post['title'] ?? 'Chi tiết',
-                          initialItinerary: _itineraryData,
+            if (filteredPosts.isEmpty) {
+              return SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(40.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryContainer.withAlpha(80),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          _exploreSearchQuery.isNotEmpty
+                              ? Icons.search_off_rounded
+                              : Icons.explore_off_rounded,
+                          size: 40,
+                          color: AppTheme.primary.withAlpha(180),
                         ),
                       ),
-                    ).then((_) {
-                      _fetchExplorePosts();
-                    });
-                  },
-                );
-              }, childCount: filteredPosts.length),
-            ),
-          );
-        }(),
+                      const SizedBox(height: 16),
+                      Text(
+                        _exploreSearchQuery.isNotEmpty
+                            ? 'Không tìm thấy bài viết phù hợp'
+                            : 'Chưa có bài viết khám phá nào',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _exploreSearchQuery.isNotEmpty
+                            ? 'Thử tìm kiếm với từ khóa khác xem sao nhé!'
+                            : 'Hãy quay lại sau để cập nhật các kinh nghiệm mới nhất nhé!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.subtitleText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            return SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final post = filteredPosts[index];
+                  return ExplorePostCard(
+                    post: post,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ExplorePostDetailScreen(
+                            postId: post['id'] as int,
+                            title: post['title'] ?? 'Chi tiết',
+                            initialItinerary: _itineraryData,
+                          ),
+                        ),
+                      ).then((_) {
+                        _fetchExplorePosts();
+                      });
+                    },
+                  );
+                }, childCount: filteredPosts.length),
+              ),
+            );
+          }(),
       ],
     );
   }
@@ -10632,7 +10734,8 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
         final catName = cat['name'] as String;
         final items = cat['items'] as List? ?? [];
         final allItemNames = items.map((it) => it['name'] as String).toList();
-        final bool isSelected = allItemNames.isNotEmpty &&
+        final bool isSelected =
+            allItemNames.isNotEmpty &&
             allItemNames.every((name) => _selectedItems.contains(name));
         final isExpanded = _expandedCategories.contains(catId);
 
@@ -10690,7 +10793,9 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
                         isSelected
                             ? Icons.check_box_rounded
                             : Icons.check_box_outline_blank_rounded,
-                        color: isSelected ? AppTheme.primary : const Color(0xFFCBD5E1),
+                        color: isSelected
+                            ? AppTheme.primary
+                            : const Color(0xFFCBD5E1),
                         size: 22,
                       ),
                     ),
@@ -10701,7 +10806,9 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
             if (isExpanded)
               ...items.map((item) {
                 final itemName = item['name'] as String;
-                final bool isItemSelfSelected = _selectedItems.contains(itemName);
+                final bool isItemSelfSelected = _selectedItems.contains(
+                  itemName,
+                );
                 return InkWell(
                   onTap: () {
                     setState(() {
@@ -10725,7 +10832,9 @@ class _ChecklistTemplateSheetState extends State<_ChecklistTemplateSheet>
                           isItemSelfSelected
                               ? Icons.check_box_rounded
                               : Icons.check_box_outline_blank_rounded,
-                          color: isItemSelfSelected ? AppTheme.primary : const Color(0xFFCBD5E1),
+                          color: isItemSelfSelected
+                              ? AppTheme.primary
+                              : const Color(0xFFCBD5E1),
                           size: 18,
                         ),
                         const SizedBox(width: 10),

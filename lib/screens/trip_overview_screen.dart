@@ -52,6 +52,239 @@ class TripOverviewScreen extends StatefulWidget {
 
 class _TripOverviewScreenState extends State<TripOverviewScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  Widget _buildAddPlaceModalItemCard({
+    required BuildContext context,
+    required Map<String, dynamic> place,
+    required String sectionOrDay,
+    required bool isOpen,
+    required DateTime targetDate,
+  }) {
+    final name = (place['name'] ?? place['customTitle'] ?? 'Địa điểm')
+        .toString();
+    final address = StringUtils.cleanAddress(place['address'] ?? '');
+    final image = (place['image'] ?? place['imageUrl'] ?? '').toString();
+    final double rating = (place['rating'] as num?)?.toDouble() ?? 0.0;
+    final int ratingCount =
+        ((place['userRatingCount'] ??
+                    place['user_rating_count'] ??
+                    place['reviewsCount'] ??
+                    0)
+                as num)
+            .toInt();
+    final categoryObj = place['category'];
+    final categoryName =
+        (categoryObj is Map ? categoryObj['name'] : (categoryObj ?? ''))
+            .toString()
+            .trim();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.isDarkMode ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.isDarkMode ? Colors.white10 : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // 1. Thumbnail Image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 64,
+              height: 64,
+              color: const Color(0xFFF1F5F9),
+              child: image.isNotEmpty
+                  ? Image.network(
+                      image,
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                        child: Icon(
+                          Icons.place_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 24,
+                        ),
+                      ),
+                    )
+                  : const Center(
+                      child: Icon(
+                        Icons.place_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 24,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // 2. Information Column
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkText,
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+
+                // Rating + Category Row
+                Row(
+                  children: [
+                    if (rating > 0) ...[
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Color(0xFFF59E0B),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        rating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFD97706),
+                        ),
+                      ),
+                      if (ratingCount > 0) ...[
+                        const SizedBox(width: 3),
+                        Text(
+                          '($ratingCount)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 6),
+                    ],
+                    if (categoryName.isNotEmpty)
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            categoryName,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF475569),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+
+                // Status + Address Row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isOpen
+                            ? const Color(0xFFDCFCE7)
+                            : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isOpen ? 'Đang mở cửa' : 'Đóng cửa',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: isOpen
+                              ? const Color(0xFF15803D)
+                              : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                    if (address.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          address,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // 3. Action Button
+          ElevatedButton.icon(
+            onPressed: () {
+              if (!isOpen) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('$name đã đóng cửa vào ngày này.'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(context);
+              _addPlace(place, sectionOrDay);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEFF6FF),
+              foregroundColor: const Color(0xFF2563EB),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+              side: const BorderSide(color: Color(0xFFBFDBFE)),
+            ),
+            icon: const Icon(Icons.add_rounded, size: 16),
+            label: const Text(
+              'Thêm',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Set<int> _visitedDetailIds = {};
   final Set<String> _deletedSectionNames = {};
 
@@ -318,7 +551,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   bool _isLoadingExplore = false;
   bool _hasFetchedExplore = false;
   String _exploreSearchQuery = '';
-  final TextEditingController _exploreSearchController = TextEditingController();
+  final TextEditingController _exploreSearchController =
+      TextEditingController();
 
   Map<int, List<LatLng>> _dayRoadPolylines = {};
   bool _isLoadingRoadRoutes = false;
@@ -780,6 +1014,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   // Overview Tab section names
   final List<String> _sectionNames = [];
+  final TextEditingController _guideIntroController = TextEditingController();
   final Map<String, TextEditingController> _searchControllers = {};
   final Map<String, List<Map<String, dynamic>>> _searchResults = {};
 
@@ -1670,7 +1905,31 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
 
-    // Allow sectionNames to be empty so newly created guides start with 0 default sections.
+    final rawDesc = (_itineraryData['description'] ?? '').toString().trim();
+    if (rawDesc.isNotEmpty &&
+        rawDesc != 'Riêng tư' &&
+        rawDesc != 'Công khai' &&
+        rawDesc != 'null') {
+      _guideIntroController.text = rawDesc;
+    } else {
+      _guideIntroController.text = '';
+    }
+
+    if (_itineraryData['isGuide'] == true) {
+      const defaultSec = 'Địa điểm tham quan';
+      if (!_deletedSectionNames.contains(defaultSec.toLowerCase()) &&
+          !_sectionNames.contains(defaultSec)) {
+        _sectionNames.insert(0, defaultSec);
+        _searchControllers.putIfAbsent(
+          defaultSec,
+          () => TextEditingController(),
+        );
+        _searchResults.putIfAbsent(defaultSec, () => []);
+        _sectionColors.putIfAbsent(defaultSec, () => _availableColors[0]);
+        _sectionIcons.putIfAbsent(defaultSec, () => Icons.place_rounded);
+        _sectionTypes.putIfAbsent(defaultSec, () => 'LIST');
+      }
+    }
 
     _checkedSections ??= Set.from(_sectionNames);
   }
@@ -1691,7 +1950,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     // Load privacy setting for this itinerary
     final prefs = await SharedPreferences.getInstance();
-    final deletedList = prefs.getStringList('deleted_sections_$itineraryId') ?? [];
+    final deletedList =
+        prefs.getStringList('deleted_sections_$itineraryId') ?? [];
     _deletedSectionNames.addAll(deletedList.map((e) => e.toLowerCase().trim()));
 
     final cachedPrivacy = prefs.getString('privacy_$itineraryId');
@@ -2033,6 +2293,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       _syncPublicPostIfNeeded();
     }
   }
+
+  Timer? _introDebounceTimer;
 
   Future<void> _syncPublicPostIfNeeded() async {
     if (_privacySetting == 'public' && _itineraryData['id'] != null) {
@@ -2680,7 +2942,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             _savedPlaces[idx] = {
               ...tempItem,
               ...updatedItem,
-              'section': updatedItem['section'] ?? tempItem['section'] ?? sectionOrDay,
+              'section':
+                  updatedItem['section'] ?? tempItem['section'] ?? sectionOrDay,
               'place': updatedItem['place'] ?? place,
             };
           }
@@ -2718,7 +2981,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       (d) => d['id'] == detailId,
       orElse: () => {},
     );
-    final dynamic targetPlaceId = targetSavedItem['placeId'] ??
+    final dynamic targetPlaceId =
+        targetSavedItem['placeId'] ??
         targetSavedItem['place']?['id'] ??
         targetDetailItem['placeId'] ??
         targetDetailItem['place']?['id'];
@@ -2736,15 +3000,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     setState(() {
       _savedPlaces.removeWhere((p) {
         final idMatches = p['id'] == detailId;
-        final pIdMatches = targetPlaceId != null &&
-            (p['placeId'] == targetPlaceId || p['place']?['id'] == targetPlaceId);
+        final pIdMatches =
+            targetPlaceId != null &&
+            (p['placeId'] == targetPlaceId ||
+                p['place']?['id'] == targetPlaceId);
         return idMatches || pIdMatches;
       });
 
       _details.removeWhere((d) {
         final idMatches = d['id'] == detailId;
-        final pIdMatches = targetPlaceId != null &&
-            (d['placeId'] == targetPlaceId || d['place']?['id'] == targetPlaceId);
+        final pIdMatches =
+            targetPlaceId != null &&
+            (d['placeId'] == targetPlaceId ||
+                d['place']?['id'] == targetPlaceId);
         return idMatches || pIdMatches;
       });
 
@@ -4561,8 +4829,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       'title': _itineraryData['title'] ?? 'Hướng dẫn của tôi',
       'description': _itineraryData['description'] ?? '',
       'destination': _itineraryData['destination'] ?? '',
-      'coverImage':
-          _itineraryData['coverImage'] ?? null,
+      'coverImage': _itineraryData['coverImage'] ?? null,
       'postType': 'USER_CURATION',
       'sections': sectionsList,
       'items': items,
@@ -4761,15 +5028,26 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           builder: (context, snapshot) {
                             final places = snapshot.data ?? [];
                             final cat32Places = places.where((p) {
-                              final catId = p['categoryId'] ?? p['category']?['id'];
-                              final hasCat32 = catId == 32 || catId == '32' || catId == 32.0;
-                              final hasImg = (p['image'] ?? '').toString().isNotEmpty;
+                              final catId =
+                                  p['categoryId'] ?? p['category']?['id'];
+                              final hasCat32 =
+                                  catId == 32 || catId == '32' || catId == 32.0;
+                              final hasImg = (p['image'] ?? '')
+                                  .toString()
+                                  .isNotEmpty;
                               return hasCat32 && hasImg;
                             }).toList();
                             final photoPlaces = cat32Places.isNotEmpty
                                 ? cat32Places
-                                : places.where((p) => (p['image'] ?? '').toString().isNotEmpty).toList();
-                            if (photoPlaces.isEmpty) return const SizedBox.shrink();
+                                : places
+                                      .where(
+                                        (p) => (p['image'] ?? '')
+                                            .toString()
+                                            .isNotEmpty,
+                                      )
+                                      .toList();
+                            if (photoPlaces.isEmpty)
+                              return const SizedBox.shrink();
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -4788,11 +5066,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   child: ListView.separated(
                                     scrollDirection: Axis.horizontal,
                                     itemCount: photoPlaces.length,
-                                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(width: 8),
                                     itemBuilder: (context, idx) {
                                       final p = photoPlaces[idx];
                                       String img = p['image'] ?? '';
-                                      if (img.startsWith('/')) img = '${ApiClient.baseUrl}$img';
+                                      if (img.startsWith('/'))
+                                        img = '${ApiClient.baseUrl}$img';
                                       final isCur = selectedCoverImage == img;
                                       return GestureDetector(
                                         onTap: () {
@@ -4804,18 +5084,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           width: 64,
                                           height: 64,
                                           decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(10),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
                                             border: Border.all(
-                                              color: isCur ? AppTheme.primary : Colors.transparent,
+                                              color: isCur
+                                                  ? AppTheme.primary
+                                                  : Colors.transparent,
                                               width: 2.5,
                                             ),
                                           ),
                                           child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                             child: Image.network(
                                               img,
                                               fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => Container(color: Colors.grey[200]),
+                                              errorBuilder: (_, __, ___) =>
+                                                  Container(
+                                                    color: Colors.grey[200],
+                                                  ),
                                             ),
                                           ),
                                         ),
@@ -5160,6 +5449,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       ),
                       PolylineLayer(
                         polylines: (() {
+                          // Khi tìm kiếm địa điểm hoặc lọc: ẩn chỉ đường của các địa điểm ở hành trình đi
+                          if ((_activeSearchQuery != null &&
+                                  _activeSearchQuery!.isNotEmpty) ||
+                              _filteredMapPlaces.isNotEmpty) {
+                            return const <Polyline>[];
+                          }
+
                           if (_activeNavStartPlace != null &&
                               _activeNavEndPlace != null) {
                             final List<Polyline> navPolylines = [];
@@ -12082,6 +12378,149 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
+  Widget _buildGuideIntroCard() {
+    bool isSavingIntro = false;
+
+    return StatefulBuilder(
+      builder: (context, setIntroState) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 22),
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF2563EB,
+                          ).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.auto_stories_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Lời giới thiệu cẩm nang',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Mô tả mở đầu & lưu ý hấp dẫn cho bài viết',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _guideIntroController,
+                maxLines: 4,
+                minLines: 3,
+                onChanged: (val) {
+                  _itineraryData['description'] = val;
+                  _introDebounceTimer?.cancel();
+                  _introDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
+                    final newIntro = val.trim();
+                    final rawId = _itineraryData['id'];
+                    final itinId = (rawId is int)
+                        ? rawId
+                        : (rawId != null ? int.tryParse(rawId.toString()) : null);
+                    if (itinId != null) {
+                      await DatabaseService().updateItinerary(itinId, {
+                        'description': newIntro,
+                      });
+                      if (_privacySetting == 'public') {
+                        _syncPublicPostIfNeeded();
+                      }
+                    }
+                  });
+                },
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF1E293B),
+                  height: 1.5,
+                ),
+                decoration: InputDecoration(
+                  hintText:
+                      'Hãy giới thiệu, chia sẻ cảm nhận hoặc những lưu ý hấp dẫn cho cẩm nang du lịch này...',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade400,
+                    height: 1.4,
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.all(14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF2563EB),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildGuideOverviewTab() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -12089,7 +12528,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Danh sách Đề mục Cẩm nang
+          // 1. Mục Giới thiệu mặc định (Text box không thể xóa)
+          _buildGuideIntroCard(),
+
+          // 2. Header: Danh sách Đề mục Cẩm nang
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -12104,7 +12546,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               GestureDetector(
                 onTap: _showAddGuideSectionDialog,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(12),
@@ -12112,7 +12557,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.add_circle_outline_rounded, color: Color(0xFF2563EB), size: 16),
+                      Icon(
+                        Icons.add_circle_outline_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 16,
+                      ),
                       SizedBox(width: 4),
                       Text(
                         'Thêm đề mục',
@@ -12160,10 +12609,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   const SizedBox(height: 4),
                   const Text(
                     'Bấm nút "+ Thêm đề mục" góc trên để tự tạo đề mục mới',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF64748B),
-                    ),
+                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                   ),
                 ],
               ),
@@ -12176,6 +12622,174 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ],
       ),
     );
+  }
+
+  Future<void> _showRenameSectionDialog(String oldSectionName) async {
+    if (!_checkCanEdit()) return;
+
+    final controller = TextEditingController(text: oldSectionName);
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.edit_note_rounded, color: Color(0xFF2563EB), size: 22),
+            SizedBox(width: 8),
+            Text(
+              'Đổi tên đề mục',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Nhập tên mới cho đề mục này:',
+              style: TextStyle(fontSize: 13, color: AppTheme.subtitleText),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                hintText: 'Ví dụ: Địa điểm ăn uống, Cà phê sống ảo...',
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF2563EB),
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final trimmed = controller.text.trim();
+              if (trimmed.isNotEmpty) {
+                Navigator.pop(context, trimmed);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              'Lưu tên mới',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (newName != null && newName.isNotEmpty && newName != oldSectionName) {
+      final index = _sectionNames.indexOf(oldSectionName);
+      if (index != -1) {
+        setState(() {
+          _sectionNames[index] = newName;
+
+          if (_sectionColors.containsKey(oldSectionName)) {
+            _sectionColors[newName] = _sectionColors.remove(oldSectionName)!;
+          }
+          if (_sectionIcons.containsKey(oldSectionName)) {
+            _sectionIcons[newName] = _sectionIcons.remove(oldSectionName)!;
+          }
+          if (_sectionTypes.containsKey(oldSectionName)) {
+            _sectionTypes[newName] = _sectionTypes.remove(oldSectionName)!;
+          }
+          if (_searchControllers.containsKey(oldSectionName)) {
+            _searchControllers[newName] = _searchControllers.remove(
+              oldSectionName,
+            )!;
+          }
+          if (_searchResults.containsKey(oldSectionName)) {
+            _searchResults[newName] = _searchResults.remove(oldSectionName)!;
+          }
+
+          // Update matching details
+          final String oldSecLower = oldSectionName.toLowerCase().trim();
+          for (var item in _details) {
+            final sec =
+                (item['section'] ?? item['section_name'] ?? item['sectionName'])
+                    ?.toString()
+                    .toLowerCase()
+                    .trim() ??
+                '';
+            if (sec == oldSecLower ||
+                (oldSecLower == 'điểm tham quan' && sec.isEmpty)) {
+              item['section'] = newName;
+              item['section_name'] = newName;
+              item['sectionName'] = newName;
+              final detailId = item['id'] as int?;
+              if (detailId != null) {
+                DatabaseService().updateItineraryDetail(detailId, {
+                  'section': newName,
+                });
+              }
+            }
+          }
+
+          // Update matching saved places
+          for (var item in _savedPlaces) {
+            final sec =
+                (item['section'] ?? item['section_name'] ?? item['sectionName'])
+                    ?.toString()
+                    .toLowerCase()
+                    .trim() ??
+                '';
+            if (sec == oldSecLower ||
+                (oldSecLower == 'điểm tham quan' && sec.isEmpty)) {
+              item['section'] = newName;
+              item['section_name'] = newName;
+              item['sectionName'] = newName;
+              final savedId = item['id'] as int?;
+              if (savedId != null) {
+                DatabaseService().updateSavedPlace(savedId, {
+                  'section': newName,
+                });
+              }
+            }
+          }
+        });
+
+        await _syncSectionsToDatabase();
+
+        _showPremiumNotification(
+          title: 'Đã đổi tên đề mục',
+          message: 'Đổi tên thành "$newName" thành công',
+          icon: Icons.check_circle_outline_rounded,
+          color: const Color(0xFF2563EB),
+        );
+      }
+    }
   }
 
   Future<void> _deleteGuideSection(String sectionName) async {
@@ -12202,9 +12816,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('Xóa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Xóa',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -12221,9 +12843,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
       // Find and delete matching details from _details & CSDL
       final List<Map<String, dynamic>> matchingDetails = _details.where((d) {
-        final sec = (d['section'] ?? d['section_name'] ?? d['sectionName'])?.toString().toLowerCase().trim() ?? '';
+        final sec =
+            (d['section'] ?? d['section_name'] ?? d['sectionName'])
+                ?.toString()
+                .toLowerCase()
+                .trim() ??
+            '';
         final dDay = d['day']?.toString();
-        return sec == secNameLower || (secDayStr != null && secDayStr.isNotEmpty && dDay == secDayStr);
+        return sec == secNameLower ||
+            (secDayStr != null && secDayStr.isNotEmpty && dDay == secDayStr);
       }).toList();
 
       for (var item in matchingDetails) {
@@ -12235,7 +12863,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
       // Find and delete matching saved places from _savedPlaces & CSDL
       final List<Map<String, dynamic>> matchingSaved = _savedPlaces.where((sp) {
-        final sec = (sp['section'] ?? sp['section_name'] ?? sp['sectionName'])?.toString().toLowerCase().trim() ?? '';
+        final sec =
+            (sp['section'] ?? sp['section_name'] ?? sp['sectionName'])
+                ?.toString()
+                .toLowerCase()
+                .trim() ??
+            '';
         return sec == secNameLower;
       }).toList();
 
@@ -12259,8 +12892,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       });
 
       try {
-        await DatabaseService().deleteItinerarySection(itineraryId, sectionName);
-        await DatabaseService().deleteSavedPlacesBySection(itineraryId, sectionName);
+        await DatabaseService().deleteItinerarySection(
+          itineraryId,
+          sectionName,
+        );
+        await DatabaseService().deleteSavedPlacesBySection(
+          itineraryId,
+          sectionName,
+        );
         await _syncSectionsToDatabase();
 
         final prefs = await SharedPreferences.getInstance();
@@ -12286,7 +12925,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final pMap = placeItem['place'] is Map
         ? Map<String, dynamic>.from(placeItem['place'] as Map)
         : placeItem;
-    final name = (pMap['name'] ?? placeItem['name'] ?? placeItem['customTitle'] ?? 'Địa điểm').toString();
+    final name =
+        (pMap['name'] ??
+                placeItem['name'] ??
+                placeItem['customTitle'] ??
+                'Địa điểm')
+            .toString();
     final detailId = (placeItem['id'] as num?)?.toInt();
 
     final confirm = await showDialog<bool>(
@@ -12310,9 +12954,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('Xóa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Xóa',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -12328,12 +12980,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final Set<dynamic> seenIds = {};
 
     bool isPlaceMatchingSection(Map<String, dynamic> item, String targetSec) {
-      final String sec = (item['section'] ??
-              item['section_name'] ??
-              item['sectionName'] ??
-              '')
-          .toString()
-          .trim();
+      final String sec =
+          (item['section'] ?? item['section_name'] ?? item['sectionName'] ?? '')
+              .toString()
+              .trim();
       final int? day = item['day'] is num
           ? (item['day'] as num).toInt()
           : int.tryParse(item['day']?.toString() ?? '');
@@ -12348,15 +12998,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
       // 2. Day-based match: if section name is "Ngày 1", "Ngày 2" and day number matches
       if (targetLower.startsWith('ngày')) {
-        final dayNum = int.tryParse(targetLower.replaceAll(RegExp(r'[^0-9]'), ''));
+        final dayNum = int.tryParse(
+          targetLower.replaceAll(RegExp(r'[^0-9]'), ''),
+        );
         if (dayNum != null && (day == dayNum || secLower == targetLower)) {
           return true;
         }
       }
 
       // 3. Fallback for "Điểm tham quan": match items with no specific section or section == "Điểm tham quan"
-      if (targetLower == 'điểm tham quan') {
-        if (secLower.isEmpty || secLower == 'điểm tham quan') {
+      if (targetLower == 'điểm tham quan' ||
+          targetLower == 'địa điểm tham quan') {
+        if (secLower.isEmpty ||
+            secLower == 'điểm tham quan' ||
+            secLower == 'địa điểm tham quan') {
           return true;
         }
       }
@@ -12384,29 +13039,30 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
 
-    final sectionIcon = _sectionIcons[sectionName] ??
+    final sectionIcon =
+        _sectionIcons[sectionName] ??
         (sectionName == 'Mẹo chung'
             ? Icons.lightbulb_outline_rounded
             : (sectionName.startsWith('Ngày')
-                ? Icons.calendar_today_rounded
-                : Icons.place_rounded));
+                  ? Icons.calendar_today_rounded
+                  : Icons.place_rounded));
 
     final sectionColor = _sectionColors[sectionName] ?? AppTheme.primary;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.isDarkMode ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppTheme.isDarkMode ? Colors.white10 : Colors.grey.shade200,
+          color: AppTheme.isDarkMode ? Colors.white10 : const Color(0xFFE2E8F0),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -12416,28 +13072,63 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           // Section Header Row
           Row(
             children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: sectionColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(sectionIcon, size: 17, color: sectionColor),
+              ),
+              const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  sectionName,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.darkText,
+                child: GestureDetector(
+                  onTap: () => _showRenameSectionDialog(sectionName),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          sectionName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.darkText,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.drive_file_rename_outline_rounded,
+                          size: 13,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '${sectionPlaces.length} địa điểm',
-                  style: TextStyle(
-                    fontSize: 11,
+                  style: const TextStyle(
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.subtitleText,
+                    color: Color(0xFF475569),
                   ),
                 ),
               ),
@@ -12447,54 +13138,73 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: const Color(0xFFFEF2F2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
                     Icons.delete_outline_rounded,
-                    color: Colors.redAccent,
+                    color: Color(0xFFEF4444),
                     size: 16,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           // List of places in this section
           if (sectionPlaces.isEmpty)
-            GestureDetector(
-              onTap: () => _showAddPlaceBottomSheet(sectionName),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppTheme.isDarkMode ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppTheme.isDarkMode ? Colors.white10 : const Color(0xFFE2E8F0),
-                    style: BorderStyle.solid,
-                  ),
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: const Color(0xFFE2E8F0),
+                  style: BorderStyle.solid,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.add_location_rounded, size: 15, color: sectionColor),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'Chưa có địa điểm trong $sectionName. Bấm để thêm!',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: sectionColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: sectionColor.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
                     ),
-                  ],
-                ),
+                    child: Icon(
+                      Icons.add_location_alt_outlined,
+                      size: 16,
+                      color: sectionColor,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Chưa có địa điểm trong $sectionName',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF1E293B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Bấm nút bên dưới để chọn và thêm địa điểm hấp dẫn',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             )
           else
@@ -12502,7 +13212,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: sectionPlaces.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final placeItem = sectionPlaces[index];
                 return _buildGuidePlaceHighlightCard(placeItem, index + 1);
@@ -12513,24 +13223,29 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           // Button "+ Thêm địa điểm vào [sectionName]"
           InkWell(
             onTap: () => _showAddPlaceBottomSheet(sectionName),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
                 color: sectionColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: sectionColor.withValues(alpha: 0.2)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_rounded, color: sectionColor, size: 16),
-                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.add_circle_outline_rounded,
+                    color: sectionColor,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
                   Text(
                     'Thêm địa điểm vào $sectionName',
                     style: TextStyle(
                       color: sectionColor,
-                      fontSize: 12.5,
+                      fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -12564,10 +13279,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           const SizedBox(height: 6),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 10,
-              color: AppTheme.subtitleText,
-            ),
+            style: TextStyle(fontSize: 10, color: AppTheme.subtitleText),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
@@ -12588,17 +13300,38 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   String _getEffectivePlaceNote(Map<String, dynamic> detail) {
-    final String directNote = (detail['noteText'] ?? detail['note'] ?? detail['notes'] ?? '').toString().trim();
+    final String directNote =
+        (detail['noteText'] ?? detail['note'] ?? detail['notes'] ?? '')
+            .toString()
+            .trim();
     if (directNote.isNotEmpty) return directNote;
 
     final pId = detail['placeId'] ?? detail['place']?['id'];
-    final pName = (detail['place']?['name'] ?? detail['name'] ?? detail['customTitle'] ?? '').toString().trim().toLowerCase();
+    final pName =
+        (detail['place']?['name'] ??
+                detail['name'] ??
+                detail['customTitle'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase();
 
     for (var other in [..._savedPlaces, ..._details]) {
       final otherId = other['placeId'] ?? other['place']?['id'];
-      final otherName = (other['place']?['name'] ?? other['name'] ?? other['customTitle'] ?? '').toString().trim().toLowerCase();
-      if ((pId != null && otherId == pId) || (pName.isNotEmpty && otherName == pName)) {
-        final otherNote = (other['noteText'] ?? other['note'] ?? other['notes'] ?? '').toString().trim();
+      final otherName =
+          (other['place']?['name'] ??
+                  other['name'] ??
+                  other['customTitle'] ??
+                  '')
+              .toString()
+              .trim()
+              .toLowerCase();
+      if ((pId != null && otherId == pId) ||
+          (pName.isNotEmpty && otherName == pName)) {
+        final otherNote =
+            (other['noteText'] ?? other['note'] ?? other['notes'] ?? '')
+                .toString()
+                .trim();
         if (otherNote.isNotEmpty) {
           detail['noteText'] = otherNote;
           detail['note'] = otherNote;
@@ -12610,22 +13343,33 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     return '';
   }
 
-  Widget _buildGuidePlaceHighlightCard(Map<String, dynamic> placeItem, int index) {
+  Widget _buildGuidePlaceHighlightCard(
+    Map<String, dynamic> placeItem,
+    int index,
+  ) {
     final pMap = placeItem['place'] is Map
         ? Map<String, dynamic>.from(placeItem['place'] as Map)
         : placeItem;
 
-    final name = (pMap['name'] ?? placeItem['name'] ?? placeItem['customTitle'] ?? 'Địa điểm').toString();
+    final name =
+        (pMap['name'] ??
+                placeItem['name'] ??
+                placeItem['customTitle'] ??
+                'Địa điểm')
+            .toString();
     final categoryObj = pMap['category'] ?? placeItem['category'];
-    final category = (categoryObj is Map
-            ? (categoryObj['name'] ?? '')
-            : (categoryObj ?? 'Địa điểm du lịch'))
-        .toString();
+    final category =
+        (categoryObj is Map
+                ? (categoryObj['name'] ?? '')
+                : (categoryObj ?? 'Địa điểm du lịch'))
+            .toString();
 
-    final image = (pMap['image'] ??
-            pMap['imageUrl'] ??
-            placeItem['image'] ??
-            placeItem['imageUrl']) as String?;
+    final image =
+        (pMap['image'] ??
+                pMap['imageUrl'] ??
+                placeItem['image'] ??
+                placeItem['imageUrl'])
+            as String?;
 
     final note = _getEffectivePlaceNote(placeItem);
 
@@ -12668,7 +13412,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEFF6FF),
                             borderRadius: BorderRadius.circular(6),
@@ -12715,7 +13462,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   GestureDetector(
                     onTap: () => _showEditPlaceNoteDialog(placeItem),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(10),
@@ -12724,7 +13474,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.edit_note_rounded, color: Color(0xFF059669), size: 15),
+                          const Icon(
+                            Icons.edit_note_rounded,
+                            color: Color(0xFF059669),
+                            size: 15,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             note.isNotEmpty ? 'Sửa bài' : 'Viết mẹo',
@@ -12798,12 +13552,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.create_new_folder_rounded, color: Color(0xFF2563EB)),
+            const Icon(
+              Icons.create_new_folder_rounded,
+              color: Color(0xFF2563EB),
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Thêm đề mục cẩm nang mới',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -12813,7 +13573,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
-            hintText: 'Nhập tên đề mục (ví dụ: Kinh nghiệm ăn uống, Khách sạn gợi ý, Ngày 2...)',
+            hintText:
+                'Nhập tên đề mục (ví dụ: Kinh nghiệm ăn uống, Khách sạn gợi ý, Ngày 2...)',
             border: OutlineInputBorder(),
           ),
         ),
@@ -12830,7 +13591,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   _sectionNames.add(newName);
                   _searchControllers[newName] = TextEditingController();
                   _searchResults[newName] = [];
-                  _sectionColors[newName] = _availableColors[_sectionNames.length % _availableColors.length];
+                  _sectionColors[newName] =
+                      _availableColors[_sectionNames.length %
+                          _availableColors.length];
                   _sectionIcons[newName] = Icons.folder_special_rounded;
                   _sectionTypes[newName] = 'LIST';
                 });
@@ -12847,7 +13610,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   void _showEditGuideIntroDialog() {
     final controller = TextEditingController(
-      text: _itineraryData['description'] as String? ?? _itineraryData['notes'] as String? ?? '',
+      text:
+          _itineraryData['description'] as String? ??
+          _itineraryData['notes'] as String? ??
+          '',
     );
     showDialog(
       context: context,
@@ -12860,7 +13626,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             Expanded(
               child: Text(
                 'Viết Giới thiệu Cẩm nang',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -12871,7 +13640,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           controller: controller,
           maxLines: 5,
           decoration: const InputDecoration(
-            hintText: 'Nhập chia sẻ, kinh nghiệm tổng quan về chuyến đi, lời khuyên di chuyển...',
+            hintText:
+                'Nhập chia sẻ, kinh nghiệm tổng quan về chuyến đi, lời khuyên di chuyển...',
             border: OutlineInputBorder(),
           ),
         ),
@@ -12887,7 +13657,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               final itineraryId = _itineraryData['id'];
               if (itineraryId != null) {
                 try {
-                  await ApiClient.put('/itineraries/$itineraryId', body: {'description': newText});
+                  await ApiClient.put(
+                    '/itineraries/$itineraryId',
+                    body: {'description': newText},
+                  );
                   setState(() {
                     _itineraryData['description'] = newText;
                   });
@@ -12904,19 +13677,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   void _showEditPlaceNoteDialog(Map<String, dynamic> place) {
-    final noteText = (place['note'] ?? place['noteText'] ?? place['notes'] ?? '').toString();
+    final noteText =
+        (place['note'] ?? place['noteText'] ?? place['notes'] ?? '').toString();
     final controller = TextEditingController(text: noteText);
     final placeName = place['name'] ?? place['customTitle'] ?? 'Địa điểm';
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Viết kinh nghiệm cho $placeName', style: const TextStyle(fontSize: 16)),
+        title: Text(
+          'Viết kinh nghiệm cho $placeName',
+          style: const TextStyle(fontSize: 16),
+        ),
         content: TextField(
           controller: controller,
           maxLines: 4,
           decoration: const InputDecoration(
-            hintText: 'Nhập mẹo tham quan (ví dụ: Nên đi buổi sáng, góc chụp ảnh đẹp, lưu ý trang phục...)',
+            hintText:
+                'Nhập mẹo tham quan (ví dụ: Nên đi buổi sáng, góc chụp ảnh đẹp, lưu ý trang phục...)',
             border: OutlineInputBorder(),
           ),
         ),
@@ -12938,13 +13716,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  Future<void> _updateDetailNote(Map<String, dynamic> detail, String newNote) async {
+  Future<void> _updateDetailNote(
+    Map<String, dynamic> detail,
+    String newNote,
+  ) async {
     final detailId = detail['id'] as int?;
     final targetPlaceId = detail['placeId'] ?? detail['place']?['id'];
-    final targetPlaceName = (detail['place']?['name'] ?? detail['name'] ?? detail['customTitle'] ?? '').toString().trim().toLowerCase();
+    final targetPlaceName =
+        (detail['place']?['name'] ??
+                detail['name'] ??
+                detail['customTitle'] ??
+                '')
+            .toString()
+            .trim()
+            .toLowerCase();
 
     try {
-      final bool isSavedPlace = _savedPlaces.any((sp) => sp['id'] == detailId) ||
+      final bool isSavedPlace =
+          _savedPlaces.any((sp) => sp['id'] == detailId) ||
           (detail['section'] != null && detail['day'] == null);
 
       if (detailId != null) {
@@ -12964,7 +13753,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       // Sync across all other matching places in _savedPlaces and _details DB tables
       for (var sp in _savedPlaces) {
         final spPlaceId = sp['placeId'] ?? sp['place']?['id'];
-        final spName = (sp['place']?['name'] ?? sp['name'] ?? sp['customTitle'] ?? '').toString().trim().toLowerCase();
+        final spName =
+            (sp['place']?['name'] ?? sp['name'] ?? sp['customTitle'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase();
         final spId = sp['id'] as int?;
         if (spId != null && spId != detailId) {
           if ((targetPlaceId != null && spPlaceId == targetPlaceId) ||
@@ -12979,7 +13772,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
       for (var d in _details) {
         final dPlaceId = d['placeId'] ?? d['place']?['id'];
-        final dName = (d['place']?['name'] ?? d['name'] ?? d['customTitle'] ?? '').toString().trim().toLowerCase();
+        final dName =
+            (d['place']?['name'] ?? d['name'] ?? d['customTitle'] ?? '')
+                .toString()
+                .trim()
+                .toLowerCase();
         final dId = d['id'] as int?;
         if (dId != null && dId != detailId) {
           if ((targetPlaceId != null && dPlaceId == targetPlaceId) ||
@@ -13000,7 +13797,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
         for (var sp in _savedPlaces) {
           final spPlaceId = sp['placeId'] ?? sp['place']?['id'];
-          final spName = (sp['place']?['name'] ?? sp['name'] ?? sp['customTitle'] ?? '').toString().trim().toLowerCase();
+          final spName =
+              (sp['place']?['name'] ?? sp['name'] ?? sp['customTitle'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
           if ((targetPlaceId != null && spPlaceId == targetPlaceId) ||
               (targetPlaceName.isNotEmpty && spName == targetPlaceName)) {
             sp['note'] = newNote;
@@ -13011,7 +13812,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
         for (var d in _details) {
           final dPlaceId = d['placeId'] ?? d['place']?['id'];
-          final dName = (d['place']?['name'] ?? d['name'] ?? d['customTitle'] ?? '').toString().trim().toLowerCase();
+          final dName =
+              (d['place']?['name'] ?? d['name'] ?? d['customTitle'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
           if ((targetPlaceId != null && dPlaceId == targetPlaceId) ||
               (targetPlaceName.isNotEmpty && dName == targetPlaceName)) {
             d['note'] = newNote;
@@ -13035,35 +13840,41 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   Future<void> _copyGuideToMyItinerary() async {
     final currentId = _itineraryData['id'];
     if (currentId == null) return;
-    final itineraryIdInt = currentId is int ? currentId : int.parse(currentId.toString());
+    final itineraryIdInt = currentId is int
+        ? currentId
+        : int.parse(currentId.toString());
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đang khởi tạo lịch trình cá nhân từ cẩm nang...')),
+      const SnackBar(
+        content: Text('Đang khởi tạo lịch trình cá nhân từ cẩm nang...'),
+      ),
     );
 
     try {
-      final newItinerary = await DatabaseService().duplicateItinerary(itineraryIdInt);
+      final newItinerary = await DatabaseService().duplicateItinerary(
+        itineraryIdInt,
+      );
 
       if (newItinerary != null && newItinerary['id'] != null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Đã tạo lịch trình cá nhân thành công!')),
+            const SnackBar(
+              content: Text('Đã tạo lịch trình cá nhân thành công!'),
+            ),
           );
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => TripOverviewScreen(
-                itinerary: newItinerary,
-              ),
+              builder: (_) => TripOverviewScreen(itinerary: newItinerary),
             ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể tạo lịch trình: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Không thể tạo lịch trình: $e')));
       }
     }
   }
@@ -16818,7 +17629,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   // 📝 Ghi chú
                                   Builder(
                                     builder: (context) {
-                                      final hasNote = _getEffectivePlaceNote(detail).isNotEmpty;
+                                      final hasNote = _getEffectivePlaceNote(
+                                        detail,
+                                      ).isNotEmpty;
                                       return _buildCardActionIcon(
                                         icon: hasNote
                                             ? Icons.description_rounded
@@ -16940,10 +17753,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => PlaceAIChatScreen(
-                                            placeName: placeName,
-                                            placeInfo: place,
-                                          ),
+                                          builder: (context) =>
+                                              PlaceAIChatScreen(
+                                                placeName: placeName,
+                                                placeInfo: place,
+                                              ),
                                         ),
                                       );
                                     },
@@ -17684,8 +18498,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       if (_exploreSearchQuery.isEmpty) return true;
       final q = _exploreSearchQuery.toLowerCase();
       final title = (post['title'] ?? '').toString().toLowerCase();
-      final desc = (post['description'] ?? post['content'] ?? '').toString().toLowerCase();
-      final authorName = (post['user']?['name'] ?? post['author']?['name'] ?? '').toString().toLowerCase();
+      final desc = (post['description'] ?? post['content'] ?? '')
+          .toString()
+          .toLowerCase();
+      final authorName =
+          (post['user']?['name'] ?? post['author']?['name'] ?? '')
+              .toString()
+              .toLowerCase();
 
       bool matchesPlace = false;
       if (post['items'] is List) {
@@ -17698,7 +18517,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         }
       }
 
-      return title.contains(q) || desc.contains(q) || authorName.contains(q) || matchesPlace;
+      return title.contains(q) ||
+          desc.contains(q) ||
+          authorName.contains(q) ||
+          matchesPlace;
     }).toList();
 
     return CustomScrollView(
@@ -17807,7 +18629,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             errorBorder: InputBorder.none,
                             disabledBorder: InputBorder.none,
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 10,
+                            ),
                           ),
                           style: TextStyle(
                             color: AppTheme.darkText,
@@ -17868,7 +18692,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      _exploreSearchQuery.isNotEmpty ? Icons.search_off_rounded : Icons.explore_off_rounded,
+                      _exploreSearchQuery.isNotEmpty
+                          ? Icons.search_off_rounded
+                          : Icons.explore_off_rounded,
                       size: 40,
                       color: AppTheme.primary.withAlpha(180),
                     ),
