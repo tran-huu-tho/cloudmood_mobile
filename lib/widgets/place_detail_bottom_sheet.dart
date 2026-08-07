@@ -78,18 +78,68 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
   List<Map<String, dynamic>> _reviews = [];
   bool _isLoadingReviews = true;
   late int _localSavedCount;
+  Map<String, dynamic> _fullPlace = {};
+
+  Map<String, dynamic> get currentPlace =>
+      _fullPlace.isNotEmpty ? _fullPlace : widget.place;
 
   @override
   void initState() {
     super.initState();
     _localSavedCount = widget.savedCount;
     _tabController = TabController(length: 3, vsync: this);
-    _loadReviews();
-    _refreshSavedCount();
+    _fetchFullPlaceData();
+  }
+
+  Future<void> _fetchFullPlaceData() async {
+    final rawId = currentPlace['id'];
+    final placeName = currentPlace['name']?.toString() ?? '';
+
+    if (rawId != null &&
+        currentPlace['description'] != null &&
+        currentPlace['description'].toString().isNotEmpty &&
+        currentPlace['rating'] != null) {
+      _loadReviews();
+      _refreshSavedCount();
+      return;
+    }
+
+    if (placeName.isNotEmpty) {
+      try {
+        final results = await DatabaseService().searchPlaces(
+          destination: currentPlace['address'] ?? placeName,
+          query: placeName,
+        );
+
+        if (results.isNotEmpty) {
+          final matched = results.firstWhere(
+            (p) {
+              final n1 = p['name'].toString().toLowerCase();
+              final n2 = placeName.toLowerCase();
+              return n1.contains(n2) || n2.contains(n1);
+            },
+            orElse: () => results.first,
+          );
+
+          if (mounted) {
+            setState(() {
+              _fullPlace = matched;
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching full place data: $e');
+      }
+    }
+
+    if (mounted) {
+      _loadReviews();
+      _refreshSavedCount();
+    }
   }
 
   Future<void> _loadReviews() async {
-    final rawId = widget.place['id'];
+    final rawId = currentPlace['id'];
     if (rawId != null) {
       final placeId = int.tryParse(rawId.toString());
       if (placeId != null) {
@@ -117,7 +167,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
       );
       if (mounted) {
         int tripsCount = 0;
-        final targetId = widget.place['id'];
+        final targetId = currentPlace['id'];
 
         for (var trip in trips) {
           bool foundInTrip = false;
@@ -171,8 +221,8 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
 
     if (widget.overrideColor == null &&
         widget.overrideIcon == null &&
-        widget.place['category'] != null) {
-      final cat = widget.place['category'];
+        currentPlace['category'] != null) {
+      final cat = currentPlace['category'];
       if (cat['iconCode'] != null) {
         categoryIcon = IconData(cat['iconCode'], fontFamily: 'MaterialIcons');
       }
@@ -259,7 +309,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    widget.place['name'] ?? '',
+                    currentPlace['name'] ?? '',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                       fontSize: 22,
@@ -328,57 +378,57 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
 
   Widget _buildIntroTab() {
     final String description =
-        widget.place['description'] ?? widget.place['editorialSummary'] ?? '';
-    final double rating = (widget.place['rating'] as num?)?.toDouble() ?? 0.0;
+        currentPlace['description'] ?? currentPlace['editorialSummary'] ?? '';
+    final double rating = (currentPlace['rating'] as num?)?.toDouble() ?? 0.0;
     final int userRatingCount =
-        (widget.place['userRatingCount'] as num?)?.toInt() ?? 0;
+        (currentPlace['userRatingCount'] as num?)?.toInt() ?? 0;
     final String address = StringUtils.cleanAddress(
-      widget.place['address'] ?? '',
+      currentPlace['address'] ?? '',
     );
 
     final String? phone =
-        widget.place['phone'] ??
-        widget.place['phoneNumber'] ??
-        widget.place['internationalPhoneNumber'] ??
-        widget.place['nationalPhoneNumber'] ??
-        widget.place['contactPhone'];
+        currentPlace['phone'] ??
+        currentPlace['phoneNumber'] ??
+        currentPlace['internationalPhoneNumber'] ??
+        currentPlace['nationalPhoneNumber'] ??
+        currentPlace['contactPhone'];
     final String? website =
-        widget.place['website'] ??
-        widget.place['websiteUri'] ??
-        widget.place['webUrl'] ??
-        widget.place['websiteUrl'];
-    final String? price = widget.place['price'];
-    final String? priceLevel = widget.place['priceLevel'];
+        currentPlace['website'] ??
+        currentPlace['websiteUri'] ??
+        currentPlace['webUrl'] ??
+        currentPlace['websiteUrl'];
+    final String? price = currentPlace['price'];
+    final String? priceLevel = currentPlace['priceLevel'];
 
     String? openingHours;
     final hoursRaw =
-        widget.place['regularOpeningHours'] ?? widget.place['openingHours'];
+        currentPlace['regularOpeningHours'] ?? currentPlace['openingHours'];
     if (hoursRaw != null) {
       openingHours = TimeUtils.getOpeningHoursText(hoursRaw);
     }
 
-    final cat = widget.place['category'];
+    final cat = currentPlace['category'];
     final String? mainCategory = cat != null && cat['name'] != null
         ? cat['name'].toString()
         : null;
 
     final List<String> amenities = [];
     final rawSub =
-        widget.place['subCategories'] ??
-        widget.place['subcategories'] ??
-        widget.place['sub_categories'];
+        currentPlace['subCategories'] ??
+        currentPlace['subcategories'] ??
+        currentPlace['sub_categories'];
     if (rawSub is List) {
       amenities.addAll(rawSub.map((e) => e.toString()));
     }
 
     String? imageUrl;
-    if (widget.place['image'] != null &&
-        widget.place['image'].toString().isNotEmpty) {
-      imageUrl = widget.place['image'];
-    } else if (widget.place['photos'] != null &&
-        widget.place['photos'] is List &&
-        widget.place['photos'].isNotEmpty) {
-      final p = widget.place['photos'][0];
+    if (currentPlace['image'] != null &&
+        currentPlace['image'].toString().isNotEmpty) {
+      imageUrl = currentPlace['image'];
+    } else if (currentPlace['photos'] != null &&
+        currentPlace['photos'] is List &&
+        currentPlace['photos'].isNotEmpty) {
+      final p = currentPlace['photos'][0];
       if (p is Map) {
         imageUrl = p['urlOriginal'] ?? p['urlThumbnail'] ?? p['url'];
       } else {
@@ -469,7 +519,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                         // User can be saving to different trips, no longer strictly bounded to currentItinerary
                         await SaveToTripBottomSheet.show(
                           context,
-                          widget.place,
+                          currentPlace,
                           onSaved: widget.onTripUpdated ?? () {},
                           initialItinerary: widget.currentItinerary,
                         );
@@ -484,7 +534,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       onTap: () async {
                         await SaveToTripBottomSheet.show(
                           context,
-                          widget.place,
+                          currentPlace,
                           onSaved: widget.onTripUpdated ?? () {},
                           initialItinerary: widget.currentItinerary,
                         );
@@ -502,8 +552,8 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     context,
                     MaterialPageRoute(
                       builder: (context) => PlaceAIChatScreen(
-                        placeName: widget.place['name'] ?? 'Địa điểm',
-                        placeInfo: widget.place,
+                        placeName: currentPlace['name'] ?? 'Địa điểm',
+                        placeInfo: currentPlace,
                       ),
                     ),
                   );
@@ -602,7 +652,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       child: GestureDetector(
                         onTap: () async {
                           final url = Uri.parse(
-                            'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.place['name'] ?? address)}',
+                            'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(currentPlace['name'] ?? address)}',
                           );
                           await _launchURL(url);
                         },
@@ -744,12 +794,12 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
               ],
             ),
           ),
-          if (widget.place['openingHours'] != null ||
-              widget.place['regularOpeningHours'] != null) ...[
+          if (currentPlace['openingHours'] != null ||
+              currentPlace['regularOpeningHours'] != null) ...[
             const SizedBox(height: 12),
             _buildFullOpeningHours(
-              widget.place['regularOpeningHours'] ??
-                  widget.place['openingHours'],
+              currentPlace['regularOpeningHours'] ??
+                  currentPlace['openingHours'],
             ),
           ],
           const SizedBox(height: 24),
@@ -768,7 +818,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 'Google Maps',
                 () async {
                   final String query =
-                      (widget.place['name'] ?? '') +
+                      (currentPlace['name'] ?? '') +
                       (address.isNotEmpty ? ' ' + address : '');
                   final url = Uri.parse(
                     'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}',
@@ -780,12 +830,12 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                 'assets/images/tripadvisor.jpg',
                 'Tripadvisor',
                 () async {
-                  final String? urlString = widget.place['tripadvisorUrl'];
+                  final String? urlString = currentPlace['tripadvisorUrl'];
                   final String suffix =
                       address.toLowerCase().contains('cần thơ')
                       ? ' Cần Thơ'
                       : '';
-                  final String query = (widget.place['name'] ?? '') + suffix;
+                  final String query = (currentPlace['name'] ?? '') + suffix;
                   final url = Uri.parse(
                     (urlString != null && urlString.isNotEmpty)
                         ? urlString
@@ -803,7 +853,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       ? ' Cần Thơ'
                       : '';
                   final String query =
-                      (widget.place['name'] ?? '') + suffix + ' wikipedia';
+                      (currentPlace['name'] ?? '') + suffix + ' wikipedia';
                   final url = Uri.parse(
                     'https://www.google.com/search?q=${Uri.encodeComponent(query)}',
                   );
@@ -879,8 +929,8 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
       }
       rating = totalRatingSum / userRatingCount;
     } else {
-      final double? dbRating = (widget.place['rating'] as num?)?.toDouble();
-      final int? dbCount = (widget.place['userRatingCount'] as num?)?.toInt();
+      final double? dbRating = (currentPlace['rating'] as num?)?.toDouble();
+      final int? dbCount = (currentPlace['userRatingCount'] as num?)?.toInt();
 
       if (dbRating != null && dbRating > 0 && dbCount != null && dbCount > 0) {
         rating = dbRating;
@@ -1094,14 +1144,14 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                   ),
                 ),
               ),
-              if (widget.place['tripadvisorUrl'] != null &&
-                  widget.place['tripadvisorUrl'].toString().isNotEmpty) ...[
+              if (currentPlace['tripadvisorUrl'] != null &&
+                  currentPlace['tripadvisorUrl'].toString().isNotEmpty) ...[
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final String? urlString = widget.place['tripadvisorUrl'];
+                      final String? urlString = currentPlace['tripadvisorUrl'];
                       if (urlString != null && urlString.isNotEmpty) {
                         final url = Uri.parse(urlString);
                         if (await canLaunchUrl(url)) await launchUrl(url);
@@ -1234,7 +1284,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Đánh giá địa điểm: ${widget.place['name'] ?? ''}',
+                    'Đánh giá địa điểm: ${currentPlace['name'] ?? ''}',
                     style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
@@ -1330,7 +1380,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                         Navigator.pop(context);
 
                         final placeId = int.tryParse(
-                          widget.place['id'].toString(),
+                          currentPlace['id'].toString(),
                         );
                         if (placeId != null) {
                           final ok = await DatabaseService().addPlaceReview(
@@ -1395,8 +1445,8 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
 
   Widget _buildPhotosTab() {
     List<dynamic> photos = [];
-    if (widget.place['photos'] != null && widget.place['photos'] is List) {
-      photos = List.from(widget.place['photos']);
+    if (currentPlace['photos'] != null && currentPlace['photos'] is List) {
+      photos = List.from(currentPlace['photos']);
     }
 
     if (photos.isEmpty) return const Center(child: Text('Chưa có ảnh nào'));

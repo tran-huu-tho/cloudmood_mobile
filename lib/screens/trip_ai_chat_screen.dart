@@ -7,6 +7,11 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
 import '../services/ai_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/database_service.dart';
+import '../services/api_client.dart';
+import '../widgets/place_detail_bottom_sheet.dart';
+import '../widgets/save_to_trip_bottom_sheet.dart';
 
 class TripAIChatScreen extends StatefulWidget {
   final String destination;
@@ -71,7 +76,14 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
     );
     if (mounted) {
       setState(() {
-        _suggestions = suggestions;
+      _suggestions = suggestions.isNotEmpty ? suggestions : [
+        'Top địa điểm ẩm thực & đặc sản trứ danh tại ${widget.destination}?',
+        'Quán cà phê view đẹp, góc sống ảo cực chất tại ${widget.destination}?',
+        'Danh sách địa điểm tham quan & thắng cảnh nổi bật nhất?',
+        'Địa điểm vui chơi, dạo đêm và trải nghiệm về đêm?',
+        'Địa điểm mua sắm đặc sản và quà địa phương uy tín?',
+        'Gợi ý khách sạn & homestay có view đẹp và tiện nghi?',
+      ];
         _suggestionsLoading = false;
       });
     }
@@ -375,9 +387,411 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
     }
   }
 
-  // ============================================
-  // Helper Widget Methods (Markdown, Streaming, Actions)
-  // ============================================
+  int _selectedMapPlaceIndex = 0;
+  final MapController _mapController = MapController();
+
+  void _focusMapCamera() {
+    final chatPlaces = _getAllChatPlaces();
+    LatLng targetCenter = _mapCenter ?? const LatLng(10.033, 105.787);
+    double targetZoom = 14.5;
+
+    if (chatPlaces.isNotEmpty) {
+      final safeIndex = _selectedMapPlaceIndex < chatPlaces.length ? _selectedMapPlaceIndex : 0;
+      final cp = chatPlaces[safeIndex];
+      if (cp['latitude'] != null && cp['longitude'] != null) {
+        targetCenter = LatLng((cp['latitude'] as num).toDouble(), (cp['longitude'] as num).toDouble());
+        targetZoom = 15.5;
+      }
+    } else if (_mapCenter != null) {
+      targetCenter = _mapCenter!;
+      targetZoom = 13.5;
+    }
+
+    try {
+      _mapController.move(targetCenter, targetZoom);
+    } catch (_) {}
+  }
+  bool _isChatHidden = false;
+
+  List<Map<String, dynamic>> _getAllChatPlaces() {
+    final places = <Map<String, dynamic>>[];
+    final seen = <String>{};
+
+    for (final msg in _messages) {
+      if (msg.role == 'AI') {
+        final lines = msg.content.split('\n');
+        for (final line in lines) {
+          final item = _tryExtractPlaceItem(line);
+          if (item != null) {
+            final name = item['name']!;
+            if (!seen.contains(name)) {
+              seen.add(name);
+              final dbPlace = _placeDbCache[name];
+              places.add(dbPlace ?? {
+                'name': name,
+                'description': item['desc'],
+                'image': _getPlaceImage(name),
+                'rating': 4.5,
+              });
+            }
+          }
+        }
+      }
+    }
+    return places;
+  }
+
+  final Map<String, Map<String, dynamic>> _placeDbCache = {};
+  final Set<String> _loadingPlaceNames = {};
+
+  void _fetchPlaceFromDb(String placeName) {
+    if (_placeDbCache.containsKey(placeName) || _loadingPlaceNames.contains(placeName)) return;
+
+    _loadingPlaceNames.add(placeName);
+    DatabaseService().searchPlaces(
+      destination: '',
+      query: placeName,
+    ).then((results) {
+      if (results.isNotEmpty) {
+        final matched = results.firstWhere(
+          (p) {
+            final n1 = p['name'].toString().toLowerCase();
+            final n2 = placeName.toLowerCase();
+            return n1.contains(n2) || n2.contains(n1);
+          },
+          orElse: () => results.first,
+        );
+        if (mounted) {
+          setState(() {
+            _placeDbCache[placeName] = matched;
+          });
+        }
+      }
+    }).catchError((e) {
+      debugPrint('Error fetching DB place: $e');
+    }).whenComplete(() {
+      _loadingPlaceNames.remove(placeName);
+    });
+  }
+
+  bool _isPlaceName(String text) {
+    final clean = text.trim();
+    if (clean.length < 2 || clean.length > 55) return false;
+
+    final lower = clean.toLowerCase();
+
+    const nonPlaceKeywords = [
+      'thư giãn', 'đón hoàng hôn', 'thưởng thức', 'ngắm', 'chụp ảnh', 'check-in',
+      'tận hưởng', 'trải nghiệm', 'dạo bộ', 'hóng gió', 'mua sắm', 'ăn sáng',
+      'ăn trưa', 'ăn tối', 'uống trà', 'đi dạo', 'tham quan', 'khám phá',
+      'tìm hiểu', 'theo thông tin chung', 'lưu ý', 'tổng quan', 'gợi ý',
+      'lịch trình', 'ghi chú', 'mẹo', 'đánh giá', 'giá vé', 'giờ mở cửa',
+      'địa chỉ', 'hướng dẫn', 'kinh nghiệm', 'tóm tắt', 'kết luận',
+      'lưu ý quan trọng', 'nổi bật', 'đặc sắc', 'ưu điểm', 'nhược điểm',
+      'phù hợp với', 'thời điểm lý tưởng', 'phương tiện di chuyển',
+      'chi phí tham khảo', 'thông tin chi tiết', 'mô tả', 'hình ảnh',
+      'trang phục', 'chuẩn bị', 'đêm nhạc', 'không gian', 'thời tiết',
+      'danh mục', 'cảnh báo', 'ăn uống', 'hành lý', 'an toàn', 'bảo quản',
+      'đặt phòng', 'đặt vé', 'điểm nổi bật', 'thời điểm', 'thời gian',
+      'ngân sách', 'thành viên', 'nhịp độ', 'khoảng thời gian', 'bao lâu'
+    ];
+
+    for (final item in nonPlaceKeywords) {
+      if (lower.contains(item)) return false;
+    }
+
+    if (RegExp(r'^(ngày\s*\d+|buổi\s*(sáng|trưa|chiều|tối)|bước\s*\d+)', caseSensitive: false).hasMatch(clean)) {
+      return false;
+    }
+
+    if (RegExp(r'^\d+$').hasMatch(clean)) return false;
+
+    if (_placeDbCache.containsKey(clean)) return true;
+
+    const placeKeywords = [
+      'chợ', 'công viên', 'cầu', 'bến', 'bãi', 'chùa', 'đền', 'miếu',
+      'bảo tàng', 'quán', 'cà phê', 'coffee', 'khách sạn', 'hotel',
+      'resort', 'nhà hàng', 'quảng trường', 'bán đảo', 'hồ', 'sông',
+      'tháp', 'vườn', 'khu du lịch', 'trung tâm', 'phố', 'đường',
+      'đảo', 'bãi biển', 'am', 'thiền viện', 'nhà thờ', 'thảo cầm viên',
+      'gành', 'mũi', 'vịnh', 'đèo', 'suối', 'thác', 'động', 'hang', 'núi',
+      'bãi bồi', 'homestay', 'bar', 'pub', 'billiards', 'bida', 'bún', 'phở',
+      'ốc', 'lẩu', 'bánh', 'trà sữa', 'spa', 'massage', 'cinema', 'rạp'
+    ];
+
+    for (final kw in placeKeywords) {
+      if (lower.contains(kw)) return true;
+    }
+
+    if (RegExp(r'^(thưởng thức|tham quan|đón|ngắm|thư giãn|chụp|check|ăn|uống|đi|đến|ghé|xem|mua|dạo|tận hưởng|trải nghiệm)\b', caseSensitive: false).hasMatch(lower)) {
+      return false;
+    }
+
+    return false;
+  }
+
+  Map<String, String>? _tryExtractPlaceItem(String rawLine) {
+    final cleanLine = rawLine.trim();
+    if (cleanLine.isEmpty) return null;
+
+    String content = cleanLine;
+    if (content.startsWith('- ') || content.startsWith('* ')) {
+      content = content.substring(2).trim();
+    } else if (RegExp(r'^\d+\.\s').hasMatch(content)) {
+      content = content.replaceFirst(RegExp(r'^\d+\.\s'), '').trim();
+    }
+
+    final boldMatch = RegExp(r'^\*\*(.+?)\*\*').firstMatch(content);
+    if (boldMatch != null) {
+      final placeName = boldMatch.group(1) ?? '';
+      if (_isPlaceName(placeName)) {
+        String desc = content.substring(boldMatch.end).trim();
+        if (desc.startsWith(':') || desc.startsWith('-')) {
+          desc = desc.substring(1).trim();
+        }
+        return {
+          'name': placeName,
+          'desc': desc,
+        };
+      }
+    }
+    return null;
+  }
+
+  String _getPlaceImage(String placeName) {
+    final lower = placeName.toLowerCase();
+    if (lower.contains('chợ') || lower.contains('market') || lower.contains('ẩm thực')) {
+      return 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&fit=crop';
+    } else if (lower.contains('công viên') || lower.contains('park') || lower.contains('bờ sông') || lower.contains('bãi bồi')) {
+      return 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=300&fit=crop';
+    } else if (lower.contains('cầu') || lower.contains('bridge') || lower.contains('bến') || lower.contains('thuyền')) {
+      return 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=300&fit=crop';
+    } else if (lower.contains('chùa') || lower.contains('đền') || lower.contains('miếu') || lower.contains('bảo tàng')) {
+      return 'https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=300&fit=crop';
+    } else if (lower.contains('cà phê') || lower.contains('coffee') || lower.contains('quán')) {
+      return 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&fit=crop';
+    } else if (lower.contains('khách sạn') || lower.contains('hotel') || lower.contains('resort')) {
+      return 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=300&fit=crop';
+    }
+    return 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=300&fit=crop';
+  }
+
+  Widget _buildPlaceCardBlock(String placeName, String description) {
+    _fetchPlaceFromDb(placeName);
+    final dbPlace = _placeDbCache[placeName];
+
+    String imageUrl = _getPlaceImage(placeName);
+    String categoryName = '';
+    String displayDesc = description;
+    double rating = 4.5;
+    int reviewCount = 120;
+
+    if (dbPlace != null) {
+      if (dbPlace['image'] != null && dbPlace['image'].toString().isNotEmpty) {
+        final rawImg = dbPlace['image'].toString();
+        imageUrl = rawImg.startsWith('/') ? '${ApiClient.baseUrl}$rawImg' : rawImg;
+      } else if (dbPlace['photos'] != null && dbPlace['photos'] is List && (dbPlace['photos'] as List).isNotEmpty) {
+        final p0 = dbPlace['photos'][0];
+        if (p0 is Map) {
+          final rawImg = (p0['urlOriginal'] ?? p0['urlThumbnail'] ?? p0['url'] ?? '').toString();
+          if (rawImg.isNotEmpty) {
+            imageUrl = rawImg.startsWith('/') ? '${ApiClient.baseUrl}$rawImg' : rawImg;
+          }
+        }
+      }
+
+      if (dbPlace['category'] != null && dbPlace['category']['name'] != null) {
+        categoryName = dbPlace['category']['name'].toString();
+      }
+      if (dbPlace['description'] != null && dbPlace['description'].toString().isNotEmpty) {
+        displayDesc = dbPlace['description'].toString();
+      }
+      if (dbPlace['rating'] != null) {
+        rating = (dbPlace['rating'] as num).toDouble();
+      }
+      if (dbPlace['userRatingCount'] != null) {
+        reviewCount = (dbPlace['userRatingCount'] as num).toInt();
+      }
+    }
+
+    final placeData = dbPlace ?? {
+      'name': placeName,
+      'address': displayDesc,
+      'image': imageUrl,
+      'rating': rating,
+      'user_ratings_total': reviewCount,
+    };
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: () {
+            PlaceDetailBottomSheet.show(
+              context,
+              placeData,
+            );
+          },
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    imageUrl,
+                    width: 58,
+                    height: 58,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.location_on_rounded,
+                        color: Color(0xFF3B82F6),
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        placeName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (categoryName.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '($categoryName)',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF3B82F6),
+                          ),
+                        ),
+                      ],
+                      if (displayDesc.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          displayDesc,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF475569),
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Row(
+                        children: const [
+                          Icon(Icons.info_outline_rounded, size: 11, color: Color(0xFF64748B)),
+                          SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              'Chạm để xem chi tiết',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () {
+                    SaveToTripBottomSheet.show(
+                      context,
+                      placeData,
+                      onSaved: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Đã thêm "$placeName" vào chuyến đi!'),
+                            backgroundColor: AppTheme.primary,
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFBFDBFE),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.add_rounded,
+                          size: 15,
+                          color: Color(0xFF2563EB),
+                        ),
+                        SizedBox(width: 2),
+                        Text(
+                          'Thêm',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2563EB),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildMessageContent(String content, bool isUser) {
     if (isUser) {
@@ -387,6 +801,12 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
     final widgets = <Widget>[];
     for (final line in lines) {
       if (line.trim().isEmpty) { widgets.add(const SizedBox(height: 8)); continue; }
+
+      final placeItem = _tryExtractPlaceItem(line);
+      if (placeItem != null) {
+        widgets.add(_buildPlaceCardBlock(placeItem['name']!, placeItem['desc']!));
+        continue;
+      }
       if (line.startsWith('### ')) {
         widgets.add(Padding(padding: const EdgeInsets.only(top: 8, bottom: 4), child: Text(line.substring(4), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.darkText))));
       } else if (line.startsWith('## ')) {
@@ -469,6 +889,270 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.transparent, borderRadius: BorderRadius.circular(12)),
       child: Icon(icon, size: 16, color: AppTheme.subtitleText),
     )));
+  }
+
+  Widget _buildMapPlaceBottomSheet() {
+    final chatPlaces = _getAllChatPlaces();
+    if (chatPlaces.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final safeIndex = _selectedMapPlaceIndex < chatPlaces.length ? _selectedMapPlaceIndex : 0;
+    final p = chatPlaces[safeIndex];
+    final name = p['name'] ?? '';
+    final description = p['description'] ?? p['address'] ?? '';
+    String imageUrl = p['image'] ?? '';
+    if (imageUrl.startsWith('/')) {
+      imageUrl = '${ApiClient.baseUrl}$imageUrl';
+    } else if (imageUrl.isEmpty) {
+      imageUrl = _getPlaceImage(name);
+    }
+
+    final catName = (p['category']?['name'] ?? '').toString();
+    IconData catIcon = Icons.place;
+    if (catName.contains('Ẩm thực') || catName.contains('Nhà hàng') || catName.contains('Quán')) {
+      catIcon = Icons.restaurant_rounded;
+    } else if (catName.contains('Công viên') || catName.contains('Sinh thái')) {
+      catIcon = Icons.park_rounded;
+    } else if (catName.contains('Chợ') || catName.contains('Mua sắm')) {
+      catIcon = Icons.storefront_rounded;
+    } else if (catName.contains('Khách sạn') || catName.contains('Resort')) {
+      catIcon = Icons.hotel_rounded;
+    }
+
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 24.0,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF06B6D4),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    catIcon,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Mô tả: ${description.isNotEmpty ? description : "Địa điểm tham quan nổi bật tại " + widget.destination}',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF64748B),
+                          height: 1.35,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    imageUrl,
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.location_on_rounded,
+                        color: Color(0xFF3B82F6),
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () {
+                      SaveToTripBottomSheet.show(
+                        context,
+                        p,
+                        onSaved: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Đã thêm "$name" vào chuyến đi!'),
+                              backgroundColor: AppTheme.primary,
+                              behavior: SnackBarBehavior.floating,
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1D4ED8),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.bookmark_border_rounded, color: Colors.white, size: 16),
+                          SizedBox(width: 5),
+                          Text(
+                            'Thêm vào',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () {
+                      PlaceDetailBottomSheet.show(
+                        context,
+                        p,
+                        currentItinerary: widget.tripConfig?.toJson(),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Text(
+                        'Chi tiết',
+                        style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () async {
+                      if (p['latitude'] != null && p['longitude'] != null) {
+                        final lat = p['latitude'];
+                        final lon = p['longitude'];
+                        final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lon');
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url);
+                        }
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Icon(
+                        Icons.near_me_rounded,
+                        color: Color(0xFF0F172A),
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _isChatHidden = false;
+                      });
+                      _sendMessage('Hãy cho tôi biết thêm thông tin về $name');
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.auto_awesome, color: Color(0xFF4F46E5), size: 14),
+                          SizedBox(width: 4),
+                          Text(
+                            'Hỏi AI',
+                            style: TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildChatBody() {
@@ -582,6 +1266,33 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                   Expanded(
                     child: Stack(
                       children: [
+                        if (_isFullScreen)
+                          Positioned(
+                            right: 16,
+                            bottom: 16,
+                            child: FloatingActionButton(
+                              heroTag: 'ai_chat_map_btn_trip',
+                              onPressed: () {
+                                final chatPlaces = _getAllChatPlaces();
+                                setState(() {
+                                  _isFullScreen = false;
+                                  if (chatPlaces.isNotEmpty) {
+                                    _isChatHidden = true;
+                                    _selectedMapPlaceIndex = 0;
+                                  }
+                                });
+                                Future.delayed(const Duration(milliseconds: 150), () {
+                                  _focusMapCamera();
+                                });
+                              },
+                              backgroundColor: const Color(0xFF1E293B),
+                              elevation: 4,
+                              child: const Icon(
+                                Icons.map_outlined,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         if (_messages.isEmpty)
                           ListView(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -832,7 +1543,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
     // Smooth height transitioning
     final double defaultHeight = _isFullScreen
         ? (screenHeight - headerHeight)
-        : 45.0;
+        : 0.0;
     final double targetSheetHeight = (_isDragging && _dragHeight != null)
         ? _dragHeight!
         : defaultHeight;
@@ -845,14 +1556,98 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
           Positioned.fill(
             child: _mapCenter != null
                 ? FlutterMap(
+                    mapController: _mapController,
                     options: MapOptions(
-                      initialCenter: _mapCenter!,
-                      initialZoom: 13.0,
+                      initialCenter: () {
+                        final chatPlaces = _getAllChatPlaces();
+                        if (chatPlaces.isNotEmpty) {
+                          final cp = chatPlaces.first;
+                          if (cp['latitude'] != null && cp['longitude'] != null) {
+                            return LatLng((cp['latitude'] as num).toDouble(), (cp['longitude'] as num).toDouble());
+                          }
+                        }
+                        return _mapCenter ?? const LatLng(10.033, 105.787);
+                      }(),
+                      initialZoom: 14.5,
                     ),
                     children: [
                       TileLayer(
                         urlTemplate:
                             'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&apistyle=s.t%3A2%7Cp.v%3Aoff',
+                      ),
+                      MarkerLayer(
+                        markers: () {
+                          final chatPlaces = _getAllChatPlaces();
+                          if (chatPlaces.isEmpty && _mapCenter != null) {
+                            return [
+                              Marker(
+                                point: _mapCenter!,
+                                width: 50,
+                                height: 50,
+                                child: const Icon(
+                                  Icons.location_on_rounded,
+                                  color: Color(0xFFEF4444),
+                                  size: 38,
+                                ),
+                              ),
+                            ];
+                          }
+                          return List.generate(chatPlaces.length, (idx) {
+                            final cp = chatPlaces[idx];
+                            final isSelected = idx == _selectedMapPlaceIndex;
+                            double lat = _mapCenter?.latitude ?? 10.033;
+                            double lon = _mapCenter?.longitude ?? 105.787;
+                            if (cp['latitude'] != null && cp['longitude'] != null) {
+                              lat = (cp['latitude'] as num).toDouble();
+                              lon = (cp['longitude'] as num).toDouble();
+                            } else {
+                              lat += (idx % 3 - 1) * 0.007;
+                              lon += (idx ~/ 3 - 1) * 0.007;
+                            }
+                            return Marker(
+                              point: LatLng(lat, lon),
+                              width: isSelected ? 54 : 44,
+                              height: isSelected ? 54 : 44,
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedMapPlaceIndex = idx;
+                                    _isChatHidden = true;
+                                  });
+                                  _focusMapCamera();
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? const Color(0xFF0F172A) : Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isSelected ? Colors.white : const Color(0xFF0F172A),
+                                      width: 2.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.25),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '${idx + 1}',
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.white : const Color(0xFF0F172A),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: isSelected ? 15 : 13,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          });
+                        }(),
                       ),
                     ],
                   )
@@ -862,6 +1657,8 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
           ),
 
 
+
+          if (_isChatHidden) _buildMapPlaceBottomSheet(),
 
           // 3. Dynamic Custom Header (AppBar / Floating Header)
           AnimatedContainer(
@@ -894,7 +1691,14 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                     child: IconButton(
                       icon: Icon(Icons.arrow_back, color: AppTheme.darkText),
                       onPressed: () {
-                        Navigator.pop(context);
+                        if (!_isFullScreen) {
+                          setState(() {
+                            _isFullScreen = true;
+                            _isChatHidden = false;
+                          });
+                        } else {
+                          Navigator.pop(context);
+                        }
                       },
                     ),
                   ),

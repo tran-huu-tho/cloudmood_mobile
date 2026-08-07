@@ -4562,7 +4562,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       'description': _itineraryData['description'] ?? '',
       'destination': _itineraryData['destination'] ?? '',
       'coverImage':
-          _itineraryData['coverImage'] ?? 'https://via.placeholder.com/800x400',
+          _itineraryData['coverImage'] ?? null,
       'postType': 'USER_CURATION',
       'sections': sectionsList,
       'items': items,
@@ -4753,6 +4753,81 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           ),
                           const SizedBox(height: 16),
                         ],
+                        FutureBuilder<List<Map<String, dynamic>>>(
+                          future: DatabaseService().searchPlaces(
+                            destination: _itineraryData['destination'] ?? '',
+                            query: '',
+                          ),
+                          builder: (context, snapshot) {
+                            final places = snapshot.data ?? [];
+                            final cat32Places = places.where((p) {
+                              final catId = p['categoryId'] ?? p['category']?['id'];
+                              final hasCat32 = catId == 32 || catId == '32' || catId == 32.0;
+                              final hasImg = (p['image'] ?? '').toString().isNotEmpty;
+                              return hasCat32 && hasImg;
+                            }).toList();
+                            final photoPlaces = cat32Places.isNotEmpty
+                                ? cat32Places
+                                : places.where((p) => (p['image'] ?? '').toString().isNotEmpty).toList();
+                            if (photoPlaces.isEmpty) return const SizedBox.shrink();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 14),
+                                const Text(
+                                  'Gợi ý ảnh đẹp từ địa điểm:',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  height: 64,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: photoPlaces.length,
+                                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                                    itemBuilder: (context, idx) {
+                                      final p = photoPlaces[idx];
+                                      String img = p['image'] ?? '';
+                                      if (img.startsWith('/')) img = '${ApiClient.baseUrl}$img';
+                                      final isCur = selectedCoverImage == img;
+                                      return GestureDetector(
+                                        onTap: () {
+                                          setSheetState(() {
+                                            selectedCoverImage = img;
+                                          });
+                                        },
+                                        child: Container(
+                                          width: 64,
+                                          height: 64,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: isCur ? AppTheme.primary : Colors.transparent,
+                                              width: 2.5,
+                                            ),
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Image.network(
+                                              img,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Container(color: Colors.grey[200]),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
@@ -10488,10 +10563,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       children: [
         ...tags.map(
           (cat) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
               color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
               cat.toString(),
@@ -15355,7 +15430,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     required String? badge,
     required VoidCallback onTap,
     bool disabled = false,
+    String? label,
+    Color? customColor,
   }) {
+    final effectiveColor = customColor ?? AppTheme.primary;
     return GestureDetector(
       onTap: disabled
           ? () {
@@ -15377,14 +15455,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             color: disabled
                 ? Colors.grey.shade200
                 : (active
-                      ? AppTheme.primary.withAlpha(18)
+                      ? effectiveColor.withAlpha(18)
                       : const Color(0xFFF4F6F8)),
             borderRadius: BorderRadius.circular(9),
             border: Border.all(
               color: disabled
                   ? Colors.grey.shade300
                   : (active
-                        ? AppTheme.primary.withAlpha(60)
+                        ? effectiveColor.withAlpha(60)
                         : Colors.transparent),
             ),
           ),
@@ -15396,8 +15474,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 size: 18,
                 color: disabled
                     ? Colors.grey.shade500
-                    : (active ? AppTheme.primary : const Color(0xFF94A3B8)),
+                    : (active ? effectiveColor : const Color(0xFF94A3B8)),
               ),
+              if (label != null && label.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: disabled
+                        ? Colors.grey.shade500
+                        : (active ? effectiveColor : const Color(0xFF475569)),
+                  ),
+                ),
+              ],
               if (badge != null) ...[
                 const SizedBox(width: 4),
                 Container(
@@ -15406,7 +15497,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     vertical: 1,
                   ),
                   decoration: BoxDecoration(
-                    color: disabled ? Colors.grey.shade400 : AppTheme.primary,
+                    color: disabled ? Colors.grey.shade400 : effectiveColor,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -16324,10 +16415,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                     ),
                                   // Number badge
                                   Container(
-                                    width: 28,
-                                    height: 28,
+                                    width: 22,
+                                    height: 22,
                                     margin: const EdgeInsets.only(
-                                      right: 10,
+                                      right: 6,
                                       top: 1,
                                     ),
                                     decoration: BoxDecoration(
@@ -16811,6 +16902,48 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           isItineraryDetail: true,
                                           dayIndex:
                                               (detail['day'] as int? ?? 1) - 1,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(width: 4),
+                                  // ℹ️ Xem chi tiết
+                                  _buildCardActionIcon(
+                                    icon: Icons.info_outline_rounded,
+                                    active: false,
+                                    badge: null,
+                                    disabled: false,
+                                    onTap: () {
+                                      if (place.isNotEmpty) {
+                                        PlaceDetailBottomSheet.show(
+                                          context,
+                                          place,
+                                          currentItinerary: _itineraryData,
+                                          onTripUpdated: () =>
+                                              _loadData(silent: true),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(width: 4),
+                                  // 🤖 Hỏi AI
+                                  _buildCardActionIcon(
+                                    icon: Icons.auto_awesome_rounded,
+                                    active: true,
+                                    badge: null,
+                                    label: 'Hỏi AI',
+                                    customColor: const Color(0xFF8B5CF6),
+                                    disabled: false,
+                                    onTap: () {
+                                      final placeName =
+                                          place['name'] ?? 'Địa điểm';
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => PlaceAIChatScreen(
+                                            placeName: placeName,
+                                            placeInfo: place,
+                                          ),
                                         ),
                                       );
                                     },

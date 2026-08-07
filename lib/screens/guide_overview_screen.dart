@@ -1686,7 +1686,7 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                 'via.placeholder.com',
               ))
           ? _itineraryData['coverImage']
-          : 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80',
+          : null,
       'postType': 'USER_CURATION',
       'items': items,
     };
