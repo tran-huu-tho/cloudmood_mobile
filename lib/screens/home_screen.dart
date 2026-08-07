@@ -219,16 +219,16 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.18)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.15)),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: color.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -236,27 +236,27 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(5),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withOpacity(0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 14, color: color),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           Text(
             label,
             style: TextStyle(
               fontSize: 10.5,
               color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             value,
             style: TextStyle(
-              fontSize: 12.5,
+              fontSize: 13,
               fontWeight: FontWeight.w800,
               color: AppTheme.darkText,
             ),
@@ -315,24 +315,24 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppTheme.primary.withOpacity(0.08),
-              AppTheme.primary.withOpacity(0.02),
+              Color(0xFFEFF6FF),
+              Color(0xFFF8FAFC),
             ],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: AppTheme.primary.withOpacity(0.12),
-            width: 1.5,
+            color: const Color(0xFFDBEAFE),
+            width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primary.withOpacity(0.04),
+              color: const Color(0xFF3B82F6).withOpacity(0.06),
               blurRadius: 20,
-              offset: const Offset(0, 8),
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -343,11 +343,11 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
               right: -30,
               top: -30,
               child: Container(
-                width: 130,
-                height: 130,
+                width: 140,
+                height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppTheme.primary.withOpacity(0.06),
+                  color: const Color(0xFF3B82F6).withOpacity(0.06),
                 ),
               ),
             ),
@@ -359,7 +359,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                 height: 120,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppTheme.primary.withOpacity(0.03),
+                  color: const Color(0xFF3B82F6).withOpacity(0.04),
                 ),
               ),
             ),
@@ -374,18 +374,18 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.location_on_rounded,
-                            size: 15,
-                            color: AppTheme.primary,
+                            size: 16,
+                            color: Color(0xFF2563EB),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             cityName,
-                            style: TextStyle(
-                              fontSize: 16,
+                            style: const TextStyle(
+                              fontSize: 16.5,
                               fontWeight: FontWeight.w800,
-                              color: AppTheme.darkText,
+                              color: Color(0xFF0F172A),
                               letterSpacing: -0.2,
                             ),
                           ),
@@ -396,9 +396,9 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.primary.withOpacity(0.18)),
+                            border: Border.all(color: const Color(0xFFDBEAFE)),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.03),
@@ -412,17 +412,17 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                             children: [
                               Text(
                                 formattedTime,
-                                style: TextStyle(
-                                  fontSize: 11,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
-                                  color: AppTheme.primary,
+                                  color: Color(0xFF2563EB),
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              Icon(
+                              const Icon(
                                 Icons.refresh_rounded,
                                 size: 13,
-                                color: AppTheme.primary,
+                                color: Color(0xFF2563EB),
                               ),
                             ],
                           ),
@@ -430,7 +430,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
                   // Main Temperature & Weather Image Row
                   Row(
@@ -440,29 +440,45 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '$temp°C',
-                            style: TextStyle(
-                              fontSize: 38,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.darkText,
-                              letterSpacing: -1,
-                              height: 1.0,
-                            ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$temp°',
+                                style: const TextStyle(
+                                  fontSize: 42,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF0F172A),
+                                  letterSpacing: -1.5,
+                                  height: 1.0,
+                                ),
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.only(top: 4.0, left: 2.0),
+                                child: Text(
+                                  'C',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                             decoration: BoxDecoration(
-                              color: AppTheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
+                              color: const Color(0xFF2563EB).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
                               desc,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w700,
-                                color: AppTheme.primary,
+                                color: Color(0xFF2563EB),
                               ),
                             ),
                           ),
@@ -470,20 +486,20 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                       ),
                       Image.network(
                         iconUrl,
-                        width: 68,
-                        height: 68,
+                        width: 72,
+                        height: 72,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Icon(
+                        errorBuilder: (_, __, ___) => const Icon(
                           Icons.wb_sunny_rounded,
-                          color: AppTheme.primary,
-                          size: 48,
+                          color: Color(0xFFF59E0B),
+                          size: 52,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
 
-                  // Beautiful 3-Stat Badges with Icon Bubbles
+                  // 3 Stat Badges
                   Row(
                     children: [
                       Expanded(
@@ -515,52 +531,92 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                     ],
                   ),
 
-
-                    if (_weatherQuote.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.surface.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: AppTheme.border.withOpacity(0.5),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.format_quote_rounded,
-                              size: 20,
-                              color: AppTheme.primary.withOpacity(0.5),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _weatherQuote,
-                                style: TextStyle(
-                                  fontStyle: FontStyle.italic,
-                                  fontSize: 12.5,
-                                  color: AppTheme.darkText.withOpacity(0.85),
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
+                  if (_weatherQuote.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFFDBEAFE),
                         ),
                       ),
-                    ],
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 3,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _weatherQuote,
+                              style: const TextStyle(
+                                fontStyle: FontStyle.italic,
+                                fontSize: 12.5,
+                                color: Color(0xFF334155),
+                                height: 1.45,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
-                ),
+                  const SizedBox(height: 12),
+                  // Action Footer: "Xem dự báo giờ & 5 ngày"
+                  InkWell(
+                    onTap: () => _showDetailedWeatherSheet(context, cityName),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.calendar_month_rounded, size: 15, color: Color(0xFF2563EB)),
+                          SizedBox(width: 6),
+                          Text(
+                            'Xem dự báo theo giờ & 5 ngày tới',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF2563EB),
+                            ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF2563EB)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
+
+  void _showDetailedWeatherSheet(BuildContext context, String city) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return _DetailedWeatherModal(cityName: city);
+      },
+    );
   }
 
   @override
@@ -640,6 +696,23 @@ class HeaderWidget extends StatelessWidget {
                   width: 32,
                   height: 32,
                   fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 10),
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFF0F172A), Color(0xFF2563EB), Color(0xFF4F46E5)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ).createShader(bounds),
+                child: const Text(
+                  'Cloudmood',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -0.8,
+                  ),
                 ),
               ),
             ],
@@ -722,45 +795,20 @@ class _SearchHeaderWidgetState extends State<SearchHeaderWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Bạn cần kế hoạch cho chuyến đi mới?',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.subtitleText,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Lên lịch trình\nthông minh ✨',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: AppTheme.darkText,
-              letterSpacing: -0.8,
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: 16),
           // Active Interactive Search box
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(18),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primary.withAlpha(12),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-                BoxShadow(
-                  color: Colors.black.withAlpha(6),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
+                  color: const Color(0xFF2563EB).withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
                 ),
               ],
-              border: Border.all(color: AppTheme.border, width: 1),
+              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
             ),
             child: Row(
               children: [
@@ -769,14 +817,18 @@ class _SearchHeaderWidgetState extends State<SearchHeaderWidget> {
                     widget.onSearchTap?.call(_searchController.text.trim());
                   },
                   child: Container(
-                    padding: const EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
                       Icons.search_rounded,
-                      color: AppTheme.primary,
+                      color: Colors.white,
                       size: 18,
                     ),
                   ),
@@ -2202,6 +2254,520 @@ class FeaturedPlacesSection extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _DetailedWeatherModal extends StatefulWidget {
+  final String cityName;
+  const _DetailedWeatherModal({required this.cityName});
+
+  @override
+  State<_DetailedWeatherModal> createState() => _DetailedWeatherModalState();
+}
+
+class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
+  bool _isLoading = true;
+  String? _errorMessage;
+  Map<String, dynamic>? _forecastData;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchForecast();
+  }
+
+  Future<void> _fetchForecast() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await ApiClient.get(
+        '/weather/forecast',
+        query: {'cityName': widget.cityName},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            _forecastData = data;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Không thể tải dự báo thời tiết';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Lỗi kết nối mạng';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.82,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(32),
+          topRight: Radius.circular(32),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Drag handle line
+          const SizedBox(height: 12),
+          Container(
+            width: 44,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Header Row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.wb_sunny_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.cityName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Dự báo thời tiết 5 ngày',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF475569)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+          // Body Content
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppTheme.primary),
+                  )
+                : _errorMessage != null
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.grey),
+                            const SizedBox(height: 12),
+                            Text(_errorMessage!, style: const TextStyle(color: Colors.grey)),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: _fetchForecast,
+                              child: const Text('Thử lại'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Current overview banner inside modal
+                            _buildCurrentBanner(_forecastData!['current']),
+                            const SizedBox(height: 24),
+
+                            // SECTION 1: Hourly Forecast (Dự báo theo giờ)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'DỰ BÁO THEO GIỜ',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF64748B),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDBEAFE),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Mỗi 3 giờ',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 130,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: (_forecastData!['hourly'] as List? ?? []).length,
+                                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                                itemBuilder: (context, index) {
+                                  final item = _forecastData!['hourly'][index];
+                                  return _buildHourlyCard(item, index == 0);
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 28),
+
+                            // SECTION 2: 5-Day Forecast (Dự báo 5 ngày)
+                            const Text(
+                              'DỰ BÁO 5 NGÀY TỚI',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF64748B),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Column(
+                              children: [
+                                for (var dayItem in (_forecastData!['daily'] as List? ?? []))
+                                  _buildDailyRow(dayItem),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCurrentBanner(Map<String, dynamic>? current) {
+    if (current == null) return const SizedBox.shrink();
+    final temp = current['temp'] ?? 25;
+    final desc = current['description'] ?? '';
+    final iconCode = current['icon'] ?? '01d';
+    final iconUrl = 'https://openweathermap.org/img/wn/$iconCode@2x.png';
+    final pop = current['pop'] ?? 0;
+    final humidity = current['humidity'] ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1D4ED8), Color(0xFF0EA5E9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0284C7).withOpacity(0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$temp°C',
+                style: const TextStyle(
+                  fontSize: 38,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -1,
+                ),
+              ),
+              Text(
+                desc.toString().toUpperCase(),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withOpacity(0.9),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _buildWhiteChip(Icons.umbrella_rounded, 'Mưa: $pop%'),
+                  const SizedBox(width: 8),
+                  _buildWhiteChip(Icons.water_drop_rounded, 'Độ ẩm: $humidity%'),
+                ],
+              ),
+            ],
+          ),
+          Image.network(
+            iconUrl,
+            width: 72,
+            height: 72,
+            errorBuilder: (_, __, ___) => const Icon(Icons.wb_sunny_rounded, size: 60, color: Colors.amber),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWhiteChip(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHourlyCard(Map<String, dynamic> item, bool isSelected) {
+    final time = item['time'] ?? '00:00';
+    final temp = item['temp'] ?? 0;
+    final iconCode = item['icon'] ?? '01d';
+    final pop = item['pop'] ?? 0;
+    final iconUrl = 'https://openweathermap.org/img/wn/$iconCode@2x.png';
+
+    return Container(
+      width: 76,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
+          width: isSelected ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            time,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: isSelected ? const Color(0xFF1E40AF) : const Color(0xFF64748B),
+            ),
+          ),
+          Image.network(
+            iconUrl,
+            width: 38,
+            height: 38,
+            errorBuilder: (_, __, ___) => const Icon(Icons.cloud, size: 28, color: Colors.blue),
+          ),
+          Text(
+            '$temp°',
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          if (pop > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.water_drop, size: 10, color: Color(0xFF0284C7)),
+                Text(
+                  '$pop%',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0284C7),
+                  ),
+                ),
+              ],
+            )
+          else
+            const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyRow(Map<String, dynamic> item) {
+    final dayName = item['dayName'] ?? '';
+    final minTemp = item['minTemp'] ?? 0;
+    final maxTemp = item['maxTemp'] ?? 0;
+    final desc = item['description'] ?? '';
+    final iconCode = item['icon'] ?? '01d';
+    final pop = item['popMax'] ?? 0;
+    final iconUrl = 'https://openweathermap.org/img/wn/$iconCode@2x.png';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Row(
+        children: [
+          // Day Name
+          SizedBox(
+            width: 85,
+            child: Text(
+              dayName,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+          ),
+
+          // Icon & Description
+          Image.network(
+            iconUrl,
+            width: 36,
+            height: 36,
+            errorBuilder: (_, __, ___) => const Icon(Icons.wb_sunny, size: 24, color: Colors.amber),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  desc,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF475569),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (pop > 0)
+                  Text(
+                    'Mưa: $pop%',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0284C7),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Temp range bar
+          Row(
+            children: [
+              Text(
+                '$minTemp°',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                width: 45,
+                height: 4,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF38BDF8), Color(0xFFF97316)],
+                  ),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '$maxTemp°',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

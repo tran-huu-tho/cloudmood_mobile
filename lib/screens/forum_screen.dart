@@ -332,51 +332,7 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
     });
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: TextField(
-        controller: _searchController,
-        style: TextStyle(fontSize: 14, color: AppTheme.darkText),
-        decoration: InputDecoration(
-          hintText: 'Tìm kiếm bài viết hoặc địa điểm...',
-          hintStyle: TextStyle(fontSize: 13, color: Colors.grey[500]),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: AppTheme.subtitleText,
-            size: 20,
-          ),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(
-                    Icons.clear_rounded,
-                    color: AppTheme.subtitleText,
-                    size: 18,
-                  ),
-                  onPressed: () {
-                    _searchController.clear();
-                    _fetchFeed(refresh: true);
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-        ),
-        onChanged: (value) {
-          setState(() {}); // Làm mới để hiện/ẩn nút Clear
-          _debounceSearch();
-        },
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -395,78 +351,134 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                   parent: AlwaysScrollableScrollPhysics(),
                 ),
                 slivers: [
-                  // ── Header ──────────────────────────────────────────────
+                  // ── Header & Search Bar ─────────────────────────────────
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
+                          // Search bar
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'CỘNG ĐỒNG CLOUDMOOD',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.primary.withAlpha(10),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                                border: Border.all(color: AppTheme.border),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.search_rounded,
                                     color: AppTheme.primary,
-                                    letterSpacing: 1.5,
+                                    size: 20,
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Diễn Đàn Du Lịch',
-                                  style: TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.darkText,
-                                    letterSpacing: -0.8,
-                                    height: 1.2,
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _searchController,
+                                      style: TextStyle(color: AppTheme.darkText, fontSize: 13.5),
+                                      decoration: const InputDecoration(
+                                        hintText: 'Tìm bài viết, địa điểm...',
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        errorBorder: InputBorder.none,
+                                        focusedErrorBorder: InputBorder.none,
+                                        disabledBorder: InputBorder.none,
+                                        filled: false,
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 2,
+                                          vertical: 8,
+                                        ),
+                                      ),
+                                      onChanged: (value) {
+                                        setState(() {});
+                                        _debounceSearch();
+                                      },
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  if (_searchController.text.isNotEmpty)
+                                    GestureDetector(
+                                      onTap: () {
+                                        _searchController.clear();
+                                        setState(() {});
+                                        _fetchFeed(refresh: true);
+                                      },
+                                      child: Icon(
+                                        Icons.close_rounded,
+                                        color: AppTheme.subtitleText,
+                                        size: 18,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
-                          ElevatedButton.icon(
-                            onPressed: () async {
+                          const SizedBox(width: 8),
+
+                          // Post Button
+                          GestureDetector(
+                            onTap: () async {
                               if (AuthService().currentUser.value == null) {
                                 _showLoginPrompt('đăng bài viết');
                                 return;
                               }
                               final result = await Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      const CreatePostScreen(),
+                                  builder: (context) => const CreatePostScreen(),
                                 ),
                               );
                               if (result == true) {
                                 _fetchFeed(refresh: true);
                               }
                             },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primary,
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10.5),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
                               ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
-                            ),
-                            icon: const Icon(
-                              Icons.add_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            label: const Text(
-                              'Đăng bài',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.add_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Đăng bài',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -474,9 +486,6 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
                       ),
                     ),
                   ),
-
-                  // ── Search Bar ──────────────────────────────────────────
-                  SliverToBoxAdapter(child: _buildSearchBar()),
 
                   // ── Posts List ──────────────────────────────────────────
                   if (_posts.isEmpty && !_isLoading)

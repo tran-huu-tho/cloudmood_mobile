@@ -54,7 +54,7 @@ class MyApp extends StatelessWidget {
       valueListenable: AppTheme.themeModeNotifier,
       builder: (context, themeMode, _) {
         return MaterialApp(
-          title: 'CLOUDMOOD',
+          title: 'Cloudmood',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

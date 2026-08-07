@@ -578,412 +578,534 @@ class _CreateItineraryWizardSheetState
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
+            return Dialog(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(28),
               ),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_add_alt_1_rounded,
-                      color: AppTheme.primary,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Mời bạn đồng hành',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 320,
+              backgroundColor: Colors.white,
+              elevation: 8,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Container(
+                width: 340,
+                padding: const EdgeInsets.all(22),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                    Text(
-                      'Nhập Email người nhận:',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.subtitleText,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _companionInputController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: AppTheme.inputDecoration(
-                        hintText: 'ví dụ: banbe@gmail.com',
-                        prefixIcon: Icons.email_rounded,
-                      ),
-                      onChanged: (val) {
-                        setDialogState(() {
-                          emailErrorMessage = null;
-                          selectedUser = null;
-                        });
-                        if (debounceTimer?.isActive ?? false) debounceTimer!.cancel();
-                        if (val.trim().isEmpty) {
-                          setDialogState(() {
-                            suggestions = [];
-                            isSearching = false;
-                          });
-                          return;
-                        }
-                        debounceTimer = Timer(const Duration(milliseconds: 300), () async {
-                          final results = await DatabaseService().searchUsersByEmail(val.trim());
-                          final alreadyInvited = _invitedCompanionsList.map((c) => c.email.toLowerCase()).toSet();
-                          setDialogState(() {
-                            suggestions = results.where((u) => !alreadyInvited.contains((u['email'] ?? '').toString().toLowerCase())).toList();
-                            isSearching = false;
-                          });
-                        });
-                      },
-                    ),
-
-                    // Suggestions list / Loading / Error alert
-                    if (isSearching)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child: Center(
-                          child: SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ),
-                      )
-                    else if (suggestions.isNotEmpty)
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 180),
-                        margin: const EdgeInsets.only(top: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey[200]!),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                      // Header Row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withOpacity(0.1),
+                              shape: BoxShape.circle,
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Material(
-                            color: Colors.white,
-                            child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: suggestions.length,
-                              itemBuilder: (context, index) {
-                                final user = suggestions[index];
-                                final String fullName = user['fullName'] ?? 'Người dùng CloudMood';
-                                final String email = user['email'] ?? '';
-                                final String? avatar = user['avatar'];
+                            child: const Icon(
+                              Icons.person_add_alt_1_rounded,
+                              color: AppTheme.primary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Mời bạn đồng hành',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                    color: AppTheme.darkText,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Thêm email người dùng CloudMood',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
 
-                                return ListTile(
-                                  dense: true,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                                  leading: CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: AppTheme.primary.withOpacity(0.1),
-                                    backgroundImage: (avatar != null && avatar.isNotEmpty)
-                                        ? NetworkImage(avatar)
-                                        : null,
-                                    child: (avatar == null || avatar.isEmpty)
-                                        ? const Icon(Icons.person, size: 18, color: AppTheme.primary)
-                                        : null,
+                      // Email Field Label
+                      Text(
+                        'Nhập Email người nhận:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _companionInputController,
+                        keyboardType: TextInputType.emailAddress,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'ví dụ: banbe@gmail.com',
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                            fontWeight: FontWeight.normal,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.mail_outline_rounded,
+                            color: AppTheme.primary,
+                            size: 20,
+                          ),
+                          suffixIcon: _companionInputController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    size: 18,
+                                    color: Colors.grey,
                                   ),
-                                  title: Text(
-                                    fullName,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                  ),
-                                  subtitle: Text(
-                                    email,
-                                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                                  ),
-                                  onTap: () {
+                                  onPressed: () {
                                     setDialogState(() {
-                                      _companionInputController.text = email;
-                                      selectedUser = user;
+                                      _companionInputController.clear();
                                       suggestions = [];
                                       emailErrorMessage = null;
+                                      selectedUser = null;
                                     });
                                   },
-                                );
-                              },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: AppTheme.primary,
+                              width: 1.5,
                             ),
                           ),
                         ),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            emailErrorMessage = null;
+                            selectedUser = null;
+                          });
+                          if (debounceTimer?.isActive ?? false) debounceTimer!.cancel();
+                          if (val.trim().isEmpty) {
+                            setDialogState(() {
+                              suggestions = [];
+                              isSearching = false;
+                            });
+                            return;
+                          }
+                          debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+                            final results = await DatabaseService().searchUsersByEmail(val.trim());
+                            final alreadyInvited = _invitedCompanionsList.map((c) => c.email.toLowerCase()).toSet();
+                            setDialogState(() {
+                              suggestions = results.where((u) => !alreadyInvited.contains((u['email'] ?? '').toString().toLowerCase())).toList();
+                              isSearching = false;
+                            });
+                          });
+                        },
                       ),
 
-                    if (emailErrorMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline_rounded, color: Colors.red, size: 16),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                emailErrorMessage!,
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                      // Suggestions / Error
+                      if (isSearching)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 10),
+                          child: Center(
+                            child: SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                          ),
+                        )
+                      else if (suggestions.isNotEmpty)
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 180),
+                          margin: const EdgeInsets.only(top: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey[200]!),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Material(
+                              color: Colors.white,
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: suggestions.length,
+                                itemBuilder: (context, index) {
+                                  final user = suggestions[index];
+                                  final String fullName = user['fullName'] ?? 'Người dùng CloudMood';
+                                  final String email = user['email'] ?? '';
+                                  final String? avatar = user['avatar'];
+
+                                  return ListTile(
+                                    dense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                                    leading: CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: AppTheme.primary.withOpacity(0.1),
+                                      backgroundImage: (avatar != null && avatar.isNotEmpty)
+                                          ? NetworkImage(avatar)
+                                          : null,
+                                      child: (avatar == null || avatar.isEmpty)
+                                          ? const Icon(Icons.person, size: 18, color: AppTheme.primary)
+                                          : null,
+                                    ),
+                                    title: Text(
+                                      fullName,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                    subtitle: Text(
+                                      email,
+                                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                    ),
+                                    onTap: () {
+                                      setDialogState(() {
+                                        _companionInputController.text = email;
+                                        selectedUser = user;
+                                        suggestions = [];
+                                        emailErrorMessage = null;
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      if (emailErrorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.error_outline_rounded,
+                                color: Colors.redAccent,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  emailErrorMessage!,
+                                  style: const TextStyle(
+                                    color: Colors.redAccent,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      const SizedBox(height: 20),
+                      Text(
+                        'Đặt quyền hạn:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Role Cards
+                      GestureDetector(
+                        onTap: () {
+                          setDialogState(() => _dialogSelectedRole = 'EDITOR');
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _dialogSelectedRole == 'EDITOR'
+                                ? AppTheme.primary.withOpacity(0.08)
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _dialogSelectedRole == 'EDITOR'
+                                  ? AppTheme.primary
+                                  : Colors.grey[200]!,
+                              width: _dialogSelectedRole == 'EDITOR' ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _dialogSelectedRole == 'EDITOR'
+                                      ? AppTheme.primary.withOpacity(0.12)
+                                      : Colors.grey[100],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.edit_note_rounded,
+                                  size: 18,
+                                  color: _dialogSelectedRole == 'EDITOR'
+                                      ? AppTheme.primary
+                                      : Colors.grey[500],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Chỉnh sửa (EDITOR)',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: _dialogSelectedRole == 'EDITOR'
+                                            ? AppTheme.primary
+                                            : AppTheme.darkText,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Có thể xem, sửa lịch trình và địa điểm',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Radio<String>(
+                                value: 'EDITOR',
+                                groupValue: _dialogSelectedRole,
+                                activeColor: AppTheme.primary,
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(() => _dialogSelectedRole = val);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      GestureDetector(
+                        onTap: () {
+                          setDialogState(() => _dialogSelectedRole = 'VIEWER');
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _dialogSelectedRole == 'VIEWER'
+                                ? AppTheme.primary.withOpacity(0.08)
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _dialogSelectedRole == 'VIEWER'
+                                  ? AppTheme.primary
+                                  : Colors.grey[200]!,
+                              width: _dialogSelectedRole == 'VIEWER' ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _dialogSelectedRole == 'VIEWER'
+                                      ? AppTheme.primary.withOpacity(0.12)
+                                      : Colors.grey[100],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.visibility_outlined,
+                                  size: 18,
+                                  color: _dialogSelectedRole == 'VIEWER'
+                                      ? AppTheme.primary
+                                      : Colors.grey[500],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Chỉ xem (VIEWER)',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: _dialogSelectedRole == 'VIEWER'
+                                            ? AppTheme.primary
+                                            : AppTheme.darkText,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Chỉ được xem thông tin chuyến đi',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Radio<String>(
+                                value: 'VIEWER',
+                                groupValue: _dialogSelectedRole,
+                                activeColor: AppTheme.primary,
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(() => _dialogSelectedRole = val);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Action Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 48,
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  side: BorderSide(color: Colors.grey[300]!),
+                                ),
+                                onPressed: () {
+                                  _companionInputController.clear();
+                                  Navigator.pop(context);
+                                },
+                                child: Text(
+                                  'Hủy',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkText,
+                                    fontSize: 15,
+                                  ),
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-
-                    const SizedBox(height: 16),
-                    Text(
-                      'Đặt quyền hạn:',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.subtitleText,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Role selector options
-                    GestureDetector(
-                      onTap: () {
-                        setDialogState(() => _dialogSelectedRole = 'EDITOR');
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _dialogSelectedRole == 'EDITOR'
-                              ? AppTheme.primary.withOpacity(0.08)
-                              : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: _dialogSelectedRole == 'EDITOR'
-                                ? AppTheme.primary
-                                : Colors.grey[200]!,
-                            width: _dialogSelectedRole == 'EDITOR' ? 1.5 : 1,
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.edit_rounded,
-                              size: 18,
-                              color: _dialogSelectedRole == 'EDITOR'
-                                  ? AppTheme.primary
-                                  : AppTheme.subtitleText,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Chỉnh sửa (EDITOR)',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 48,
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppTheme.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
                                   ),
-                                  Text(
-                                    'Có thể xem, sửa lịch trình và địa điểm',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.subtitleText,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (_dialogSelectedRole == 'EDITOR')
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                color: AppTheme.primary,
-                                size: 18,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                                  elevation: 0,
+                                ),
+                                onPressed: () async {
+                                  final emailText = _companionInputController.text.trim();
+                                  if (emailText.isEmpty) {
+                                    setDialogState(() => emailErrorMessage = 'Vui lòng nhập Email');
+                                    return;
+                                  }
 
-                    GestureDetector(
-                      onTap: () {
-                        setDialogState(() => _dialogSelectedRole = 'VIEWER');
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _dialogSelectedRole == 'VIEWER'
-                              ? AppTheme.primary.withOpacity(0.08)
-                              : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: _dialogSelectedRole == 'VIEWER'
-                                ? AppTheme.primary
-                                : Colors.grey[200]!,
-                            width: _dialogSelectedRole == 'VIEWER' ? 1.5 : 1,
+                                  final isAlreadyAdded = _invitedCompanionsList.any(
+                                    (c) => c.email.toLowerCase() == emailText.toLowerCase(),
+                                  );
+                                  if (isAlreadyAdded) {
+                                    setDialogState(() {
+                                      emailErrorMessage = 'Người dùng này đã có trong danh sách bạn đồng hành';
+                                    });
+                                    return;
+                                  }
+
+                                  setDialogState(() => emailErrorMessage = null);
+                                  final searchResult = await DatabaseService().searchUsersByEmail(emailText);
+                                  final exactUser = searchResult.firstWhere(
+                                    (u) => (u['email'] ?? '').toString().toLowerCase() == emailText.toLowerCase(),
+                                    orElse: () => selectedUser ?? {},
+                                  );
+
+                                  if (exactUser.isEmpty) {
+                                    setDialogState(() {
+                                      emailErrorMessage = 'Email chưa đăng ký tài khoản CloudMood';
+                                    });
+                                    return;
+                                  }
+
+                                  setState(() {
+                                    _invitedCompanionsList.add(
+                                      InvitedCompanion(
+                                        email: exactUser['email'] ?? emailText,
+                                        role: _dialogSelectedRole,
+                                        fullName: exactUser['fullName'],
+                                        avatar: exactUser['avatar'],
+                                      ),
+                                    );
+                                  });
+                                  _companionInputController.clear();
+                                  Navigator.pop(context);
+                                },
+                                child: const Text(
+                                  'Thêm & Mời',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.visibility_rounded,
-                              size: 18,
-                              color: _dialogSelectedRole == 'VIEWER'
-                                  ? AppTheme.primary
-                                  : AppTheme.subtitleText,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Chỉ xem (VIEWER)',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Chỉ được xem thông tin chuyến đi',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.subtitleText,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (_dialogSelectedRole == 'VIEWER')
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                color: AppTheme.primary,
-                                size: 18,
-                              ),
-                          ],
-                        ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            actions: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          side: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        onPressed: () {
-                          _companionInputController.clear();
-                          Navigator.pop(context);
-                        },
-                        child: Text(
-                          'Hủy',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.darkText,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 0,
-                        ),
-                        onPressed: () async {
-                          final emailText = _companionInputController.text.trim();
-                          if (emailText.isEmpty) {
-                            setDialogState(() => emailErrorMessage = 'Vui lòng nhập Email');
-                            return;
-                          }
-
-                          // Check if user is already added to companion list
-                          final isAlreadyAdded = _invitedCompanionsList.any(
-                            (c) => c.email.toLowerCase() == emailText.toLowerCase(),
-                          );
-                          if (isAlreadyAdded) {
-                            setDialogState(() {
-                              emailErrorMessage = 'Người dùng này đã có trong danh sách bạn đồng hành';
-                            });
-                            return;
-                          }
-
-                          // Verify if email belongs to a registered CloudMood user
-                          setDialogState(() => emailErrorMessage = null);
-                          final searchResult = await DatabaseService().searchUsersByEmail(emailText);
-                          final exactUser = searchResult.firstWhere(
-                            (u) => (u['email'] ?? '').toString().toLowerCase() == emailText.toLowerCase(),
-                            orElse: () => selectedUser ?? {},
-                          );
-
-                          if (exactUser.isEmpty) {
-                            setDialogState(() {
-                              emailErrorMessage = 'Email chưa đăng ký tài khoản CloudMood';
-                            });
-                            return;
-                          }
-
-                          setState(() {
-                            _invitedCompanionsList.add(
-                              InvitedCompanion(
-                                email: exactUser['email'] ?? emailText,
-                                role: _dialogSelectedRole,
-                                fullName: exactUser['fullName'],
-                                avatar: exactUser['avatar'],
-                              ),
-                            );
-                          });
-                          _companionInputController.clear();
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Thêm & Mời',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             );
           },
         );
@@ -1350,19 +1472,19 @@ class _CreateItineraryWizardSheetState
               colors: [Color(0xFF1A56DB), Color(0xFF0EA5E9)],
             ).createShader(bounds),
             child: const Text(
-              'Hành trình của bạn\nbắt đầu từ đây',
+              'Bắt đầu tạo lịch trình',
               style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
                 color: Colors.white,
-                height: 1.25,
+                letterSpacing: -0.3,
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            'Đặt một cái tên thật ý nghĩa và chọn điểm đến bạn dự định ghé thăm.',
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            'Đặt tên và chọn điểm đến bạn muốn ghé thăm.',
+            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
           ),
           const SizedBox(height: 20),
 
@@ -2599,6 +2721,7 @@ class _CreateItineraryWizardSheetState
 
       if (iconCode != null && iconCode > 0) {
         return Icon(
+          // ignore: non_const_argument_for_const_parameter
           IconData(iconCode, fontFamily: 'MaterialIcons'),
           size: 18,
           color: AppTheme.primary,

@@ -208,161 +208,136 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFE0F2FE), // Light sky blue
-              Color(0xFFF8FAFC), // Off-white
-              Colors.white,
-            ],
-            stops: [0.0, 0.4, 1.0],
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Back button and header logo
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              color: AppTheme.darkText,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+      backgroundColor: AppTheme.background,
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // Top Blue Gradient Hero Header (Matching Guest Screen UI)
+              Container(
+                width: double.infinity,
+                height: 280,
+                decoration: const BoxDecoration(
+                  gradient: AppTheme.heroGradient,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(40),
+                    bottomRight: Radius.circular(40),
                   ),
-
-                  // Illustration and Logo container
-                  Center(
-                    child: FadeTransition(
-                      opacity: _fadeIn,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            constraints: BoxConstraints(
-                              maxHeight: size.height * 0.32,
-                            ),
-                            child: Image.asset(
-                              'assets/images/login_illustration.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  height: 180,
-                                  width: size.width * 0.8,
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade50,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.airport_shuttle_rounded,
-                                      size: 80,
-                                      color: AppTheme.primaryLight,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          // Floating Logo / Signpost
-                          Positioned(
-                            top: 10,
-                            right: size.width * 0.15,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFBBF24), // Yellow
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFF1E293B), width: 2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.wb_cloudy_rounded,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ],
+                ),
+                child: Stack(
+                  children: [
+                    // Top-Right Decorative Circle Overlay
+                    Positioned(
+                      top: -50,
+                      right: -60,
+                      child: Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.12),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Header title
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: FadeTransition(
-                      opacity: _fadeIn,
-                      child: SlideTransition(
-                        position: _slideUp,
+                    Positioned(
+                      bottom: -30,
+                      left: -40,
+                      child: Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.08),
+                        ),
+                      ),
+                    ),
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Đăng nhập để Khám phá\nLịch trình của bạn',
-                              style: TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w900,
-                                height: 1.3,
-                                color: AppTheme.darkText,
-                                letterSpacing: -0.8,
+                            // Back Button
+                            GestureDetector(
+                              onTap: () => Navigator.of(context).pop(),
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
                               ),
                             ),
+                            const Spacer(),
+                            // User Icon & Welcome Title inside Blue Header
+                            Center(
+                              child: FadeTransition(
+                                opacity: _fadeIn,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(18),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.person_rounded,
+                                        size: 48,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    const Text(
+                                      'Đăng nhập tài khoản',
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Khám phá & Quản lý lịch trình du lịch CloudMood',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.white.withOpacity(0.85),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
                           ],
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 28),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
 
-                  // Inputs and Buttons
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                    child: FadeTransition(
-                      opacity: _fadeIn,
-                      child: SlideTransition(
-                        position: _slideUp,
-                        child: Column(
-                          children: [
+              // Inputs and Buttons Form Body
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: FadeTransition(
+                  opacity: _fadeIn,
+                  child: SlideTransition(
+                    position: _slideUp,
+                    child: Column(
+                      children: [
                             // Email field
                             TextFormField(
                               controller: _emailController,
@@ -478,36 +453,48 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                             const SizedBox(height: 28),
 
                             // Login Button
-                            SizedBox(
+                            Container(
                               width: double.infinity,
                               height: 54,
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : _handleLogin,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF1E293B), // Dark slate/black button
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  elevation: 0,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF1A56DB), Color(0xFF0EA5E9)],
                                 ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Đăng nhập',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
+                                borderRadius: BorderRadius.circular(28),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.primary.withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(28),
+                                  onTap: _isLoading ? null : _handleLogin,
+                                  child: Center(
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Đăng nhập',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.white,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 20),
@@ -656,8 +643,6 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
+        );
+      }
 }

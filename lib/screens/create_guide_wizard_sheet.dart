@@ -401,53 +401,132 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
+            return Dialog(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(28),
               ),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: guidePrimary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_add_alt_1_rounded,
-                      color: guidePrimary,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Mời đồng tác giả',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 320,
+              backgroundColor: Colors.white,
+              elevation: 8,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Container(
+                width: 340,
+                padding: const EdgeInsets.all(22),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Header Row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: guidePrimary.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.person_add_alt_1_rounded,
+                              color: guidePrimary,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Mời đồng tác giả',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                    color: AppTheme.darkText,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Thêm email người dùng CloudMood',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Email Field Label
                       Text(
                         'Nhập Email người nhận:',
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.subtitleText,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkText,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       TextField(
                         controller: _companionInputController,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: AppTheme.inputDecoration(
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                        decoration: InputDecoration(
                           hintText: 'ví dụ: banbe@gmail.com',
-                          prefixIcon: Icons.email_rounded,
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                            fontWeight: FontWeight.normal,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.mail_outline_rounded,
+                            color: guidePrimary,
+                            size: 20,
+                          ),
+                          suffixIcon: _companionInputController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    size: 18,
+                                    color: Colors.grey,
+                                  ),
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      _companionInputController.clear();
+                                      suggestions = [];
+                                      emailErrorMessage = null;
+                                      selectedUser = null;
+                                    });
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: guidePrimary,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
                         onChanged: (val) {
                           setDialogState(() {
@@ -473,22 +552,25 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                         },
                       ),
 
-                      // Suggestions list / Loading / Error alert
+                      // Suggestions / Error
                       if (isSearching)
                         const Padding(
-                          padding: EdgeInsets.only(top: 8),
+                          padding: EdgeInsets.only(top: 10),
                           child: Center(
                             child: SizedBox(
                               height: 18,
                               width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: guidePrimary),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: guidePrimary,
+                              ),
                             ),
                           ),
                         )
                       else if (suggestions.isNotEmpty)
                         Container(
                           constraints: const BoxConstraints(maxHeight: 180),
-                          margin: const EdgeInsets.only(top: 6),
+                          margin: const EdgeInsets.only(top: 8),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
@@ -555,13 +637,17 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                           padding: const EdgeInsets.only(top: 8),
                           child: Row(
                             children: [
-                              const Icon(Icons.error_outline_rounded, color: Colors.red, size: 16),
+                              const Icon(
+                                Icons.error_outline_rounded,
+                                color: Colors.redAccent,
+                                size: 16,
+                              ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   emailErrorMessage!,
                                   style: const TextStyle(
-                                    color: Colors.red,
+                                    color: Colors.redAccent,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -571,32 +657,30 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                           ),
                         ),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       Text(
                         'Đặt quyền hạn:',
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.subtitleText,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkText,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
 
-                      // Role selector options
+                      // Role Cards
                       GestureDetector(
                         onTap: () {
                           setDialogState(() => _dialogSelectedRole = 'EDITOR');
                         },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: _dialogSelectedRole == 'EDITOR'
                                 ? guidePrimary.withOpacity(0.08)
                                 : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: _dialogSelectedRole == 'EDITOR'
                                   ? guidePrimary
@@ -606,41 +690,58 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.edit_rounded,
-                                size: 18,
-                                color: _dialogSelectedRole == 'EDITOR'
-                                    ? guidePrimary
-                                    : AppTheme.subtitleText,
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _dialogSelectedRole == 'EDITOR'
+                                      ? guidePrimary.withOpacity(0.12)
+                                      : Colors.grey[100],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.edit_note_rounded,
+                                  size: 18,
+                                  color: _dialogSelectedRole == 'EDITOR'
+                                      ? guidePrimary
+                                      : Colors.grey[500],
+                                ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Chỉnh sửa (EDITOR)',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
+                                        color: _dialogSelectedRole == 'EDITOR'
+                                            ? guidePrimary
+                                            : AppTheme.darkText,
                                       ),
                                     ),
+                                    const SizedBox(height: 2),
                                     Text(
-                                      'Có thể xem, sửa bài viết và địa điểm',
+                                      'Có thể xem, viết bài và chỉnh sửa nội dung',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: AppTheme.subtitleText,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              if (_dialogSelectedRole == 'EDITOR')
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  color: guidePrimary,
-                                  size: 18,
-                                ),
+                              Radio<String>(
+                                value: 'EDITOR',
+                                groupValue: _dialogSelectedRole,
+                                activeColor: guidePrimary,
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(() => _dialogSelectedRole = val);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                         ),
@@ -651,16 +752,14 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                         onTap: () {
                           setDialogState(() => _dialogSelectedRole = 'VIEWER');
                         },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: _dialogSelectedRole == 'VIEWER'
                                 ? guidePrimary.withOpacity(0.08)
                                 : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: _dialogSelectedRole == 'VIEWER'
                                   ? guidePrimary
@@ -670,130 +769,154 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.visibility_rounded,
-                                size: 18,
-                                color: _dialogSelectedRole == 'VIEWER'
-                                    ? guidePrimary
-                                    : AppTheme.subtitleText,
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _dialogSelectedRole == 'VIEWER'
+                                      ? guidePrimary.withOpacity(0.12)
+                                      : Colors.grey[100],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.visibility_outlined,
+                                  size: 18,
+                                  color: _dialogSelectedRole == 'VIEWER'
+                                      ? guidePrimary
+                                      : Colors.grey[500],
+                                ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Chỉ xem (VIEWER)',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
+                                        color: _dialogSelectedRole == 'VIEWER'
+                                            ? guidePrimary
+                                            : AppTheme.darkText,
                                       ),
                                     ),
+                                    const SizedBox(height: 2),
                                     Text(
                                       'Chỉ được xem thông tin bài viết',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: AppTheme.subtitleText,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              if (_dialogSelectedRole == 'VIEWER')
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  color: guidePrimary,
-                                  size: 18,
-                                ),
+                              Radio<String>(
+                                value: 'VIEWER',
+                                groupValue: _dialogSelectedRole,
+                                activeColor: guidePrimary,
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(() => _dialogSelectedRole = val);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Action Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 48,
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  side: BorderSide(color: Colors.grey[300]!),
+                                ),
+                                onPressed: () {
+                                  _companionInputController.clear();
+                                  Navigator.pop(context);
+                                },
+                                child: Text(
+                                  'Hủy',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkText,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 48,
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: guidePrimary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                onPressed: () {
+                                  final email = _companionInputController.text.trim();
+                                  if (email.isEmpty || !email.contains('@')) {
+                                    setDialogState(() {
+                                      emailErrorMessage = 'Vui lòng nhập Email hợp lệ';
+                                    });
+                                    return;
+                                  }
+
+                                  final alreadyInvited = _invitedCompanionsList.any(
+                                    (c) => c.email.toLowerCase() == email.toLowerCase(),
+                                  );
+                                  if (alreadyInvited) {
+                                    setDialogState(() {
+                                      emailErrorMessage = 'Email này đã có trong danh sách';
+                                    });
+                                    return;
+                                  }
+
+                                  setState(() {
+                                    _invitedCompanionsList.add(
+                                      InvitedGuideCompanion(
+                                        email: email,
+                                        role: _dialogSelectedRole,
+                                        fullName: selectedUser?['fullName'],
+                                        avatar: selectedUser?['avatar'],
+                                      ),
+                                    );
+                                  });
+
+                                  _companionInputController.clear();
+                                  Navigator.pop(context);
+                                },
+                                child: const Text(
+                                  'Thêm & Mời',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               ),
-              actions: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          side: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        onPressed: () {
-                          _companionInputController.clear();
-                          Navigator.pop(context);
-                        },
-                        child: Text(
-                          'Hủy',
-                          style: TextStyle(
-                            color: AppTheme.subtitleText,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: guidePrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        onPressed: () {
-                          final email = _companionInputController.text.trim();
-                          if (email.isEmpty || !email.contains('@')) {
-                            setDialogState(() {
-                              emailErrorMessage = 'Vui lòng nhập Email hợp lệ';
-                            });
-                            return;
-                          }
-
-                          final alreadyInvited = _invitedCompanionsList.any(
-                            (c) => c.email.toLowerCase() == email.toLowerCase(),
-                          );
-                          if (alreadyInvited) {
-                            setDialogState(() {
-                              emailErrorMessage = 'Email này đã có trong danh sách';
-                            });
-                            return;
-                          }
-
-                          setState(() {
-                            _invitedCompanionsList.add(
-                              InvitedGuideCompanion(
-                                email: email,
-                                role: _dialogSelectedRole,
-                                fullName: selectedUser?['fullName'],
-                                avatar: selectedUser?['avatar'],
-                              ),
-                            );
-                          });
-
-                          _companionInputController.clear();
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Thêm & Mời',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             );
           },
         );
@@ -1095,19 +1218,19 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
           ShaderMask(
             shaderCallback: (bounds) => guideGradient.createShader(bounds),
             child: const Text(
-              'Bài viết hướng dẫn của bạn\nbắt đầu từ đây',
+              'Tên bài cẩm nang du lịch',
               style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
                 color: Colors.white,
-                height: 1.25,
+                letterSpacing: -0.3,
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            'Đặt một cái tên thật ý nghĩa và chọn điểm đến bạn viết hướng dẫn.',
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            'Đặt tên và chọn điểm đến bạn muốn viết cẩm nang.',
+            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
           ),
           const SizedBox(height: 20),
 
@@ -1783,21 +1906,21 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
           ShaderMask(
             shaderCallback: (bounds) => guideGradient.createShader(bounds),
             child: const Text(
-              'Chủ đề hướng dẫn',
+              'Chủ đề cẩm nang',
               style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
                 color: Colors.white,
+                letterSpacing: -0.3,
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            'Chọn các danh mục phù hợp để giúp mọi người dễ dàng tìm thấy hướng dẫn của bạn.',
+            'Chọn danh mục để người xem dễ dàng tìm thấy.',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               color: Colors.grey[600],
-              height: 1.4,
             ),
           ),
           const SizedBox(height: 20),

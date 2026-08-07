@@ -119,7 +119,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     setState(() {
       _selectedDestination = destName;
       if (!_userEditedTitle || _tripTitleController.text.trim().isEmpty) {
-        _tripTitleController.text = 'Chuyến đi $destName AI';
+        _tripTitleController.text = 'Chuyến đi $destName';
       }
     });
   }
@@ -1445,61 +1445,140 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
+            return Dialog(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(28),
               ),
-              title: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _aiPurple.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.person_add_alt_1_rounded,
-                      color: _aiPurple,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Mời bạn đồng hành',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 320,
+              backgroundColor: Colors.white,
+              elevation: 8,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Container(
+                width: 340,
+                padding: const EdgeInsets.all(22),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Header Row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: _aiPurple.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.person_add_alt_1_rounded,
+                              color: _aiPurple,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Mời bạn đồng hành',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                    color: AppTheme.darkText,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Thêm email người dùng CloudMood',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Email Field Label
                       Text(
                         'Nhập Email người nhận:',
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.subtitleText,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkText,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       TextField(
                         controller: _companionInputController,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: AppTheme.inputDecoration(
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                        decoration: InputDecoration(
                           hintText: 'ví dụ: banbe@gmail.com',
-                          prefixIcon: Icons.email_rounded,
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                            fontWeight: FontWeight.normal,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.mail_outline_rounded,
+                            color: _aiPurple,
+                            size: 20,
+                          ),
+                          suffixIcon: _companionInputController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    size: 18,
+                                    color: Colors.grey,
+                                  ),
+                                  onPressed: () {
+                                    setDialogState(() {
+                                      _companionInputController.clear();
+                                      suggestions = [];
+                                      emailErrorMessage = null;
+                                      selectedUser = null;
+                                    });
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: _aiPurple,
+                              width: 1.5,
+                            ),
+                          ),
                         ),
                         onChanged: (val) {
                           setDialogState(() {
                             emailErrorMessage = null;
                             selectedUser = null;
                           });
-                          if (debounceTimer?.isActive ?? false)
-                            debounceTimer!.cancel();
+                          if (debounceTimer?.isActive ?? false) debounceTimer!.cancel();
                           if (val.trim().isEmpty) {
                             setDialogState(() {
                               suggestions = [];
@@ -1507,46 +1586,36 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                             });
                             return;
                           }
-                          debounceTimer = Timer(
-                            const Duration(milliseconds: 300),
-                            () async {
-                              final results = await DatabaseService()
-                                  .searchUsersByEmail(val.trim());
-                              final alreadyInvited = _invitedCompanionsList
-                                  .map((c) => c.email.toLowerCase())
-                                  .toSet();
-                              setDialogState(() {
-                                suggestions = results
-                                    .where(
-                                      (u) => !alreadyInvited.contains(
-                                        (u['email'] ?? '')
-                                            .toString()
-                                            .toLowerCase(),
-                                      ),
-                                    )
-                                    .toList();
-                                isSearching = false;
-                              });
-                            },
-                          );
+                          debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+                            final results = await DatabaseService().searchUsersByEmail(val.trim());
+                            final alreadyInvited = _invitedCompanionsList.map((c) => c.email.toLowerCase()).toSet();
+                            setDialogState(() {
+                              suggestions = results.where((u) => !alreadyInvited.contains((u['email'] ?? '').toString().toLowerCase())).toList();
+                              isSearching = false;
+                            });
+                          });
                         },
                       ),
 
+                      // Suggestions / Error
                       if (isSearching)
                         const Padding(
-                          padding: EdgeInsets.only(top: 8),
+                          padding: EdgeInsets.only(top: 10),
                           child: Center(
                             child: SizedBox(
                               height: 18,
                               width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: _aiPurple,
+                              ),
                             ),
                           ),
                         )
                       else if (suggestions.isNotEmpty)
                         Container(
                           constraints: const BoxConstraints(maxHeight: 180),
-                          margin: const EdgeInsets.only(top: 6),
+                          margin: const EdgeInsets.only(top: 8),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
@@ -1568,48 +1637,30 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                 itemCount: suggestions.length,
                                 itemBuilder: (context, index) {
                                   final user = suggestions[index];
-                                  final String fullName =
-                                      user['fullName'] ??
-                                      'Người dùng CloudMood';
+                                  final String fullName = user['fullName'] ?? 'Người dùng CloudMood';
                                   final String email = user['email'] ?? '';
                                   final String? avatar = user['avatar'];
 
                                   return ListTile(
                                     dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 2,
-                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                                     leading: CircleAvatar(
                                       radius: 16,
-                                      backgroundColor: _aiPurple.withOpacity(
-                                        0.1,
-                                      ),
-                                      backgroundImage:
-                                          (avatar != null && avatar.isNotEmpty)
+                                      backgroundColor: _aiPurple.withOpacity(0.1),
+                                      backgroundImage: (avatar != null && avatar.isNotEmpty)
                                           ? NetworkImage(avatar)
                                           : null,
                                       child: (avatar == null || avatar.isEmpty)
-                                          ? const Icon(
-                                              Icons.person,
-                                              size: 18,
-                                              color: _aiPurple,
-                                            )
+                                          ? const Icon(Icons.person, size: 18, color: _aiPurple)
                                           : null,
                                     ),
                                     title: Text(
                                       fullName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                     ),
                                     subtitle: Text(
                                       email,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey[600],
-                                      ),
+                                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                                     ),
                                     onTap: () {
                                       setDialogState(() {
@@ -1633,7 +1684,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                             children: [
                               const Icon(
                                 Icons.error_outline_rounded,
-                                color: Colors.red,
+                                color: Colors.redAccent,
                                 size: 16,
                               ),
                               const SizedBox(width: 6),
@@ -1641,7 +1692,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                 child: Text(
                                   emailErrorMessage!,
                                   style: const TextStyle(
-                                    color: Colors.red,
+                                    color: Colors.redAccent,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1651,32 +1702,30 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                           ),
                         ),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       Text(
                         'Đặt quyền hạn:',
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.subtitleText,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkText,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
 
-                      // Role selector option 1: EDITOR
+                      // Role Cards
                       GestureDetector(
                         onTap: () {
                           setDialogState(() => dialogSelectedRole = 'EDITOR');
                         },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: dialogSelectedRole == 'EDITOR'
                                 ? _aiPurple.withOpacity(0.08)
                                 : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: dialogSelectedRole == 'EDITOR'
                                   ? _aiPurple
@@ -1686,62 +1735,76 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.edit_rounded,
-                                size: 18,
-                                color: dialogSelectedRole == 'EDITOR'
-                                    ? _aiPurple
-                                    : AppTheme.subtitleText,
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: dialogSelectedRole == 'EDITOR'
+                                      ? _aiPurple.withOpacity(0.12)
+                                      : Colors.grey[100],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.edit_note_rounded,
+                                  size: 18,
+                                  color: dialogSelectedRole == 'EDITOR'
+                                      ? _aiPurple
+                                      : Colors.grey[500],
+                                ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Chỉnh sửa (EDITOR)',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
+                                        color: dialogSelectedRole == 'EDITOR'
+                                            ? _aiPurple
+                                            : AppTheme.darkText,
                                       ),
                                     ),
+                                    const SizedBox(height: 2),
                                     Text(
                                       'Có thể xem, sửa lịch trình và địa điểm',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: AppTheme.subtitleText,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              if (dialogSelectedRole == 'EDITOR')
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  color: _aiPurple,
-                                  size: 18,
-                                ),
+                              Radio<String>(
+                                value: 'EDITOR',
+                                groupValue: dialogSelectedRole,
+                                activeColor: _aiPurple,
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(() => dialogSelectedRole = val);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 8),
 
-                      // Role selector option 2: VIEWER
                       GestureDetector(
                         onTap: () {
                           setDialogState(() => dialogSelectedRole = 'VIEWER');
                         },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: dialogSelectedRole == 'VIEWER'
                                 ? _aiPurple.withOpacity(0.08)
                                 : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: dialogSelectedRole == 'VIEWER'
                                   ? _aiPurple
@@ -1751,119 +1814,154 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                           ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.visibility_rounded,
-                                size: 18,
-                                color: dialogSelectedRole == 'VIEWER'
-                                    ? _aiPurple
-                                    : AppTheme.subtitleText,
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: dialogSelectedRole == 'VIEWER'
+                                      ? _aiPurple.withOpacity(0.12)
+                                      : Colors.grey[100],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.visibility_outlined,
+                                  size: 18,
+                                  color: dialogSelectedRole == 'VIEWER'
+                                      ? _aiPurple
+                                      : Colors.grey[500],
+                                ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Chỉ xem (VIEWER)',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
+                                        color: dialogSelectedRole == 'VIEWER'
+                                            ? _aiPurple
+                                            : AppTheme.darkText,
                                       ),
                                     ),
+                                    const SizedBox(height: 2),
                                     Text(
                                       'Chỉ được xem thông tin chuyến đi',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: AppTheme.subtitleText,
+                                        color: Colors.grey[600],
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              if (dialogSelectedRole == 'VIEWER')
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  color: _aiPurple,
-                                  size: 18,
-                                ),
+                              Radio<String>(
+                                value: 'VIEWER',
+                                groupValue: dialogSelectedRole,
+                                activeColor: _aiPurple,
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(() => dialogSelectedRole = val);
+                                  }
+                                },
+                              ),
                             ],
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Action Buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 48,
+                              child: OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  side: BorderSide(color: Colors.grey[300]!),
+                                ),
+                                onPressed: () {
+                                  _companionInputController.clear();
+                                  Navigator.pop(context);
+                                },
+                                child: Text(
+                                  'Hủy',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkText,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 48,
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _aiPurple,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                onPressed: () async {
+                                  final email = _companionInputController.text.trim();
+                                  if (email.isEmpty || !email.contains('@')) {
+                                    setDialogState(() {
+                                      emailErrorMessage = 'Email không hợp lệ!';
+                                    });
+                                    return;
+                                  }
+
+                                  final isAlreadyAdded = _invitedCompanionsList.any(
+                                    (c) => c.email.toLowerCase() == email.toLowerCase(),
+                                  );
+                                  if (isAlreadyAdded) {
+                                    setDialogState(() {
+                                      emailErrorMessage = 'Người dùng này đã có trong danh sách bạn đồng hành';
+                                    });
+                                    return;
+                                  }
+
+                                  setState(() {
+                                    _invitedCompanionsList.add(
+                                      InvitedCompanion(
+                                        email: email,
+                                        role: dialogSelectedRole,
+                                        fullName: selectedUser?['fullName'],
+                                        avatar: selectedUser?['avatar'],
+                                      ),
+                                    );
+                                  });
+
+                                  _companionInputController.clear();
+                                  Navigator.pop(context);
+                                },
+                                child: const Text(
+                                  'Thêm & Mời',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               ),
-              actions: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          side: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        onPressed: () {
-                          _companionInputController.clear();
-                          Navigator.pop(context);
-                        },
-                        child: Text(
-                          'Hủy',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.darkText,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _aiPurple,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        onPressed: () {
-                          final email = _companionInputController.text.trim();
-                          if (email.isEmpty || !email.contains('@')) {
-                            setDialogState(() {
-                              emailErrorMessage = 'Email không hợp lệ!';
-                            });
-                            return;
-                          }
-
-                          setState(() {
-                            _invitedCompanionsList.add(
-                              InvitedCompanion(
-                                email: email,
-                                role: dialogSelectedRole,
-                                fullName: selectedUser?['fullName'],
-                                avatar: selectedUser?['avatar'],
-                              ),
-                            );
-                          });
-
-                          _companionInputController.clear();
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          'Thêm & Mời',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             );
           },
         );
@@ -1963,9 +2061,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          _currentStep > 0
-                              ? Icons.arrow_back_rounded
-                              : Icons.close_rounded,
+                          Icons.arrow_back_rounded,
                           size: 20,
                           color: AppTheme.darkText,
                         ),
@@ -2098,7 +2194,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         child: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF0F0C20), Color(0xFF1B0B38), Color(0xFF2E0949)],
+              colors: [Color(0xFFFFFFFF), Color(0xFFF5F3FF), Color(0xFFEDE9FE)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -2122,20 +2218,21 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                       children: [
                         // Ambient Outer Glow Ring
                         Container(
-                          width: 120,
-                          height: 120,
+                          width: 110,
+                          height: 110,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            color: Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: _aiPurple.withOpacity(0.4),
-                                blurRadius: 40,
-                                spreadRadius: 8,
+                                color: _aiPurple.withOpacity(0.2),
+                                blurRadius: 30,
+                                spreadRadius: 6,
                               ),
                               BoxShadow(
-                                color: const Color(0xFF0EA5E9).withOpacity(0.3),
-                                blurRadius: 30,
-                                spreadRadius: 4,
+                                color: const Color(0xFF0EA5E9).withOpacity(0.15),
+                                blurRadius: 20,
+                                spreadRadius: 2,
                               ),
                             ],
                           ),
@@ -2143,19 +2240,19 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
                         // Animated Gradient Core Icon Container
                         Container(
-                          width: 84,
-                          height: 84,
+                          width: 80,
+                          height: 80,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: const LinearGradient(
-                              colors: [_aiPurple, _aiPurpleDark],
+                              colors: [_aiPurple, Color(0xFF4A00E0)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 15,
+                                color: _aiPurple.withOpacity(0.4),
+                                blurRadius: 16,
                                 offset: const Offset(0, 6),
                               ),
                             ],
@@ -2163,7 +2260,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                           child: const Center(
                             child: Icon(
                               Icons.auto_awesome_rounded,
-                              size: 40,
+                              size: 38,
                               color: Colors.white,
                             ),
                           ),
@@ -2176,15 +2273,15 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                     // App AI Title & Destination Info
                     ShaderMask(
                       shaderCallback: (bounds) => const LinearGradient(
-                        colors: [Colors.white, Color(0xFFE2E8F0)],
+                        colors: [_aiPurple, Color(0xFF4A00E0)],
                       ).createShader(bounds),
                       child: const Text(
                         'CloudMood AI Assistant',
                         style: TextStyle(
                           fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w900,
                           color: Colors.white,
-                          letterSpacing: 0.5,
+                          letterSpacing: -0.3,
                         ),
                       ),
                     ),
@@ -2194,168 +2291,180 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.white.withOpacity(0.7),
-                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 28),
 
-                    // Progress Bar & Percentage Pill Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            currentStepData['title']!,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _aiPurple.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _aiPurple.withOpacity(0.5),
-                            ),
-                          ),
-                          child: Text(
-                            '$percentInt%',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFE0E7FF),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    // Smooth Custom Progress Bar Indicator
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: SizedBox(
-                        height: 8,
-                        child: LinearProgressIndicator(
-                          value: _creationProgress,
-                          backgroundColor: Colors.white.withOpacity(0.12),
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            _aiPurple,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-                    Text(
-                      currentStepData['desc']!,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.6),
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Step-by-Step Processing Timeline Checklist Card
+                    // Card Container for Progress & Timeline
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(20),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.12),
+                          color: Colors.grey[200]!,
                           width: 1,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
                       child: Column(
-                        children: List.generate(_aiLoadingSteps.length, (
-                          index,
-                        ) {
-                          final step = _aiLoadingSteps[index];
-                          final isDone = index < _activeStepIndex;
-                          final isCurrent = index == _activeStepIndex;
+                        children: [
+                          // Progress Bar Header
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  currentStepData['title']!,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.darkText,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _aiPurple.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '$percentInt%',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                    color: _aiPurple,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
 
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 5),
-                            child: Row(
-                              children: [
-                                // Icon Indicator
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  width: 22,
-                                  height: 22,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: isDone
-                                        ? const Color(0xFF10B981)
-                                        : (isCurrent
-                                              ? _aiPurple
-                                              : Colors.white.withOpacity(0.1)),
-                                  ),
-                                  child: Center(
-                                    child: isDone
-                                        ? const Icon(
-                                            Icons.check_rounded,
-                                            size: 13,
-                                            color: Colors.white,
-                                          )
-                                        : (isCurrent
-                                              ? const SizedBox(
-                                                  width: 10,
-                                                  height: 10,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: Colors.white,
-                                                        strokeWidth: 2,
-                                                      ),
-                                                )
-                                              : Text(
-                                                  '${index + 1}',
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    color: Colors.white
-                                                        .withOpacity(0.5),
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                )),
-                                  ),
+                          const SizedBox(height: 12),
+
+                          // Smooth Custom Progress Bar Indicator
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              height: 8,
+                              child: LinearProgressIndicator(
+                                value: _creationProgress,
+                                backgroundColor: const Color(0xFFF1F5F9),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  _aiPurple,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    step['title']!,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: isCurrent
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                      color: isDone || isCurrent
-                                          ? Colors.white
-                                          : Colors.white.withOpacity(0.4),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          );
-                        }),
+                          ),
+
+                          const SizedBox(height: 10),
+                          Text(
+                            currentStepData['desc']!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[500],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+                          Divider(height: 1, color: Colors.grey[200]),
+                          const SizedBox(height: 16),
+
+                          // Step-by-Step Processing Timeline Checklist
+                          Column(
+                            children: List.generate(_aiLoadingSteps.length, (
+                              index,
+                            ) {
+                              final step = _aiLoadingSteps[index];
+                              final isDone = index < _activeStepIndex;
+                              final isCurrent = index == _activeStepIndex;
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                child: Row(
+                                  children: [
+                                    // Icon Indicator
+                                    AnimatedContainer(
+                                      duration: const Duration(milliseconds: 300),
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: isDone
+                                            ? const Color(0xFF10B981)
+                                            : (isCurrent
+                                                  ? _aiPurple
+                                                  : const Color(0xFFF1F5F9)),
+                                      ),
+                                      child: Center(
+                                        child: isDone
+                                            ? const Icon(
+                                                Icons.check_rounded,
+                                                size: 14,
+                                                color: Colors.white,
+                                              )
+                                            : (isCurrent
+                                                  ? const SizedBox(
+                                                      width: 12,
+                                                      height: 12,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            color: Colors.white,
+                                                            strokeWidth: 2,
+                                                          ),
+                                                    )
+                                                  : Text(
+                                                      '${index + 1}',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: Colors.grey[500],
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    )),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        step['title']!,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: isCurrent || isDone
+                                              ? FontWeight.bold
+                                              : FontWeight.w500,
+                                          color: isCurrent
+                                              ? _aiPurple
+                                              : (isDone
+                                                    ? AppTheme.darkText
+                                                    : Colors.grey[400]),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -2474,19 +2583,19 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
             ).createShader(bounds),
             child: const Text(
-              'Hành trình của bạn\nbắt đầu từ đây',
+              'Bắt đầu tạo lịch trình AI',
               style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
                 color: Colors.white,
-                height: 1.25,
+                letterSpacing: -0.3,
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            'Đặt một cái tên thật ý nghĩa và chọn điểm đến bạn dự định ghé thăm.',
-            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            'Đặt tên và chọn điểm đến dự định của bạn.',
+            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
           ),
           const SizedBox(height: 20),
 
@@ -2514,7 +2623,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               },
               decoration: InputDecoration(
                 hintText: _selectedDestination.isNotEmpty
-                    ? 'Chuyến đi $_selectedDestination AI'
+                    ? 'Chuyến đi $_selectedDestination'
                     : 'Nhập tên chuyến đi...',
                 hintStyle: TextStyle(color: Colors.grey[400]),
                 prefixIcon: const Icon(
@@ -2902,7 +3011,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Lịch trình AI hỗ trợ tối đa 7 ngày để tối ưu hóa địa điểm',
+                'AI hỗ trợ thiết kế lịch trình tối đa 7 ngày',
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 12),
@@ -3420,18 +3529,19 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
             ).createShader(bounds),
             child: const Text(
-              'Bạn đồng hành & Quyền xem',
+              'Thành viên & Quyền xem',
               style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
                 color: Colors.white,
+                letterSpacing: -0.3,
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            'Thêm người đi cùng và chọn mức độ riêng tư cho chuyến đi.',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            'Chọn mức độ riêng tư và thêm người đi cùng.',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 20),
 
@@ -3753,6 +3863,11 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
   // STEP 5: Budget & Currency (Single values for total trip)
   Widget _buildStep5Budget() {
+    final bool isLowBudgetDisabled = _days >= 3;
+    if (isLowBudgetDisabled && _selectedBudgetLevel == 'Tiết kiệm') {
+      _selectedBudgetLevel = 'Vừa phải';
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -3764,228 +3879,204 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
             ).createShader(bounds),
             child: const Text(
-              'Dự kiến ngân sách chuyến đi',
+              'Dự kiến ngân sách',
               style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
                 color: Colors.white,
+                letterSpacing: -0.3,
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            'Tổng ngân sách dự kiến cho cả chuyến đi ($_days ngày)',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            'Chi phí ước tính cho chuyến đi $_days ngày',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 20),
 
-          // Selector Preset vs Custom
-          Row(
-            children: [
-              Expanded(
-                child: ChoiceChip(
-                  label: Center(
-                    child: Text(
-                      'Mức chọn sẵn',
-                      style: TextStyle(
-                        fontFamily: 'SDK_SC_Web-Heavy',
-                        color: !_useCustomBudget
-                            ? Colors.white
-                            : Colors.black87,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  selected: !_useCustomBudget,
-                  selectedColor: _aiPurple,
-                  labelStyle: TextStyle(
-                    fontFamily: 'SDK_SC_Web-Heavy',
-                    color: !_useCustomBudget ? Colors.white : Colors.black87,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  onSelected: (selected) {
-                    if (selected) setState(() => _useCustomBudget = false);
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ChoiceChip(
-                  label: Center(
-                    child: Text(
-                      'Tự nhập số tiền',
-                      style: TextStyle(
-                        fontFamily: 'SDK_SC_Web-Heavy',
-                        color: _useCustomBudget ? Colors.white : Colors.black87,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  selected: _useCustomBudget,
-                  selectedColor: _aiPurple,
-                  labelStyle: TextStyle(
-                    fontFamily: 'SDK_SC_Web-Heavy',
-                    color: _useCustomBudget ? Colors.white : Colors.black87,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  onSelected: (selected) {
-                    if (selected) setState(() => _useCustomBudget = true);
-                  },
-                ),
-              ),
-            ],
+          // Preset Option 1: Tiết kiệm
+          _buildBudgetPresetCard(
+            'Tiết kiệm',
+            '3.000.000 VNĐ / chuyến đi',
+            isDisabled: isLowBudgetDisabled,
+            disabledReason:
+                'Mức Tiết kiệm (3tr) chỉ phù hợp cho chuyến đi 1-2 ngày. Chuyến đi $_days ngày cần ngân sách tối thiểu từ mức Vừa phải.',
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
 
-          if (!_useCustomBudget) ...[
-            Builder(
-              builder: (context) {
-                final bool isLowBudgetDisabled = _days >= 3;
-                if (isLowBudgetDisabled &&
-                    _selectedBudgetLevel == 'Tiết kiệm') {
-                  _selectedBudgetLevel = 'Vừa phải';
-                }
-                return Column(
-                  children: [
-                    _buildBudgetPresetCard(
-                      'Tiết kiệm 💵',
-                      '3.000.000 VNĐ / chuyến đi',
-                      isDisabled: isLowBudgetDisabled,
-                      disabledReason:
-                          'Mức Tiết kiệm (3tr) chỉ phù hợp cho chuyến đi 1-2 ngày. Chuyến đi $_days ngày cần ngân sách tối thiểu từ mức Vừa phải.',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildBudgetPresetCard(
-                      'Vừa phải 💳',
-                      '7.000.000 VNĐ / chuyến đi',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildBudgetPresetCard(
-                      'Sang trọng 💎',
-                      '15.000.000 VNĐ / chuyến đi',
-                    ),
-                  ],
-                );
-              },
-            ),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Nhập tổng ngân sách cho cả chuyến đi:',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
+          // Preset Option 2: Vừa phải
+          _buildBudgetPresetCard(
+            'Vừa phải',
+            '7.000.000 VNĐ / chuyến đi',
+          ),
+          const SizedBox(height: 12),
+
+          // Preset Option 3: Sang trọng
+          _buildBudgetPresetCard(
+            'Sang trọng',
+            '15.000.000 VNĐ / chuyến đi',
+          ),
+          const SizedBox(height: 12),
+
+          // Custom Option 4: Tự nhập số tiền (Directly below!)
+          _buildCustomBudgetCard(),
+
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomBudgetCard() {
+    final isSelected = _useCustomBudget;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _useCustomBudget = true;
+          _selectedBudgetLevel = 'Tự nhập';
+        });
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? _aiPurple.withOpacity(0.08)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected ? _aiPurple : Colors.grey.shade200,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _customBudgetController,
-                          keyboardType: TextInputType.number,
-                          onChanged: (val) {
-                            setState(() {});
-                          },
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            CurrencyInputFormatter(),
-                          ],
-                          decoration: InputDecoration(
-                            hintText: _days >= 3 ? '3.000.000' : '1.000.000',
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide(
-                                color: Colors.grey.shade300,
-                              ),
-                            ),
-                          ),
+                      Text(
+                        'Tự nhập số tiền',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? _aiPurple : AppTheme.darkText,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedCurrency,
-                            items: _currencies
-                                .map(
-                                  (c) => DropdownMenuItem(
-                                    value: c,
-                                    child: Text(
-                                      c,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() => _selectedCurrency = val);
-                              }
-                            },
-                          ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Nhập hạn mức ngân sách tùy chỉnh theo nhu cầu',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
                         ),
                       ),
                     ],
                   ),
-                  Builder(
-                    builder: (context) {
-                      final rawText = _customBudgetController.text
-                          .replaceAll('.', '')
-                          .replaceAll(',', '')
-                          .trim();
-                      final int customAmount = int.tryParse(rawText) ?? 0;
-                      final int minRequired = _days >= 3 ? 3000000 : 1000000;
-                      if (customAmount > 0 && customAmount < minRequired) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8.0, left: 4.0),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                size: 14,
-                                color: Colors.redAccent,
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: const Text(
-                                  'Chưa đáp ứng được ngân sách tối thiểu',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.redAccent,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ],
-              ),
+                ),
+                Radio<bool>(
+                  value: true,
+                  groupValue: isSelected,
+                  activeColor: _aiPurple,
+                  onChanged: (_) {
+                    setState(() {
+                      _useCustomBudget = true;
+                      _selectedBudgetLevel = 'Tự nhập';
+                    });
+                  },
+                ),
+              ],
             ),
+            if (isSelected) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _customBudgetController,
+                        keyboardType: TextInputType.number,
+                        autofocus: true,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkText,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          CurrencyInputFormatter(),
+                        ],
+                        decoration: InputDecoration(
+                          hintText: _days >= 3 ? '3.000.000' : '1.000.000',
+                          hintStyle: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 15,
+                            fontWeight: FontWeight.normal,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onChanged: (val) {
+                          setState(() {});
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'VNĐ',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: _aiPurple,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Builder(
+                builder: (context) {
+                  final rawText = _customBudgetController.text
+                      .replaceAll('.', '')
+                      .replaceAll(',', '')
+                      .trim();
+                  final int customAmount = int.tryParse(rawText) ?? 0;
+                  final int minRequired = _days >= 3 ? 3000000 : 1000000;
+                  if (customAmount > 0 && customAmount < minRequired) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                      child: Text(
+                        'Chưa đáp ứng được ngân sách tối thiểu cho chuyến đi $_days ngày',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ],
           ],
-          const SizedBox(height: 24),
-        ],
+        ),
       ),
     );
   }
@@ -4023,11 +4114,11 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
-                'Tùy chọn — Trợ lý AI sẽ cá nhân hóa lịch trình theo đúng sở thích của bạn',
+                'Tùy chọn — AI sẽ cá nhân hóa lịch trình theo sở thích bạn',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 13,
                   color: Colors.grey.shade600,
                 ),
               ),
@@ -4242,7 +4333,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                               border: Border.all(color: Colors.amber.shade200),
                             ),
                             child: Text(
-                              'Chỉ áp dụng 1-2 ngày 🔒',
+                              'Chỉ áp dụng 1-2 ngày',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -4264,8 +4355,19 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                   ],
                 ),
               ),
-              if (isSelected && !isDisabled)
-                const Icon(Icons.check_circle_rounded, color: _aiPurple),
+              Radio<bool>(
+                value: true,
+                groupValue: isSelected,
+                activeColor: _aiPurple,
+                onChanged: isDisabled
+                    ? null
+                    : (_) {
+                        setState(() {
+                          _selectedBudgetLevel = levelKey;
+                          _useCustomBudget = false;
+                        });
+                      },
+              ),
             ],
           ),
         ),

@@ -968,135 +968,142 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         final comment = _comments[index];
                         final cAuthor = comment['user'] ?? {};
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              AvatarImage(avatarUrl: cAuthor['avatar'], size: 32),
-                              const SizedBox(width: 12),
+                              AvatarImage(avatarUrl: cAuthor['avatar'], size: 36),
+                              const SizedBox(width: 10),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              cAuthor['fullName'] ?? 'Người dùng',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: AppTheme.darkText,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              _formatTimeAgo(comment['createdAt']),
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.grey[500],
-                                              ),
-                                            ),
-                                            if (comment['editedAt'] != null) ...[
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '• Đã chỉnh sửa',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: Colors.grey[500],
-                                                  fontStyle: FontStyle.italic,
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                        if (AuthService().currentUser.value != null)
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
                                           Row(
-                                            mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              // Sửa bình luận - Chỉ chủ nhân bình luận
-                                              if (comment['userId']?.toString() == AuthService().currentUser.value!.id.toString()) ...[
-                                                GestureDetector(
-                                                  onTap: () => _startEditComment(comment),
-                                                  child: Padding(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                    child: Icon(
-                                                      Icons.edit_outlined,
-                                                      size: 16,
-                                                      color: Colors.grey[400],
-                                                    ),
+                                              Text(
+                                                cAuthor['fullName'] ?? 'Người dùng',
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Color(0xFF0F172A),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                _formatTimeAgo(comment['createdAt']),
+                                                style: const TextStyle(
+                                                  fontSize: 10.5,
+                                                  color: Color(0xFF94A3B8),
+                                                ),
+                                              ),
+                                              if (comment['editedAt'] != null) ...[
+                                                const SizedBox(width: 4),
+                                                const Text(
+                                                  '• Đã chỉnh sửa',
+                                                  style: TextStyle(
+                                                    fontSize: 10.5,
+                                                    color: Color(0xFF94A3B8),
+                                                    fontStyle: FontStyle.italic,
                                                   ),
                                                 ),
-                                                const SizedBox(width: 4),
                                               ],
-                                              // Xóa bình luận - Chủ bình luận HOẶC chủ bài viết
-                                              if (comment['userId']?.toString() == AuthService().currentUser.value!.id.toString() ||
-                                                  _post?['userId']?.toString() == AuthService().currentUser.value!.id.toString())
-                                                GestureDetector(
-                                                  onTap: () {
-                                                    final int? commentId = int.tryParse(comment['id']?.toString() ?? '');
-                                                    if (commentId != null) {
-                                                      _deleteComment(commentId);
-                                                    }
-                                                  },
-                                                  child: Padding(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                                    child: Icon(
-                                                      Icons.delete_outline_rounded,
-                                                      size: 16,
-                                                      color: Colors.grey[400],
+                                            ],
+                                          ),
+                                          if (AuthService().currentUser.value != null)
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (comment['userId']?.toString() == AuthService().currentUser.value!.id.toString()) ...[
+                                                  GestureDetector(
+                                                    onTap: () => _startEditComment(comment),
+                                                    child: const Padding(
+                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                      child: Icon(
+                                                        Icons.edit_outlined,
+                                                        size: 15,
+                                                        color: Color(0xFF94A3B8),
+                                                      ),
                                                     ),
                                                   ),
+                                                  const SizedBox(width: 4),
+                                                ],
+                                                if (comment['userId']?.toString() == AuthService().currentUser.value!.id.toString() ||
+                                                    _post?['userId']?.toString() == AuthService().currentUser.value!.id.toString())
+                                                  GestureDetector(
+                                                    onTap: () {
+                                                      final int? commentId = int.tryParse(comment['id']?.toString() ?? '');
+                                                      if (commentId != null) {
+                                                        _deleteComment(commentId);
+                                                      }
+                                                    },
+                                                    child: const Padding(
+                                                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                      child: Icon(
+                                                        Icons.delete_outline_rounded,
+                                                        size: 15,
+                                                        color: Color(0xFF94A3B8),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        comment['content'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 13.5,
+                                          color: Color(0xFF334155),
+                                          height: 1.35,
+                                        ),
+                                      ),
+                                      if (comment['mediaUrl'] != null) ...[
+                                        const SizedBox(height: 8),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              Image.network(
+                                                comment['mediaUrl'],
+                                                height: 120,
+                                                width: 160,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error, stackTrace) =>
+                                                    Container(
+                                                      color: Colors.grey[200],
+                                                      width: 160,
+                                                      height: 100,
+                                                      child: const Icon(Icons.broken_image, size: 20),
+                                                    ),
+                                              ),
+                                              if (comment['mediaType'] == 'VIDEO')
+                                                Container(
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: const BoxDecoration(
+                                                    color: Colors.black54,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
                                                 ),
                                             ],
                                           ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      comment['content'] ?? '',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey[800],
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                    if (comment['mediaUrl'] != null) ...[
-                                      const SizedBox(height: 8),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Stack(
-                                          alignment: Alignment.center,
-                                          children: [
-                                            Image.network(
-                                              comment['mediaUrl'],
-                                              height: 120,
-                                              width: 160,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) =>
-                                                  Container(
-                                                    color: Colors.grey[200],
-                                                    width: 160,
-                                                    height: 100,
-                                                    child: const Icon(Icons.broken_image, size: 20),
-                                                  ),
-                                            ),
-                                            if (comment['mediaType'] == 'VIDEO')
-                                              Container(
-                                                padding: const EdgeInsets.all(4),
-                                                decoration: const BoxDecoration(
-                                                  color: Colors.black54,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
-                                              ),
-                                          ],
                                         ),
-                                      ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -1104,7 +1111,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         );
                       },
                     ),
-                  const SizedBox(height: 80), // Chừa khoảng trống để tránh đè lên ô nhập
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
@@ -1113,26 +1120,25 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           // 7. Write Comment Box
           Container(
             padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
+              left: 14,
+              right: 14,
               top: 10,
               bottom: MediaQuery.of(context).viewInsets.bottom + 10,
             ),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey[200]!)),
+              border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Banner khi đang sửa bình luận
                 if (_editingCommentId != null)
                   Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
+                      color: const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -1142,7 +1148,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           'Đang chỉnh sửa bình luận...',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppTheme.primary,
+                            color: Color(0xFF2563EB),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1151,13 +1157,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           child: const Icon(
                             Icons.cancel_rounded,
                             size: 16,
-                            color: AppTheme.primary,
+                            color: Color(0xFF2563EB),
                           ),
                         ),
                       ],
                     ),
                   ),
-                // Preview selected media
                 if (_selectedCommentMedia != null) ...[
                   Container(
                     margin: const EdgeInsets.only(bottom: 8),
@@ -1207,7 +1212,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                   ),
                 ] else if (_editingCommentExistingMediaUrl != null && !_clearCommentMedia) ...[
-                  // Preview hình ảnh bình luận cũ đang sửa
                   Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     height: 80,
@@ -1255,42 +1259,52 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 Row(
                   children: [
                     if (AuthService().currentUser.value != null) ...[
-                      IconButton(
-                        icon: Icon(Icons.attach_file_rounded, color: AppTheme.subtitleText),
-                        onPressed: _pickCommentMedia,
+                      GestureDetector(
+                        onTap: _pickCommentMedia,
+                        child: Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.attach_file_rounded, color: Color(0xFF64748B), size: 20),
+                        ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 8),
                     ],
                     Expanded(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(24),
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: AuthService().currentUser.value == null
                             ? GestureDetector(
                                 onTap: () => _showLoginPrompt('bình luận'),
                                 child: const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                  padding: EdgeInsets.symmetric(vertical: 11),
                                   child: Text(
                                     'Đăng nhập để bình luận...',
-                                    style: TextStyle(color: Colors.grey),
+                                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
                                   ),
                                 ),
                               )
                             : TextField(
                                 controller: _commentController,
                                 focusNode: _commentFocusNode,
+                                style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                                 decoration: InputDecoration(
                                   hintText: _editingCommentId != null
                                       ? 'Chỉnh sửa bình luận của bạn...'
                                       : 'Nhập bình luận của bạn...',
+                                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
                                   border: InputBorder.none,
                                   enabledBorder: InputBorder.none,
                                   focusedBorder: InputBorder.none,
                                   filled: false,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                                 ),
                                 maxLines: null,
                               ),
@@ -1298,18 +1312,44 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     ),
                     const SizedBox(width: 8),
                     AuthService().currentUser.value == null
-                        ? IconButton(
-                            icon: const Icon(Icons.send_rounded, color: Colors.grey),
-                            onPressed: () => _showLoginPrompt('bình luận'),
+                        ? GestureDetector(
+                            onTap: () => _showLoginPrompt('bình luận'),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFE2E8F0),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                            ),
                           )
                         : _isSendingComment
-                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary))
-                            : IconButton(
-                                icon: Icon(
-                                  _editingCommentId != null ? Icons.check_rounded : Icons.send_rounded,
-                                  color: AppTheme.primary,
+                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)))
+                            : GestureDetector(
+                                onTap: _sendComment,
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    _editingCommentId != null ? Icons.check_rounded : Icons.send_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
                                 ),
-                                onPressed: _sendComment,
                               ),
                   ],
                 ),

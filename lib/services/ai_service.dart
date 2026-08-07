@@ -108,6 +108,17 @@ class AiService {
       return [];
     }
   }
+  static Future<bool> deleteChatSession(String sessionId) async {
+    try {
+      final response = await ApiClient.delete(
+        '/mobile/ai/chat-sessions/$sessionId',
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error deleteChatSession: $e');
+      return false;
+    }
+  }
 
   static Future<List<ChatMessage>> getChatMessages(String sessionId) async {
     try {

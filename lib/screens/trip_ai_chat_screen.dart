@@ -182,34 +182,91 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                           itemBuilder: (context, index) {
                             final session = _sessions[index];
                             final isSelected = session.id == _sessionId;
-                            return ListTile(
-                              leading: Icon(
-                                Icons.chat_bubble_outline,
-                                color: isSelected
-                                    ? AppTheme.primary
-                                    : Colors.grey,
-                              ),
-                              title: Text(
-                                session.title.isNotEmpty
-                                    ? session.title
-                                    : 'Cuộc trò chuyện',
-                                style: TextStyle(
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                  color: isSelected
-                                      ? AppTheme.primary
-                                      : AppTheme.darkText,
+                            return Dismissible(
+                              key: Key(session.id),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade500,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'Xóa',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Icon(Icons.delete_outline_rounded, color: Colors.white),
+                                  ],
                                 ),
                               ),
-                              subtitle: Text(
-                                '${session.updatedAt.day}/${session.updatedAt.month}/${session.updatedAt.year}',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _loadChatHistory(session.id, session.title);
+                              confirmDismiss: (direction) async {
+                                return await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Xóa cuộc trò chuyện?'),
+                                    content: Text('Bạn có chắc chắn muốn xóa "${session.title}" không?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('Hủy'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                ) ?? false;
                               },
+                              onDismissed: (direction) async {
+                                final deletedId = session.id;
+                                setStateSheet(() {
+                                  _sessions.removeAt(index);
+                                });
+                                setState(() {
+                                  if (_sessionId == deletedId) {
+                                    _startNewConversation();
+                                  }
+                                });
+                                await AiService.deleteChatSession(deletedId);
+                              },
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.chat_bubble_outline,
+                                  color: isSelected
+                                      ? AppTheme.primary
+                                      : Colors.grey,
+                                ),
+                                title: Text(
+                                  session.title.isNotEmpty
+                                      ? session.title
+                                      : 'Cuộc trò chuyện',
+                                  style: TextStyle(
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    color: isSelected
+                                        ? AppTheme.primary
+                                        : AppTheme.darkText,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${session.updatedAt.day}/${session.updatedAt.month}/${session.updatedAt.year}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _loadChatHistory(session.id, session.title);
+                                },
+                              ),
                             );
                           },
                         ),

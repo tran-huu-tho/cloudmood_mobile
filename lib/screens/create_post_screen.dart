@@ -205,64 +205,165 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   void _showPlaceSearchDialog() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      isScrollControlled: true,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: const Text('Gắn thẻ địa điểm', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: _placeSearchController,
-                      decoration: const InputDecoration(
-                        hintText: 'Nhập tên địa điểm...',
-                        prefixIcon: Icon(Icons.search_rounded),
-                        border: OutlineInputBorder(),
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                12,
+                20,
+                MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      width: 38,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      onChanged: (val) async {
-                        await _searchPlaces(val);
-                        setDialogState(() {}); // Cập nhật danh sách trong dialog
-                      },
                     ),
-                    const SizedBox(height: 12),
-                    if (_isSearchingPlaces)
-                      const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-                    else if (_searchResults.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Text('Không tìm thấy địa điểm nào', style: TextStyle(color: Colors.grey)),
-                      )
-                    else
-                      Flexible(
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _searchResults.length,
-                          itemBuilder: (context, index) {
-                            final place = _searchResults[index];
-                            return ListTile(
-                              leading: const Icon(Icons.place_rounded, color: AppTheme.primary),
-                              title: Text(place['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              subtitle: Text(place['address'] ?? '', style: const TextStyle(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
-                              onTap: () {
-                                setState(() {
-                                  _taggedPlace = place;
-                                });
-                                _placeSearchController.clear();
-                                _searchResults.clear();
-                                Navigator.of(context).pop();
-                              },
-                            );
-                          },
+                  ),
+                  const Text(
+                    'Gắn thẻ địa điểm',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Search Field
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.search_rounded,
+                          color: Color(0xFF2563EB),
+                          size: 20,
                         ),
-                      ),
-                  ],
-                ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _placeSearchController,
+                            style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                            decoration: const InputDecoration(
+                              hintText: 'Nhập tên địa điểm...',
+                              hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              filled: false,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 10),
+                            ),
+                            onChanged: (val) async {
+                              await _searchPlaces(val);
+                              setDialogState(() {});
+                            },
+                          ),
+                        ),
+                        if (_placeSearchController.text.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              _placeSearchController.clear();
+                              _searchResults.clear();
+                              setDialogState(() {});
+                            },
+                            child: const Icon(
+                              Icons.close_rounded,
+                              color: Color(0xFF94A3B8),
+                              size: 18,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Search Results List
+                  SizedBox(
+                    height: 320,
+                    child: _isSearchingPlaces
+                        ? const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+                        : _searchResults.isEmpty
+                            ? Center(
+                                child: Text(
+                                  _placeSearchController.text.isEmpty
+                                      ? 'Nhập tên địa điểm để tìm kiếm'
+                                      : 'Không tìm thấy địa điểm nào',
+                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13.5),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: _searchResults.length,
+                                separatorBuilder: (_, __) => const Divider(color: Color(0xFFF1F5F9), height: 1),
+                                itemBuilder: (context, index) {
+                                  final place = _searchResults[index];
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                    leading: Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.location_on_rounded,
+                                        color: Color(0xFF2563EB),
+                                        size: 20,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      place['name'] ?? '',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                        color: Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      place['address'] ?? '',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    onTap: () {
+                                      setState(() {
+                                        _taggedPlace = place;
+                                      });
+                                      _placeSearchController.clear();
+                                      _searchResults.clear();
+                                      Navigator.of(context).pop();
+                                    },
+                                  );
+                                },
+                              ),
+                  ),
+                ],
               ),
             );
           },
@@ -276,27 +377,65 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text('Viết bài mới', style: TextStyle(color: AppTheme.darkText, fontWeight: FontWeight.w800, fontSize: 18)),
+        title: const Text(
+          'Viết bài mới',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
+        ),
         backgroundColor: Colors.white,
-        elevation: 0.5,
+        elevation: 0,
+        centerTitle: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFF1F5F9), height: 1),
+        ),
         leading: IconButton(
-          icon: Icon(Icons.close_rounded, color: AppTheme.darkText),
+          icon: const Icon(Icons.close_rounded, color: Color(0xFF0F172A), size: 24),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: _isUploading
-                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: AppTheme.primary))
-                : ElevatedButton(
-                    onPressed: _submitPost,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      elevation: 0,
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF2563EB)),
+                  )
+                : GestureDetector(
+                    onTap: _submitPost,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Đăng',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ),
                     ),
-                    child: const Text('Đăng', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
           ),
         ],
@@ -304,41 +443,56 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Text Field Content
-                TextField(
-                  controller: _contentController,
-                  maxLines: 8,
-                  keyboardType: TextInputType.multiline,
-                  decoration: const InputDecoration(
-                    hintText: 'Bạn đang nghĩ gì? Chia sẻ kinh nghiệm chuyến đi của bạn...',
-                    border: InputBorder.none,
+                // 1. Text Field Content Container
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: TextField(
+                    controller: _contentController,
+                    maxLines: 8,
+                    keyboardType: TextInputType.multiline,
+                    style: const TextStyle(fontSize: 15, color: Color(0xFF0F172A), height: 1.4),
+                    decoration: const InputDecoration(
+                      hintText: 'Bạn đang nghĩ gì? Chia sẻ kinh nghiệm chuyến đi của bạn...',
+                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14.5),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
 
-                // 2. Tagged Place Indicator
+                // 2. Tagged Place Indicator Badge
                 if (_taggedPlace != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryContainer.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.place_rounded, size: 16, color: AppTheme.primary),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.location_on_rounded, size: 18, color: Color(0xFF2563EB)),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _taggedPlace!['name'] ?? '',
                             style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primary,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1E40AF),
                             ),
                           ),
                         ),
@@ -348,7 +502,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                               _taggedPlace = null;
                             });
                           },
-                          child: const Icon(Icons.cancel_rounded, size: 18, color: Colors.grey),
+                          child: const Icon(Icons.cancel_rounded, size: 20, color: Color(0xFF93C5FD)),
                         )
                       ],
                     ),
@@ -357,15 +511,18 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
                 // 3. Media Grid View
                 if (_selectedFiles.isNotEmpty) ...[
-                  const Text('Tệp đã chọn:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
+                  const Text(
+                    'Tệp đã chọn:',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 10),
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
                       childAspectRatio: 1,
                     ),
                     itemCount: _selectedFiles.length,
@@ -376,7 +533,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         fit: StackFit.expand,
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(12),
                             child: isVideo
                                 ? Container(
                                     color: Colors.black87,
@@ -394,8 +551,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                                   ),
                           ),
                           Positioned(
-                            top: 4,
-                            right: 4,
+                            top: 6,
+                            right: 6,
                             child: GestureDetector(
                               onTap: () {
                                 setState(() {
@@ -404,7 +561,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                               },
                               child: Container(
                                 decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                                padding: const EdgeInsets.all(4),
+                                padding: const EdgeInsets.all(5),
                                 child: const Icon(Icons.close_rounded, color: Colors.white, size: 14),
                               ),
                             ),
@@ -419,36 +576,62 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             ),
           ),
 
-          // 4. Attachments Toolbar (bottom sheet overlay style)
+          // 4. Attachments Toolbar (Bottom overlay)
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                border: Border(top: BorderSide(color: Colors.grey[200]!)),
+                border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
               ),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.add_photo_alternate_rounded, color: AppTheme.primary, size: 28),
-                    onPressed: _pickImages,
+                  _buildAttachmentIconButton(
+                    icon: Icons.photo_library_rounded,
+                    onTap: _pickImages,
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.videocam_rounded, color: AppTheme.primary, size: 28),
-                    onPressed: _pickVideo,
+                  const SizedBox(width: 10),
+                  _buildAttachmentIconButton(
+                    icon: Icons.videocam_rounded,
+                    onTap: _pickVideo,
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.pin_drop_rounded, color: AppTheme.primary, size: 28),
-                    onPressed: _showPlaceSearchDialog,
+                  const SizedBox(width: 10),
+                  _buildAttachmentIconButton(
+                    icon: Icons.location_on_rounded,
+                    onTap: _showPlaceSearchDialog,
                   ),
                   const Spacer(),
-                  const Text('Thêm vào bài đăng', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Thêm vào bài đăng',
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5, fontWeight: FontWeight.w700),
+                  ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentIconButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          color: const Color(0xFF2563EB),
+          size: 22,
+        ),
       ),
     );
   }
