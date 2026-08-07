@@ -812,6 +812,15 @@ class _ProfileDashboardState extends State<ProfileDashboard>
   }
 
   @override
+  void didUpdateWidget(ProfileDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user.id != widget.user.id) {
+      _loadData();
+      _loadNotes();
+    }
+  }
+
+  @override
   void dispose() {
     DatabaseService.refreshTrigger.removeListener(_loadData);
     _itinerarySearchController.dispose();

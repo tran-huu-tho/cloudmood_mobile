@@ -5,13 +5,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
 class ApiClient {
-  // ⚠️ Khi cắm cáp USB: Dùng 'http://127.0.0.1:3000' kết hợp lệnh `adb reverse tcp:3000 tcp:3000`
-  static const String _pcIpAddress = 'http://127.0.0.1:3000'; 
+  // 📶 Kết nối trực tiếp qua Wi-Fi (Không cần cắm cáp USB):
+  static const String _pcIpAddress = 'http://127.0.0.1:3000';
 
   static String get baseUrl {
     if (_pcIpAddress.isNotEmpty) return _pcIpAddress;
     if (kIsWeb) return 'http://localhost:3000';
-    if (defaultTargetPlatform == TargetPlatform.android) return 'http://10.0.2.2:3000';
+    if (defaultTargetPlatform == TargetPlatform.android)
+      return 'http://10.0.2.2:3000';
     return 'http://localhost:3000';
   }
 

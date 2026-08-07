@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import 'api_client.dart';
+import 'database_service.dart';
 
 class AuthService {
   // Singleton pattern
@@ -290,6 +291,7 @@ class AuthService {
       final userJson = jsonEncode(user.toMap());
       await prefs.setString(_sessionKey, userJson);
       await prefs.setString(_tokenKey, token);
+      DatabaseService.refreshTrigger.value++;
     } catch (e) {
       debugPrint('Error saving local session: $e');
     }
@@ -315,6 +317,8 @@ class AuthService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_sessionKey);
       await prefs.remove(_tokenKey);
+      await prefs.remove('primary_itinerary_id');
+      DatabaseService.refreshTrigger.value++;
     } catch (e) {
       debugPrint('Error clearing local session: $e');
     }

@@ -1,5 +1,6 @@
 import 'dart:ui' show ImageFilter;
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -34,19 +35,51 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
   Map<String, dynamic>? _weatherData;
   bool _isLoadingWeather = true;
   String _weatherQuote = "";
-  List<Map<String, dynamic>>? _forecastData;
-  bool _isLoadingForecast = true;
+
+  static Map<String, dynamic>? _cachedWeatherData;
+  static String _cachedWeatherQuote = "";
+  static DateTime? _lastWeatherFetchTime;
+  Timer? _weatherTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchWeatherAndQuote();
+    _weatherTimer = Timer.periodic(const Duration(minutes: 10), (_) {
+      _fetchWeatherAndQuote(force: true);
+    });
   }
 
-  Future<void> _fetchWeatherAndQuote() async {
-    setState(() {
-      _isLoadingWeather = true;
-    });
+  @override
+  void dispose() {
+    _weatherTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchWeatherAndQuote({bool force = false}) async {
+    final now = DateTime.now();
+    if (!force &&
+        _cachedWeatherData != null &&
+        _lastWeatherFetchTime != null &&
+        now.difference(_lastWeatherFetchTime!) < const Duration(minutes: 10)) {
+      if (mounted) {
+        setState(() {
+          _weatherData = _cachedWeatherData;
+          _weatherQuote = _cachedWeatherQuote;
+          _isLoadingWeather = false;
+        });
+      }
+      return;
+    }
+
+    if (_cachedWeatherData == null) {
+      if (mounted) {
+        setState(() {
+          _isLoadingWeather = true;
+        });
+      }
+    }
+
     try {
       Position? position;
       try {
@@ -88,21 +121,20 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        final quote = _getQuoteForCondition(data['condition'] ?? '');
+        _cachedWeatherData = data;
+        _cachedWeatherQuote = quote;
+        _lastWeatherFetchTime = DateTime.now();
+
         if (mounted) {
           setState(() {
             _weatherData = data;
-            _weatherQuote = _getQuoteForCondition(data['condition'] ?? '');
+            _weatherQuote = quote;
           });
         }
-        final double lat = (data['latitude'] as num?)?.toDouble() ?? 16.0544;
-        final double lon = (data['longitude'] as num?)?.toDouble() ?? 108.2022;
-        _fetchForecast(lat, lon);
-      } else {
-        _fetchForecast(16.0544, 108.2022);
       }
     } catch (e) {
       debugPrint('Error fetching weather: $e');
-      _fetchForecast(16.0544, 108.2022);
     } finally {
       if (mounted) {
         setState(() {
@@ -150,99 +182,84 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
     }
   }
 
-  Future<void> _fetchForecast(double lat, double lon) async {
-    if (!mounted) return;
-    setState(() {
-      _isLoadingForecast = true;
-    });
-    try {
-      final url = Uri.parse(
-        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=auto',
-      );
-      final response = await http.get(url).timeout(const Duration(seconds: 4));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final daily = data['daily'];
-        if (daily != null && daily['time'] is List) {
-          final List times = daily['time'];
-          final List codes = daily['weather_code'];
-          final List maxTemps = daily['temperature_2m_max'];
-          final List minTemps = daily['temperature_2m_min'];
-          final List rainProbs = daily['precipitation_probability_max'] ?? [];
-          final List rainSums = daily['precipitation_sum'] ?? [];
+  String _getFriendlyWeatherDesc(String rawDesc, String condition) {
+    final raw = rawDesc.toLowerCase();
+    final cond = condition.toLowerCase();
 
-          final List<Map<String, dynamic>> forecast = [];
-          for (int i = 0; i < times.length; i++) {
-            final date = DateTime.tryParse(times[i]) ?? DateTime.now();
-            final int code = (codes[i] as num?)?.toInt() ?? 0;
-            final double maxT = (maxTemps[i] as num?)?.toDouble() ?? 25.0;
-            final double minT = (minTemps[i] as num?)?.toDouble() ?? 20.0;
-            final int rainProb = i < rainProbs.length
-                ? (rainProbs[i] as num?)?.toInt() ?? 0
-                : 0;
-            final double rainSum = i < rainSums.length
-                ? (rainSums[i] as num?)?.toDouble() ?? 0.0
-                : 0.0;
-
-            final weatherMeta = _getWeatherMetaForCode(code);
-
-            forecast.add({
-              'date': date,
-              'dateStr': times[i],
-              'tempMax': maxT.round(),
-              'tempMin': minT.round(),
-              'desc': weatherMeta['desc'],
-              'icon': weatherMeta['icon'],
-              'color': weatherMeta['color'],
-              'rainProb': rainProb,
-              'rainSum': rainSum,
-            });
-          }
-          if (mounted) {
-            setState(() {
-              _forecastData = forecast;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching forecast: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingForecast = false;
-        });
-      }
+    if (raw.contains('mây đen') || raw.contains('overcast') || raw.contains('broken clouds')) {
+      return 'Nhiều mây âm u';
+    } else if (raw.contains('scattered') || raw.contains('few clouds') || raw.contains('mây rải rác')) {
+      return 'Mây rải rác nhẹ';
+    } else if (raw.contains('cloud') || cond.contains('cloud')) {
+      return 'Trời nhiều mây';
+    } else if (raw.contains('clear') || raw.contains('sunny') || cond.contains('clear')) {
+      return 'Trời nắng quang đãng';
+    } else if (raw.contains('light rain') || raw.contains('mưa nhẹ') || raw.contains('mưa rào rải rác')) {
+      return 'Mưa rào nhẹ';
+    } else if (raw.contains('thunderstorm') || cond.contains('thunderstorm')) {
+      return 'Mưa giông';
+    } else if (raw.contains('rain') || cond.contains('rain')) {
+      return 'Có mưa rào';
+    } else if (raw.contains('drizzle') || cond.contains('drizzle')) {
+      return 'Mưa phùn nhẹ';
+    } else if (raw.contains('mist') || raw.contains('fog')) {
+      return 'Sương mù nhẹ';
     }
+    return rawDesc.isNotEmpty ? rawDesc : 'Trời mát';
   }
 
-  Map<String, dynamic> _getWeatherMetaForCode(int code) {
-    String desc = 'Nắng đẹp';
-    IconData icon = Icons.wb_sunny_rounded;
-    Color color = const Color(0xFFEA580C); // Orange
-
-    if (code == 0) {
-      desc = 'Trời quang';
-      icon = Icons.wb_sunny_rounded;
-      color = const Color(0xFFEA580C);
-    } else if (code >= 1 && code <= 3) {
-      desc = code == 3 ? 'Nhiều mây' : 'Nắng nhẹ';
-      icon = code == 3 ? Icons.wb_cloudy_rounded : Icons.wb_cloudy_outlined;
-      color = code == 3 ? const Color(0xFF1E293B) : const Color(0xFF475569);
-    } else if (code == 45 || code == 48) {
-      desc = 'Sương mù';
-      icon = Icons.blur_on_rounded;
-      color = const Color(0xFF334155);
-    } else if (code >= 51 && code <= 67) {
-      desc = 'Mưa rào';
-      icon = Icons.grain_rounded;
-      color = const Color(0xFF2563EB);
-    } else if (code >= 80 && code <= 99) {
-      desc = 'Mưa giông';
-      icon = Icons.thunderstorm_rounded;
-      color = const Color(0xFF7C3AED);
-    }
-    return {'desc': desc, 'icon': icon, 'color': color};
+  Widget _buildStatBadge({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.18)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.darkText,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildWeatherWidget() {
@@ -273,299 +290,227 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
         ? (_weatherData!['temp'] as num).round()
         : 25;
     final cityName = _weatherData!['cityName'] ?? 'Đà Nẵng';
-    final desc = _weatherData!['description'] ?? 'Trời mát';
+    final rawDesc = _weatherData!['description'] ?? '';
+    final condition = _weatherData!['condition'] ?? '';
+    final desc = _getFriendlyWeatherDesc(rawDesc, condition);
+
     final iconCode = _weatherData!['icon'] ?? '01d';
     final iconUrl = 'https://openweathermap.org/img/wn/$iconCode@2x.png';
 
     final humidity = _weatherData!['humidity'] ?? 0;
-    final windSpeed = _weatherData!['windSpeed'] ?? 0.0;
-
     final suggestions = _weatherData!['suggestions'] ?? {};
     final rainProb = suggestions['rainProbability'] ?? 0;
-    final rainfall = suggestions['estimatedRainfall'] ?? 0.0;
+    final num rainfallNum = (suggestions['estimatedRainfall'] ?? _weatherData!['rainfall'] ?? 0);
+    final double rainfall = rainfallNum.toDouble();
+
+    final String formattedTime = _lastWeatherFetchTime != null
+        ? "${_lastWeatherFetchTime!.hour.toString().padLeft(2, '0')}:${_lastWeatherFetchTime!.minute.toString().padLeft(2, '0')}"
+        : "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}";
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: GestureDetector(
-        onTap: _fetchWeatherAndQuote,
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppTheme.primary.withOpacity(0.08),
-                AppTheme.primary.withOpacity(0.02),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: AppTheme.primary.withOpacity(0.12),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.primary.withOpacity(0.04),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.primary.withOpacity(0.08),
+              AppTheme.primary.withOpacity(0.02),
             ],
           ),
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            children: [
-              Positioned(
-                right: -30,
-                top: -30,
-                child: Container(
-                  width: 130,
-                  height: 130,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.primary.withOpacity(0.06),
-                  ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: AppTheme.primary.withOpacity(0.12),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primary.withOpacity(0.04),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Positioned(
+              right: -30,
+              top: -30,
+              child: Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.primary.withOpacity(0.06),
                 ),
               ),
-              Positioned(
-                left: -40,
-                bottom: -40,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.primary.withOpacity(0.03),
-                  ),
+            ),
+            Positioned(
+              left: -40,
+              bottom: -40,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppTheme.primary.withOpacity(0.03),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on_rounded,
-                                    size: 14,
-                                    color: AppTheme.primary,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      cityName,
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppTheme.darkText,
-                                        letterSpacing: -0.2,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(18.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header Row: City Name & Refresh Time Tag Button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_rounded,
+                            size: 15,
+                            color: AppTheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            cityName,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.darkText,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                      GestureDetector(
+                        onTap: () => _fetchWeatherAndQuote(force: true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.primary.withOpacity(0.18)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
                               ),
-                              const SizedBox(height: 6),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    '$temp',
-                                    style: TextStyle(
-                                      fontSize: 44,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppTheme.darkText,
-                                      height: 1.0,
-                                      letterSpacing: -1,
-                                    ),
-                                  ),
-                                  Text(
-                                    '°C',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    desc,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppTheme.subtitleText,
-                                    ),
-                                  ),
-                                ],
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                formattedTime,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.refresh_rounded,
+                                size: 13,
+                                color: AppTheme.primary,
                               ),
                             ],
                           ),
                         ),
-                        Image.network(
-                          iconUrl,
-                          width: 72,
-                          height: 72,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(
-                            Icons.wb_sunny_rounded,
-                            color: AppTheme.primary,
-                            size: 48,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10.0),
-                      child: Text(
-                        'Dự báo thời tiết 7 ngày',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.darkText.withOpacity(0.8),
-                          letterSpacing: 0.2,
-                        ),
                       ),
-                    ),
-                    if (_isLoadingForecast &&
-                        (_forecastData == null || _forecastData!.isEmpty))
-                      Container(
-                        height: 110,
-                        alignment: Alignment.center,
-                        child: const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppTheme.primary,
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Main Temperature & Weather Image Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$temp°C',
+                            style: TextStyle(
+                              fontSize: 38,
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.darkText,
+                              letterSpacing: -1,
+                              height: 1.0,
                             ),
                           ),
-                        ),
-                      )
-                    else if (_forecastData != null && _forecastData!.isNotEmpty)
-                      SizedBox(
-                        height: 112,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _forecastData!.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (context, idx) {
-                            final dayData = _forecastData![idx];
-                            final date = dayData['date'] as DateTime;
-                            final bool isToday = (idx == 0);
-
-                            String dayOfWeekLabel = '';
-                            if (isToday) {
-                              dayOfWeekLabel = 'Hôm nay';
-                            } else {
-                              final List<String> weekdays = [
-                                'T2',
-                                'T3',
-                                'T4',
-                                'T5',
-                                'T6',
-                                'T7',
-                                'CN',
-                              ];
-                              dayOfWeekLabel = weekdays[date.weekday - 1];
-                            }
-                            final String dateStr =
-                                "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}";
-
-                            return Container(
-                              width: 78,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                                horizontal: 6,
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              desc,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.primary,
                               ),
-                              decoration: BoxDecoration(
-                                color: isToday
-                                    ? AppTheme.primary.withOpacity(0.06)
-                                    : Colors.white.withOpacity(0.55),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: isToday
-                                      ? AppTheme.primary.withOpacity(0.2)
-                                      : Colors.grey.withOpacity(0.12),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    dayOfWeekLabel,
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: isToday
-                                          ? AppTheme.primary
-                                          : AppTheme.darkText,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 1),
-                                  Text(
-                                    dateStr,
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: AppTheme.subtitleText,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Icon(
-                                    dayData['icon'] as IconData,
-                                    color: dayData['color'] as Color,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '${dayData['tempMax']}°/${dayData['tempMin']}°',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.darkText,
-                                    ),
-                                  ),
-                                  if (dayData['rainProb'] > 0) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '💧 ${dayData['rainProb']}%',
-                                      style: const TextStyle(
-                                        fontSize: 8.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF2563EB),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    else
-                      Container(
-                        height: 110,
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Không có dữ liệu dự báo',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.subtitleText,
+                            ),
                           ),
+                        ],
+                      ),
+                      Image.network(
+                        iconUrl,
+                        width: 68,
+                        height: 68,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Icon(
+                          Icons.wb_sunny_rounded,
+                          color: AppTheme.primary,
+                          size: 48,
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Beautiful 3-Stat Badges with Icon Bubbles
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatBadge(
+                          icon: Icons.water_drop_rounded,
+                          label: 'Tỉ lệ mưa',
+                          value: '$rainProb%',
+                          color: const Color(0xFF2563EB),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatBadge(
+                          icon: Icons.water_rounded,
+                          label: 'Độ ẩm',
+                          value: '$humidity%',
+                          color: const Color(0xFF0284C7),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildStatBadge(
+                          icon: Icons.umbrella_rounded,
+                          label: 'Lượng mưa',
+                          value: '${rainfall.toStringAsFixed(1)}mm',
+                          color: const Color(0xFF7C3AED),
+                        ),
+                      ),
+                    ],
+                  ),
+
 
                     if (_weatherQuote.isNotEmpty) ...[
                       const SizedBox(height: 16),
@@ -611,8 +556,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   @override
