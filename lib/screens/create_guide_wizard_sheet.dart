@@ -1272,6 +1272,29 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       onTap: () {
+                        if (!name.toLowerCase().contains('cần thơ')) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Hiện tại hệ thống hỗ trợ tốt nhất tại Cần Thơ. $name sẽ sớm ra mắt!',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: Colors.indigo.shade900,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                          return;
+                        }
                         _selectDestination(name);
                       },
                     );
@@ -1290,83 +1313,138 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                 final dest = _popularDestinations[index];
                 final String name = dest['name']!;
                 final String desc = dest['desc'] ?? '';
+                final bool isAvailable = (name == 'Cần Thơ');
                 final isSelected = _selectedDestination == name;
 
                 return GestureDetector(
                   onTap: () {
+                    if (!isAvailable) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Hiện tại CloudMood hỗ trợ tạo chuyến đi tại Cần Thơ. $name sẽ sớm ra mắt!',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: Colors.indigo.shade900,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                      return;
+                    }
                     _searchController.clear();
                     _selectDestination(name);
                   },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: isSelected ? guidePrimary.withOpacity(0.08) : Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: isSelected ? guidePrimary : Colors.grey[200]!,
-                        width: isSelected ? 2 : 1,
-                      ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: guidePrimary.withOpacity(0.1),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ]
-                          : [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.02),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: isSelected ? guidePrimary.withOpacity(0.12) : guidePrimary.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.location_on_rounded, color: guidePrimary, size: 20),
+                  child: Opacity(
+                    opacity: isAvailable ? 1.0 : 0.6,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isSelected ? guidePrimary.withOpacity(0.08) : Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: isSelected ? guidePrimary : Colors.grey[200]!,
+                          width: isSelected ? 2 : 1,
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                  color: isSelected ? guidePrimary : AppTheme.darkText,
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: guidePrimary.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
                                 ),
-                              ),
-                              if (desc.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  desc,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ]
+                            : [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.02),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
-                            ],
-                          ),
-                        ),
-                        if (isSelected)
+                      ),
+                      child: Row(
+                        children: [
                           Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: guidePrimary,
-                              shape: BoxShape.circle,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? guidePrimary.withOpacity(0.12) : guidePrimary.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.check_rounded, color: Colors.white, size: 16),
+                            child: const Icon(Icons.location_on_rounded, color: guidePrimary, size: 20),
                           ),
-                      ],
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                    color: isSelected ? guidePrimary : AppTheme.darkText,
+                                  ),
+                                ),
+                                if (desc.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    desc,
+                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: guidePrimary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check_rounded, color: Colors.white, size: 16),
+                            )
+                          else if (!isAvailable)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.amber.shade200),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.lock_clock_rounded,
+                                    size: 12,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Sắp ra mắt',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 );

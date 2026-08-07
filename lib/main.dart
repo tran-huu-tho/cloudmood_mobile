@@ -75,6 +75,7 @@ class CloudmoodMainShell extends StatefulWidget {
 
 class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
   int _currentIndex = 0;
+  String? _placesInitialQuery;
 
   // Render current body based on bottom navigation index
   Widget _buildBody() {
@@ -86,8 +87,9 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
               _currentIndex = 4; // Profile tab
             });
           },
-          onExplorePlacesTap: () {
+          onExplorePlacesTap: (query) {
             setState(() {
+              _placesInitialQuery = query;
               _currentIndex = 1; // Places tab
             });
           },
@@ -98,7 +100,7 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
           },
         );
       case 1:
-        return const CloudmoodPlacesScreen();
+        return CloudmoodPlacesScreen(initialQuery: _placesInitialQuery);
       case 3:
         return const CloudmoodForumScreen();
       case 4:
@@ -110,8 +112,9 @@ class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
               _currentIndex = 4;
             });
           },
-          onExplorePlacesTap: () {
+          onExplorePlacesTap: (query) {
             setState(() {
+              _placesInitialQuery = query;
               _currentIndex = 1;
             });
           },

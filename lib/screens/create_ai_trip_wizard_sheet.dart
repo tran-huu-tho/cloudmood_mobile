@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -62,7 +63,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     },
     {
       'title': 'Trợ lý AI đang phân tích',
-      'desc': 'OpenAI GPT đọc hiểu yêu cầu và chọn lọc địa điểm...',
+      'desc': 'Trợ lý AI đọc hiểu yêu cầu và chọn lọc địa điểm...',
     },
     {
       'title': 'AI lên kế hoạch từng ngày',
@@ -408,6 +409,51 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       }
     }
 
+    if (_currentStep == 2 && _useCustomBudget) {
+      final rawText = _customBudgetController.text
+          .replaceAll('.', '')
+          .replaceAll(',', '')
+          .trim();
+      final customAmount = int.tryParse(rawText) ?? 0;
+      final int minRequired = _days >= 3 ? 3000000 : 1000000;
+
+      if (customAmount < minRequired) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _days >= 3
+                        ? 'Chưa đáp ứng được ngân sách tối thiểu!'
+                        : 'Chưa đáp ứng được ngân sách tối thiểu!',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.indigo.shade900,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+    }
+
     if (_currentStep < _totalSteps - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -441,7 +487,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           .replaceAll(',', '')
           .replaceAll('.', '')
           .trim();
-      budgetInVND = int.tryParse(raw) ?? 7000000;
+      final parsed = int.tryParse(raw) ?? 7000000;
+      budgetInVND = math.max(parsed, _days >= 3 ? 3000000 : 1000000);
     } else {
       final bLower = _selectedBudgetLevel.toLowerCase();
       if (bLower.contains('tiết kiệm') || bLower.contains('tiet kiem')) {
@@ -661,7 +708,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'OpenAI GPT đã tạo lịch trình $_days ngày cho bạn!',
+                      'Trợ lý AI đã tạo lịch trình $_days ngày cho bạn!',
                     ),
                   ),
                 ],
@@ -2617,6 +2664,38 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       onTap: () {
+                        if (!name.toLowerCase().contains('cần thơ')) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Hiện tại hệ thống hỗ trợ tốt nhất tại Cần Thơ. $name sẽ sớm ra mắt!',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              backgroundColor: Colors.indigo.shade900,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                          return;
+                        }
                         _destinationSearchController.text = name;
                         _searchResults = [];
                         _selectDestination(name);
@@ -2642,78 +2721,146 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final dest = _popularDestinations[index];
+              final String destName = dest['name']!;
+              final bool isAvailable = destName == 'Cần Thơ';
               final isSelected =
-                  _selectedDestination == dest['name'] &&
+                  _selectedDestination == destName &&
                   _destinationSearchController.text.trim().isEmpty;
 
               return InkWell(
                 onTap: () {
-                  _destinationSearchController.clear();
-                  _selectDestination(dest['name']!);
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? _aiPurple.withOpacity(0.08)
-                        : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isSelected ? _aiPurple : Colors.grey.shade200,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? _aiPurple.withOpacity(0.12)
-                              : _aiPurple.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.location_on_rounded,
-                          color: _aiPurple,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  if (!isAvailable) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
                           children: [
-                            Text(
-                              dest['name']!,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: isSelected
-                                    ? _aiPurple
-                                    : AppTheme.darkText,
-                              ),
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              color: Colors.white,
+                              size: 20,
                             ),
-                            Text(
-                              dest['desc']!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade600,
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Hiện tại CloudMood hỗ trợ tạo chuyến đi tại Cần Thơ. $destName sẽ sớm ra mắt!',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      if (isSelected)
-                        const Icon(
-                          Icons.check_circle_rounded,
-                          color: _aiPurple,
+                        backgroundColor: Colors.indigo.shade900,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                    ],
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                    return;
+                  }
+                  _destinationSearchController.clear();
+                  _selectDestination(destName);
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Opacity(
+                  opacity: isAvailable ? 1.0 : 0.6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? _aiPurple.withOpacity(0.08)
+                          : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? _aiPurple : Colors.grey.shade200,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? _aiPurple.withOpacity(0.12)
+                                : _aiPurple.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.location_on_rounded,
+                            color: _aiPurple,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                destName,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected
+                                      ? _aiPurple
+                                      : AppTheme.darkText,
+                                ),
+                              ),
+                              Text(
+                                dest['desc']!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            color: _aiPurple,
+                          )
+                        else if (!isAvailable)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.shade200),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.lock_clock_rounded,
+                                  size: 12,
+                                  color: Colors.amber.shade900,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Sắp ra mắt',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber.shade900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -3691,13 +3838,35 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           const SizedBox(height: 24),
 
           if (!_useCustomBudget) ...[
-            _buildBudgetPresetCard('Tiết kiệm 💵', '3.000.000 VNĐ / chuyến đi'),
-            const SizedBox(height: 12),
-            _buildBudgetPresetCard('Vừa phải 💳', '7.000.000 VNĐ / chuyến đi'),
-            const SizedBox(height: 12),
-            _buildBudgetPresetCard(
-              'Sang trọng 💎',
-              '15.000.000 VNĐ / chuyến đi',
+            Builder(
+              builder: (context) {
+                final bool isLowBudgetDisabled = _days >= 3;
+                if (isLowBudgetDisabled &&
+                    _selectedBudgetLevel == 'Tiết kiệm') {
+                  _selectedBudgetLevel = 'Vừa phải';
+                }
+                return Column(
+                  children: [
+                    _buildBudgetPresetCard(
+                      'Tiết kiệm 💵',
+                      '3.000.000 VNĐ / chuyến đi',
+                      isDisabled: isLowBudgetDisabled,
+                      disabledReason:
+                          'Mức Tiết kiệm (3tr) chỉ phù hợp cho chuyến đi 1-2 ngày. Chuyến đi $_days ngày cần ngân sách tối thiểu từ mức Vừa phải.',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildBudgetPresetCard(
+                      'Vừa phải 💳',
+                      '7.000.000 VNĐ / chuyến đi',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildBudgetPresetCard(
+                      'Sang trọng 💎',
+                      '15.000.000 VNĐ / chuyến đi',
+                    ),
+                  ],
+                );
+              },
             ),
           ] else ...[
             Container(
@@ -3721,8 +3890,15 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                         child: TextField(
                           controller: _customBudgetController,
                           keyboardType: TextInputType.number,
+                          onChanged: (val) {
+                            setState(() {});
+                          },
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            CurrencyInputFormatter(),
+                          ],
                           decoration: InputDecoration(
-                            hintText: '7,000,000',
+                            hintText: _days >= 3 ? '3.000.000' : '1.000.000',
                             filled: true,
                             fillColor: Colors.white,
                             border: OutlineInputBorder(
@@ -3768,6 +3944,42 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                       ),
                     ],
                   ),
+                  Builder(
+                    builder: (context) {
+                      final rawText = _customBudgetController.text
+                          .replaceAll('.', '')
+                          .replaceAll(',', '')
+                          .trim();
+                      final int customAmount = int.tryParse(rawText) ?? 0;
+                      final int minRequired = _days >= 3 ? 3000000 : 1000000;
+                      if (customAmount > 0 && customAmount < minRequired) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                size: 14,
+                                color: Colors.redAccent,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: const Text(
+                                  'Chưa đáp ứng được ngân sách tối thiểu',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.redAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
                 ],
               ),
             ),
@@ -3778,13 +3990,12 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     );
   }
 
-  // STEP 6: Custom Request for OpenAI GPT
+  // STEP 6: Custom Request for AI
   Widget _buildStep6CustomRequest() {
     final List<String> exampleRequests = [
-      'Yêu thích thiên nhiên, không khí trong lành và ngắm cảnh',
-      'Thích thưởng thức ẩm thực đặc sản địa phương',
-      'Thích check-in sống ảo, nhiều góc chụp hình đẹp',
-      'Du lịch tâm linh, viếng chùa, đền và cầu bình an',
+      'Đi gia đình có người lớn tuổi & trẻ em, ưu tiên xe hơi di chuyển tận nơi',
+      'Trải nghiệm Chợ nổi Cái Răng sáng sớm & hủ tiếu ghe truyền thống',
+      'Săn quán ăn đặc sản & café gu bản địa ngon bổ rẻ',
     ];
 
     return SingleChildScrollView(
@@ -3793,109 +4004,72 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 12),
-          // Header with AI badge
-          Row(
+          // Header arranged vertically so title never wraps unnaturally
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
-                      ).createShader(bounds),
-                      child: const Text(
-                        'Yêu cầu riêng của bạn',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Tùy chọn — OpenAI GPT sẽ cá nhân hóa lịch trình theo yêu cầu',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+              const CloudMoodAIBadge(),
+              const SizedBox(height: 12),
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+                ).createShader(bounds),
                 child: const Text(
-                  'OpenAI GPT',
+                  'Yêu cầu riêng của bạn',
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
                     color: Colors.white,
                   ),
                 ),
               ),
+              const SizedBox(height: 6),
+              Text(
+                'Tùy chọn — Trợ lý AI sẽ cá nhân hóa lịch trình theo đúng sở thích của bạn',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          // Main text field
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: const Color(0xFF8E2DE2).withOpacity(0.25),
-                width: 1.5,
+          // Main text field - Clean single frame
+          TextField(
+            controller: _customRequestController,
+            maxLines: 4,
+            maxLength: 250,
+            style: const TextStyle(fontSize: 15, height: 1.5),
+            decoration: InputDecoration(
+              hintText:
+                  'VD: Đi gia đình có người già, không muốn đi bộ nhiều, thích quán ăn bản địa chuẩn vị và không khí trong lành...',
+              hintStyle: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade400,
+                height: 1.5,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF8E2DE2).withOpacity(0.06),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              contentPadding: const EdgeInsets.all(18),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(color: Colors.grey.shade200),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(color: Colors.grey.shade200),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: const BorderSide(
+                  color: _aiPurple,
+                  width: 1.5,
                 ),
-              ],
-            ),
-            child: TextField(
-              controller: _customRequestController,
-              maxLines: 4,
-              maxLength: 250,
-              style: const TextStyle(fontSize: 15, height: 1.5),
-              decoration: InputDecoration(
-                hintText:
-                    'VD: Đi với người già, không muốn đi bộ nhiều, thích quán yên tĩnh và không khí trong lành...',
-                hintStyle: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade400,
-                  height: 1.5,
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.all(18),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF8E2DE2),
-                    width: 2,
-                  ),
-                ),
-                counterStyle: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade400,
-                ),
+              ),
+              counterStyle: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade400,
               ),
             ),
           ),
@@ -3975,65 +4149,217 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     );
   }
 
-  Widget _buildBudgetPresetCard(String levelName, String desc) {
-    String levelKey = 'Vừa phải';
-    if (levelName.contains('Tiết kiệm')) {
-      levelKey = 'Tiết kiệm';
-    } else if (levelName.contains('Sang trọng')) {
-      levelKey = 'Sang trọng';
-    } else if (levelName.contains('Vừa phải')) {
-      levelKey = 'Vừa phải';
-    } else {
-      levelKey = levelName.split(' ')[0];
-    }
-    final isSelected = _selectedBudgetLevel == levelKey;
+  Widget _buildBudgetPresetCard(
+    String levelName,
+    String desc, {
+    bool isDisabled = false,
+    String? disabledReason,
+  }) {
+    final String levelKey = levelName.split(' ')[0];
+    final isSelected = _selectedBudgetLevel == levelKey && !_useCustomBudget;
 
     return InkWell(
-      onTap: () => setState(() => _selectedBudgetLevel = levelKey),
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? _aiPurple.withOpacity(0.08) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isSelected ? _aiPurple : Colors.grey.shade200,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      onTap: () {
+        if (isDisabled) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
                 children: [
-                  Text(
-                    levelName,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? _aiPurple : AppTheme.darkText,
-                    ),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: Colors.white,
+                    size: 20,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    desc,
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      disabledReason ??
+                          'Mức ngân sách này không phù hợp cho chuyến đi dài ngày.',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ],
               ),
+              backgroundColor: Colors.indigo.shade900,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              duration: const Duration(seconds: 3),
             ),
-            Radio<String>(
-              value: levelKey,
-              groupValue: _selectedBudgetLevel,
-              activeColor: _aiPurple,
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedBudgetLevel = val);
-              },
+          );
+          return;
+        }
+        setState(() {
+          _selectedBudgetLevel = levelKey;
+          _useCustomBudget = false;
+        });
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Opacity(
+        opacity: isDisabled ? 0.5 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? _aiPurple.withOpacity(0.08)
+                : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isSelected ? _aiPurple : Colors.grey.shade200,
+              width: isSelected ? 2 : 1,
             ),
-          ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          levelName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? _aiPurple : AppTheme.darkText,
+                          ),
+                        ),
+                        if (isDisabled) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.amber.shade200),
+                            ),
+                            child: Text(
+                              'Chỉ áp dụng 1-2 ngày 🔒',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      desc,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected && !isDisabled)
+                const Icon(Icons.check_circle_rounded, color: _aiPurple),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class CloudMoodAIBadge extends StatelessWidget {
+  const CloudMoodAIBadge({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8E2DE2).withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.asset(
+              'assets/images/logo-cloudmood-new.png',
+              width: 18,
+              height: 18,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'CloudMood AI',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.auto_awesome_rounded,
+            size: 13,
+            color: Color(0xFFFFD700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    String cleanText = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleanText.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < cleanText.length; i++) {
+      if (i > 0 && (cleanText.length - i) % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(cleanText[i]);
+    }
+
+    final formattedText = buffer.toString();
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
     );
   }
 }

@@ -379,41 +379,49 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
     }
   }
 
-  String _getAuthorNoteForPlace(Map<String, dynamic> item, Map<String, dynamic> place) {
-    final String placeDesc = (place['description'] ?? '').toString().trim();
+  String _getAuthorNoteForPlace(dynamic item, dynamic place) {
+    if (item == null && place == null) return '';
+    final iMap = item is Map ? item : {};
+    final pMap = place is Map ? place : {};
+
+    final String placeDesc = (pMap['description'] ?? '').toString().trim();
 
     // 1. Direct item content/note fields
-    final String itemContent = (item['content'] ?? item['note'] ?? item['noteText'] ?? '').toString().trim();
+    final String itemContent = (iMap['content'] ?? iMap['note'] ?? iMap['noteText'] ?? '').toString().trim();
     if (itemContent.isNotEmpty && itemContent != placeDesc) {
       return itemContent;
     }
 
-    final placeNote = (place['noteText'] ?? place['note'] ?? '').toString().trim();
+    final placeNote = (pMap['noteText'] ?? pMap['note'] ?? '').toString().trim();
     if (placeNote.isNotEmpty && placeNote != placeDesc) {
       return placeNote;
     }
 
-    final placeId = place['id'] ?? item['placeId'];
+    final placeId = pMap['id'] ?? iMap['placeId'];
 
     // 2. Check widget.initialItinerary savedPlaces and details
     if (widget.initialItinerary != null) {
       final saved = widget.initialItinerary!['savedPlaces'] as List?;
       if (saved != null) {
         for (var sp in saved) {
-          final spId = sp['placeId'] ?? sp['place']?['id'];
-          if (placeId != null && spId?.toString() == placeId.toString()) {
-            final note = (sp['noteText'] ?? sp['note'] ?? sp['notes'] ?? '').toString().trim();
-            if (note.isNotEmpty) return note;
+          if (sp is Map) {
+            final spId = sp['placeId'] ?? sp['place']?['id'];
+            if (placeId != null && spId?.toString() == placeId.toString()) {
+              final note = (sp['noteText'] ?? sp['note'] ?? sp['notes'] ?? '').toString().trim();
+              if (note.isNotEmpty) return note;
+            }
           }
         }
       }
       final details = widget.initialItinerary!['details'] as List?;
       if (details != null) {
         for (var d in details) {
-          final dId = d['placeId'] ?? d['place']?['id'];
-          if (placeId != null && dId?.toString() == placeId.toString()) {
-            final note = (d['noteText'] ?? d['note'] ?? d['notes'] ?? '').toString().trim();
-            if (note.isNotEmpty) return note;
+          if (d is Map) {
+            final dId = d['placeId'] ?? d['place']?['id'];
+            if (placeId != null && dId?.toString() == placeId.toString()) {
+              final note = (d['noteText'] ?? d['note'] ?? d['notes'] ?? '').toString().trim();
+              if (note.isNotEmpty) return note;
+            }
           }
         }
       }
@@ -422,23 +430,29 @@ class _ExplorePostDetailScreenState extends State<ExplorePostDetailScreen> {
     // 3. Check _post['originalItinerary'] savedPlaces and details
     if (_post != null && _post!['originalItinerary'] != null) {
       final orig = _post!['originalItinerary'];
-      final saved = orig['savedPlaces'] as List?;
-      if (saved != null) {
-        for (var sp in saved) {
-          final spId = sp['placeId'] ?? sp['place']?['id'];
-          if (placeId != null && spId?.toString() == placeId.toString()) {
-            final note = (sp['noteText'] ?? sp['note'] ?? sp['notes'] ?? '').toString().trim();
-            if (note.isNotEmpty) return note;
+      if (orig is Map) {
+        final saved = orig['savedPlaces'] as List?;
+        if (saved != null) {
+          for (var sp in saved) {
+            if (sp is Map) {
+              final spId = sp['placeId'] ?? sp['place']?['id'];
+              if (placeId != null && spId?.toString() == placeId.toString()) {
+                final note = (sp['noteText'] ?? sp['note'] ?? sp['notes'] ?? '').toString().trim();
+                if (note.isNotEmpty) return note;
+              }
+            }
           }
         }
-      }
-      final details = orig['details'] as List?;
-      if (details != null) {
-        for (var d in details) {
-          final dId = d['placeId'] ?? d['place']?['id'];
-          if (placeId != null && dId?.toString() == placeId.toString()) {
-            final note = (d['noteText'] ?? d['note'] ?? d['notes'] ?? '').toString().trim();
-            if (note.isNotEmpty) return note;
+        final details = orig['details'] as List?;
+        if (details != null) {
+          for (var d in details) {
+            if (d is Map) {
+              final dId = d['placeId'] ?? d['place']?['id'];
+              if (placeId != null && dId?.toString() == placeId.toString()) {
+                final note = (d['noteText'] ?? d['note'] ?? d['notes'] ?? '').toString().trim();
+                if (note.isNotEmpty) return note;
+              }
+            }
           }
         }
       }

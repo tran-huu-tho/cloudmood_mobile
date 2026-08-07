@@ -12,7 +12,12 @@ import 'package:latlong2/latlong.dart';
 import 'map_picker_screen.dart';
 
 class CloudmoodPlacesScreen extends StatefulWidget {
-  const CloudmoodPlacesScreen({super.key});
+  final String? initialQuery;
+
+  const CloudmoodPlacesScreen({
+    super.key,
+    this.initialQuery,
+  });
 
   @override
   State<CloudmoodPlacesScreen> createState() => _CloudmoodPlacesScreenState();
@@ -69,8 +74,24 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+      _searchQuery = widget.initialQuery!;
+      _searchController.text = widget.initialQuery!;
+    }
     _loadCategories();
     _loadPlaces(page: 1);
+  }
+
+  @override
+  void didUpdateWidget(covariant CloudmoodPlacesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialQuery != oldWidget.initialQuery && widget.initialQuery != null) {
+      setState(() {
+        _searchQuery = widget.initialQuery!;
+        _searchController.text = widget.initialQuery!;
+      });
+      _loadPlaces(page: 1);
+    }
   }
 
   @override

@@ -56,6 +56,8 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   List<Map<String, dynamic>> _explorePosts = [];
   bool _isLoadingExplore = false;
   bool _hasFetchedExplore = false;
+  String _exploreSearchQuery = '';
+  final TextEditingController _exploreSearchController = TextEditingController();
 
   // Pagination for web images
   int _webImagesPage = 1;
@@ -9930,8 +9932,8 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                 // Floating Search Pill
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                    horizontal: 14,
+                    vertical: 2,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -9955,17 +9957,56 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                         color: AppTheme.primary,
                         size: 20,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          'Tìm kiếm bài viết ở $destination...',
+                        child: TextField(
+                          controller: _exploreSearchController,
+                          onChanged: (val) {
+                            setState(() {
+                              _exploreSearchQuery = val.trim();
+                            });
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Tìm kiếm bài viết ở $destination...',
+                            hintStyle: TextStyle(
+                              color: AppTheme.subtitleText,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            filled: false,
+                            fillColor: Colors.transparent,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
                           style: TextStyle(
-                            color: AppTheme.subtitleText,
+                            color: AppTheme.darkText,
                             fontSize: 14,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
+                      if (_exploreSearchQuery.isNotEmpty)
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _exploreSearchController.clear();
+                              _exploreSearchQuery = '';
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Icon(
+                              Icons.clear_rounded,
+                              color: Colors.grey.shade400,
+                              size: 18,
+                            ),
+                          ),
+                        ),
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
@@ -9996,53 +10037,78 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
               ),
             ),
           )
-        else if (_explorePosts.isEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(40.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryContainer.withAlpha(80),
-                      shape: BoxShape.circle,
+        else () {
+          final filteredPosts = _explorePosts.where((post) {
+            if (_exploreSearchQuery.isEmpty) return true;
+            final q = _exploreSearchQuery.toLowerCase();
+            final title = (post['title'] ?? '').toString().toLowerCase();
+            final desc = (post['description'] ?? post['content'] ?? '').toString().toLowerCase();
+            final authorName = (post['user']?['name'] ?? post['author']?['name'] ?? '').toString().toLowerCase();
+            bool matchesPlace = false;
+            if (post['items'] is List) {
+              for (var item in (post['items'] as List)) {
+                final pName = (item['place']?['name'] ?? '').toString().toLowerCase();
+                if (pName.contains(q)) {
+                  matchesPlace = true;
+                  break;
+                }
+              }
+            }
+            return title.contains(q) || desc.contains(q) || authorName.contains(q) || matchesPlace;
+          }).toList();
+
+          if (filteredPosts.isEmpty) {
+            return SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(40.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryContainer.withAlpha(80),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _exploreSearchQuery.isNotEmpty ? Icons.search_off_rounded : Icons.explore_off_rounded,
+                        size: 40,
+                        color: AppTheme.primary.withAlpha(180),
+                      ),
                     ),
-                    child: Icon(
-                      Icons.explore_off_rounded,
-                      size: 40,
-                      color: AppTheme.primary.withAlpha(180),
+                    const SizedBox(height: 16),
+                    Text(
+                      _exploreSearchQuery.isNotEmpty
+                          ? 'Không tìm thấy bài viết phù hợp'
+                          : 'Chưa có bài viết khám phá nào',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.darkText,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Chưa có bài viết khám phá nào',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.darkText,
+                    const SizedBox(height: 6),
+                    Text(
+                      _exploreSearchQuery.isNotEmpty
+                          ? 'Thử tìm kiếm với từ khóa khác xem sao nhé!'
+                          : 'Hãy quay lại sau để cập nhật các kinh nghiệm mới nhất nhé!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.subtitleText,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Hãy quay lại sau để cập nhật các kinh nghiệm mới nhất nhé!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.subtitleText,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          )
-        else
-          SliverPadding(
+            );
+          }
+
+          return SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
-                final post = _explorePosts[index];
+                final post = filteredPosts[index];
                 return ExplorePostCard(
                   post: post,
                   onTap: () {
@@ -10060,9 +10126,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                     });
                   },
                 );
-              }, childCount: _explorePosts.length),
+              }, childCount: filteredPosts.length),
             ),
-          ),
+          );
+        }(),
       ],
     );
   }

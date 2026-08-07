@@ -13,10 +13,11 @@ import '../widgets/place_detail_bottom_sheet.dart';
 import 'explore_post_detail_screen.dart';
 import 'places_screen.dart';
 import 'forum_screen.dart';
+import 'all_explore_guides_screen.dart';
 
 class CloudmoodHomeScreen extends StatefulWidget {
   final VoidCallback onProfileTap;
-  final VoidCallback? onExplorePlacesTap;
+  final Function(String query)? onExplorePlacesTap;
   final VoidCallback? onExploreGuidesTap;
 
   const CloudmoodHomeScreen({
@@ -35,6 +36,9 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
   Map<String, dynamic>? _weatherData;
   bool _isLoadingWeather = true;
   String _weatherQuote = "";
+
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
 
   static Map<String, dynamic>? _cachedWeatherData;
   static String _cachedWeatherQuote = "";
@@ -583,7 +587,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 1. Hero Search Header
-                const SearchHeaderWidget(),
+                SearchHeaderWidget(onSearchTap: widget.onExplorePlacesTap),
                 const SizedBox(height: 20),
 
                 // Weather Widget
@@ -591,7 +595,11 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                 const SizedBox(height: 24),
 
                 // Featured Places Section
-                FeaturedPlacesSection(onSeeMore: widget.onExplorePlacesTap),
+                FeaturedPlacesSection(
+                  onSeeMore: widget.onExplorePlacesTap != null
+                      ? () => widget.onExplorePlacesTap!('')
+                      : null,
+                ),
                 const SizedBox(height: 28),
 
                 // 3. Featured Guides
@@ -687,8 +695,25 @@ class HeaderWidget extends StatelessWidget {
 }
 
 /// Welcome text and search bar section
-class SearchHeaderWidget extends StatelessWidget {
-  const SearchHeaderWidget({super.key});
+/// Welcome text and search bar section
+class SearchHeaderWidget extends StatefulWidget {
+  final Function(String query)? onSearchTap;
+
+  const SearchHeaderWidget({super.key, this.onSearchTap});
+
+  @override
+  State<SearchHeaderWidget> createState() => _SearchHeaderWidgetState();
+}
+
+class _SearchHeaderWidgetState extends State<SearchHeaderWidget> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -698,7 +723,7 @@ class SearchHeaderWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Hôm nay tâm trạng bạn thế nào?',
+            'Bạn cần kế hoạch cho chuyến đi mới?',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -707,7 +732,7 @@ class SearchHeaderWidget extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Lên lịch trình\ntheo cảm xúc ✨',
+            'Lên lịch trình\nthông minh ✨',
             style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
@@ -717,9 +742,9 @@ class SearchHeaderWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          // Search box
+          // Active Interactive Search box
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             decoration: BoxDecoration(
               color: AppTheme.surface,
               borderRadius: BorderRadius.circular(18),
@@ -739,35 +764,87 @@ class SearchHeaderWidget extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.search_rounded,
-                    color: AppTheme.primary,
-                    size: 18,
+                GestureDetector(
+                  onTap: () {
+                    widget.onSearchTap?.call(_searchController.text.trim());
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.search_rounded,
+                      color: AppTheme.primary,
+                      size: 18,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    'Tìm điểm đến, cẩm nang du lịch...',
-                    style: TextStyle(color: AppTheme.hintText, fontSize: 14),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val.trim();
+                      });
+                    },
+                    onSubmitted: (val) {
+                      widget.onSearchTap?.call(val.trim());
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Tìm điểm đến, cẩm nang du lịch...',
+                      hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 14),
+                      filled: false,
+                      fillColor: Colors.transparent,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    style: TextStyle(
+                      color: AppTheme.darkText,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceVariant,
-                    borderRadius: BorderRadius.circular(8),
+                if (_searchQuery.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _searchController.clear();
+                        _searchQuery = '';
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Icon(
+                        Icons.clear_rounded,
+                        color: Colors.grey.shade400,
+                        size: 18,
+                      ),
+                    ),
                   ),
-                  child: Icon(
-                    Icons.tune_rounded,
-                    color: AppTheme.subtitleText,
-                    size: 16,
+                GestureDetector(
+                  onTap: () {
+                    widget.onSearchTap?.call(_searchController.text.trim());
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceVariant,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.tune_rounded,
+                      color: AppTheme.subtitleText,
+                      size: 16,
+                    ),
                   ),
                 ),
               ],
@@ -959,9 +1036,12 @@ class FeaturedGuidesSection extends StatelessWidget {
                   InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
-                      if (onSeeMore != null) {
-                        onSeeMore!();
-                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AllExploreGuidesScreen(),
+                        ),
+                      );
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -1708,10 +1788,10 @@ class CreateMenuOverlay extends StatelessWidget {
                                 context: context,
                                 icon: Icons.luggage_rounded,
                                 gradient: AppTheme.primaryGradient,
-                                title: 'Lên kế hoạch chuyến đi',
+                                title: 'Lịch trình tự thiết kế',
                                 subtitle:
-                                    'Tạo hành trình thông minh, tự động sắp xếp theo sở thích và tâm trạng của riêng bạn.',
-                                actionText: 'Tạo kế hoạch →',
+                                    'Chủ động chọn từng địa điểm, mốc thời gian và tùy chỉnh hành trình theo ý thích.',
+                                actionText: 'Tạo thủ công →',
                                 actionColor: AppTheme.primary,
                                 onTap: () {
                                   Navigator.of(context).pop('create_itinerary');
@@ -1729,10 +1809,10 @@ class CreateMenuOverlay extends StatelessWidget {
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
-                                title: 'Lên kế hoạch với trợ lý AI',
+                                title: 'Lên lịch trình bằng AI',
                                 subtitle:
-                                    'Trò chuyện cùng Trợ lý AI thông minh để gợi ý địa điểm, lịch trình tối ưu theo ý muốn.',
-                                actionText: 'Hỏi Trợ lý AI →',
+                                    'Trợ lý AI tự động gợi ý địa điểm, phân bổ thời gian và tối ưu hành trình chỉ trong 5s.',
+                                actionText: 'Tạo với AI →',
                                 actionColor: const Color(0xFF8E2DE2),
                                 onTap: () {
                                   Navigator.of(context).pop('ai_chat');
@@ -1750,10 +1830,10 @@ class CreateMenuOverlay extends StatelessWidget {
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
-                                title: 'Viết hướng dẫn du lịch',
+                                title: 'Chia sẻ cẩm nang du lịch',
                                 subtitle:
-                                    'Chia sẻ địa điểm ẩn mình, cẩm nang chi tiết và mẹo hay cho các lữ khách khác.',
-                                actionText: 'Viết cẩm nang →',
+                                    'Viết bài chia sẻ kinh nghiệm chuyến đi, mẹo hay và địa điểm ẩn mình cho cộng đồng.',
+                                actionText: 'Viết bài ngay →',
                                 actionColor: const Color(0xFFD97706),
                                 onTap: () {
                                   Navigator.of(context).pop('create_guide');
