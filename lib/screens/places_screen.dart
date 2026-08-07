@@ -1077,7 +1077,11 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                           children: [
                             OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: AppTheme.border),
+                                side: BorderSide(
+                                  color: _currentPage > 1
+                                      ? AppTheme.primary.withAlpha(80)
+                                      : AppTheme.border,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -1094,20 +1098,10 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                                       );
                                     }
                                   : null,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.arrow_back_ios_rounded, size: 12, color: _currentPage > 1 ? AppTheme.primary : AppTheme.subtitleText),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Trang trước',
-                                    style: TextStyle(
-                                      color: _currentPage > 1 ? AppTheme.primary : AppTheme.subtitleText,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'SDK_SC_Web-Heavy',
-                                    ),
-                                  ),
-                                ],
+                              child: Icon(
+                                Icons.arrow_back_ios_rounded,
+                                size: 14,
+                                color: _currentPage > 1 ? AppTheme.primary : AppTheme.subtitleText,
                               ),
                             ),
                             const SizedBox(width: 20),
@@ -1122,7 +1116,11 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                             const SizedBox(width: 20),
                             OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: AppTheme.border),
+                                side: BorderSide(
+                                  color: _hasMore
+                                      ? AppTheme.primary.withAlpha(80)
+                                      : AppTheme.border,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -1139,20 +1137,10 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
                                       );
                                     }
                                   : null,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Trang sau',
-                                    style: TextStyle(
-                                      color: _hasMore ? AppTheme.primary : AppTheme.subtitleText,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'SDK_SC_Web-Heavy',
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Icon(Icons.arrow_forward_ios_rounded, size: 12, color: _hasMore ? AppTheme.primary : AppTheme.subtitleText),
-                                ],
+                              child: Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 14,
+                                color: _hasMore ? AppTheme.primary : AppTheme.subtitleText,
                               ),
                             ),
                           ],

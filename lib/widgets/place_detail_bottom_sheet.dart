@@ -715,7 +715,23 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                       ),
                       Expanded(
                         child: Text(
-                          '${price ?? ''}${priceLevel != null && priceLevel.isNotEmpty ? ' (${_formatPriceLevel(priceLevel)})' : ''}',
+                          (() {
+                            final formattedLevel =
+                                (priceLevel != null && priceLevel.isNotEmpty)
+                                    ? _formatPriceLevel(priceLevel)
+                                    : '';
+                            if (price != null &&
+                                price.isNotEmpty &&
+                                formattedLevel.isNotEmpty) {
+                              return '$price ($formattedLevel)';
+                            } else if (price != null && price.isNotEmpty) {
+                              return price;
+                            } else {
+                              return formattedLevel.isNotEmpty
+                                  ? formattedLevel
+                                  : 'Tham khảo';
+                            }
+                          })(),
                           style: TextStyle(
                             color: AppTheme.darkText,
                             fontWeight: FontWeight.w600,
@@ -1491,17 +1507,28 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
   }
 
   String _formatPriceLevel(String level) {
-    switch (level.toUpperCase()) {
+    switch (level.toUpperCase().trim()) {
       case 'CHEAP':
       case 'INEXPENSIVE':
-        return 'Giá rẻ';
+      case 'PRICE_LEVEL_CHEAP':
+      case 'PRICE_LEVEL_INEXPENSIVE':
+      case '\$':
+        return 'Bình dân';
       case 'MODERATE':
-        return 'Trung bình';
+      case 'PRICE_LEVEL_MODERATE':
+      case '\$\$':
+        return 'Vừa túi tiền';
       case 'EXPENSIVE':
-        return 'Sang trọng';
+      case 'PRICE_LEVEL_EXPENSIVE':
+      case '\$\$\$':
+        return 'Cao cấp';
       case 'VERY_EXPENSIVE':
-        return 'Rất sang trọng';
+      case 'PRICE_LEVEL_VERY_EXPENSIVE':
+      case '\$\$\$\$':
+      case '\$\$\$\$\$':
+        return 'Sang trọng';
       case 'FREE':
+      case 'PRICE_LEVEL_FREE':
         return 'Miễn phí';
       default:
         return level;

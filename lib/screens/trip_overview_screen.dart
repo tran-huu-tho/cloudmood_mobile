@@ -56,13 +56,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
       final nextLoc = _getNextLocation();
       if (nextLoc != null) {
         _triggerLiveActivityNotification(nextLoc);
       }
     }
   }
+
   Future<void> _triggerLiveActivityNotification(Map<String, dynamic>? nextLoc) async {
     if (nextLoc == null) return;
 
@@ -77,8 +80,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         ? (_itineraryData['id'] as num).toInt()
         : int.tryParse(_itineraryData['id']?.toString() ?? '') ?? 0;
 
-    // Strictly enforce: system notifications only fire for the primary selected trip!
-    if (primaryId == null || currentItinId != primaryId) {
+    // Allow notifications for current open trip if primaryId matches or is not set yet
+    if (primaryId != null && primaryId > 0 && currentItinId != primaryId) {
       return;
     }
     final place = nextLoc['place'] ?? {};
@@ -136,17 +139,27 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
       await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
+      const androidChannel = AndroidNotificationChannel(
+        'cloudmood_live_destination_v2',
+        'Điểm đến tiếp theo',
+        description: 'Thông báo đẩy ghim điểm đến trên thanh trạng thái và màn hình khóa',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
+
       final androidPlugin = flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
       if (androidPlugin != null) {
+        await androidPlugin.createNotificationChannel(androidChannel);
         await androidPlugin.requestNotificationsPermission();
       }
 
       final bodyText = '🗓️ $dayAndDateText • ⏰ ${timeInfo.isNotEmpty ? timeInfo : "Chuẩn bị khởi hành"}${cleanAddr.isNotEmpty ? " • $cleanAddr" : ""}';
 
       final androidDetails = AndroidNotificationDetails(
-        'cloudmood_live_destination',
+        'cloudmood_live_destination_v2',
         'Điểm đến tiếp theo',
         channelDescription:
             'Thông báo đẩy ghim điểm đến trên thanh trạng thái và màn hình khóa',
@@ -154,6 +167,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         priority: Priority.high,
         ongoing: true,
         autoCancel: false,
+        playSound: true,
+        enableVibration: true,
         visibility: NotificationVisibility.public,
         styleInformation: BigTextStyleInformation(bodyText),
       );
@@ -263,6 +278,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           color: Colors.amber,
         );
       }
+    }
+    final nextLoc = _getNextLocation();
+    if (nextLoc != null) {
+      _triggerLiveActivityNotification(nextLoc);
     }
   }
 
@@ -10829,6 +10848,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   List<Map<String, dynamic>> _recalculateDayTimeline(
     List<Map<String, dynamic>> items, {
     int? pinnedDetailId,
+    bool forceResetUnpinned = true,
   }) {
     if (items.isEmpty) return items;
 
@@ -10843,7 +10863,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
 
-    // Sort items sequence based on sortOrder (or Market early morning priority)
+    // Sort items sequence based on sortOrder (with Floating Market at top priority for early morning)
     sorted.sort((a, b) {
       final placeA = a['place'] ?? {};
       final placeB = b['place'] ?? {};
@@ -10863,24 +10883,40 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       return orderA.compareTo(orderB);
     });
 
-    int currentCursorMinutes = 7 * 60; // Default starts 07:00 AM
+    final firstPlace = sorted.first['place'] ?? {};
+    final String firstName = (firstPlace['name'] ?? sorted.first['name'] ?? '').toString().toLowerCase();
+    final bool startsWithMarket = firstName.contains('chợ nổi') ||
+        firstName.contains('cái răng') ||
+        firstName.contains('floating market');
+
+    int currentCursorMinutes = startsWithMarket ? (5 * 60 + 30) : (7 * 60);
 
     for (int i = 0; i < sorted.length; i++) {
       final item = sorted[i];
       final bool hasValidTime = item['startTime'] != null &&
           item['startTime'].toString().contains(':');
       final place = item['place'] ?? {};
-      final String placeName = (place['name'] ?? '').toString().toLowerCase();
+      final String placeName = (place['name'] ?? item['name'] ?? '').toString().toLowerCase();
       final bool isMarket = placeName.contains('chợ nổi') ||
           placeName.contains('cái răng') ||
           placeName.contains('floating market');
-      final bool isPinned = item['isUserPinned'] == true ||
-          item['id'] == pinnedDetailId ||
-          isMarket ||
-          hasValidTime;
+      final bool isNightScene = placeName.contains('chợ đêm') ||
+          placeName.contains('night market') ||
+          placeName.contains('cầu đi bộ') ||
+          placeName.contains('bar') ||
+          placeName.contains('pub') ||
+          placeName.contains('bến tàu') ||
+          placeName.contains('hoàng hôn') ||
+          placeName.contains('sunset') ||
+          placeName.contains('du thuyền') ||
+          placeName.contains('club') ||
+          placeName.contains('lounge');
 
-      if (isPinned && hasValidTime) {
-        // 100% PRIORITY FOR PINNED / PRE-SET PLACE: Keep exact startTime & endTime
+      final bool isExplicitlyPinned =
+          item['isUserPinned'] == true || item['id'] == pinnedDetailId;
+
+      if (isExplicitlyPinned && hasValidTime && !forceResetUnpinned) {
+        // 100% PRIORITY FOR USER-PINNED PLACE: Keep exact startTime & endTime
         final startParts = item['startTime'].toString().split(':');
         final endParts = (item['endTime']?.toString() ?? '').split(':');
 
@@ -10900,46 +10936,33 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
         currentCursorMinutes = (eH * 60 + eM + 30);
       } else {
-        // UNPINNED PLACE: Optimize around currentCursorMinutes and upcoming pinned items
-        int? nextPinnedStartMinutes;
-        for (int j = i + 1; j < sorted.length; j++) {
-          final nextItem = sorted[j];
-          final bool nextHasTime = nextItem['startTime'] != null &&
-              nextItem['startTime'].toString().contains(':');
-          final bool nextPinned = nextHasTime ||
-              nextItem['isUserPinned'] == true ||
-              nextItem['id'] == pinnedDetailId;
+        // UNPINNED / OPTIMIZING: Recalculate timeline sequentially from cursor
+        if (isMarket && i == 0) {
+          item['startTime'] = '05:30';
+          item['endTime'] = '07:30';
+          currentCursorMinutes = 7 * 60 + 30; // 07:30 AM
+        } else if (isNightScene && currentCursorMinutes < (18 * 60)) {
+          currentCursorMinutes = 18 * 60; // 18:00 PM
+          item['startTime'] = '18:00';
+          item['endTime'] = '19:30';
+          currentCursorMinutes = 19 * 60 + 30 + 30; // 20:00 PM
+        } else {
+          int startM = currentCursorMinutes;
+          int duration = 90; // Default 1.5h
 
-          if (nextPinned && nextHasTime) {
-            final parts = nextItem['startTime'].toString().split(':');
-            nextPinnedStartMinutes = (int.tryParse(parts[0]) ?? 12) * 60 +
-                (int.tryParse(parts[1]) ?? 0);
-            break;
-          }
+          int sH = (startM ~/ 60) % 24;
+          int sM = startM % 60;
+          int eTotal = startM + duration;
+          int eH = (eTotal ~/ 60) % 24;
+          int eM = eTotal % 60;
+
+          item['startTime'] =
+              '${sH.toString().padLeft(2, '0')}:${sM.toString().padLeft(2, '0')}';
+          item['endTime'] =
+              '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
+
+          currentCursorMinutes = eTotal + 30; // 30 min travel & rest
         }
-
-        int startM = currentCursorMinutes;
-        int duration = 90;
-
-        if (nextPinnedStartMinutes != null &&
-            (startM + duration) > nextPinnedStartMinutes) {
-          if (nextPinnedStartMinutes - startM >= 45) {
-            duration = nextPinnedStartMinutes - startM - 15;
-          }
-        }
-
-        int sH = (startM ~/ 60) % 24;
-        int sM = startM % 60;
-        int eTotal = startM + duration;
-        int eH = (eTotal ~/ 60) % 24;
-        int eM = eTotal % 60;
-
-        item['startTime'] =
-            '${sH.toString().padLeft(2, '0')}:${sM.toString().padLeft(2, '0')}';
-        item['endTime'] =
-            '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
-
-        currentCursorMinutes = eTotal + 30;
       }
 
       item['sortOrder'] = i;
@@ -10955,7 +10978,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   List<Map<String, dynamic>> _optimizeDayTimeSlots(
     List<Map<String, dynamic>> items,
   ) {
-    return _recalculateDayTimeline(items);
+    return _recalculateDayTimeline(items, forceResetUnpinned: true);
   }
 
   Future<void> _optimizeDay(int dayIndex) async {

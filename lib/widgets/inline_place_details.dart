@@ -732,7 +732,18 @@ class InlinePlaceBottomInfo extends StatelessWidget {
                         if (price.isNotEmpty || priceLevel.isNotEmpty) ...[
                           _buildInfoRow(
                             Icons.attach_money_rounded,
-                            'Mức giá: $price${priceLevel.isNotEmpty ? ' ($priceLevel)' : ''}',
+                            (() {
+                              final formattedLevel = priceLevel.isNotEmpty
+                                  ? _formatPriceLevel(priceLevel)
+                                  : '';
+                              if (price.isNotEmpty && formattedLevel.isNotEmpty) {
+                                return 'Mức giá: $price ($formattedLevel)';
+                              } else if (price.isNotEmpty) {
+                                return 'Mức giá: $price';
+                              } else {
+                                return 'Mức giá: ${formattedLevel.isNotEmpty ? formattedLevel : 'Tham khảo'}';
+                              }
+                            })(),
                             context,
                           ),
                           if (address.isNotEmpty ||
@@ -952,5 +963,34 @@ class InlinePlaceBottomInfo extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatPriceLevel(String level) {
+    switch (level.toUpperCase().trim()) {
+      case 'CHEAP':
+      case 'INEXPENSIVE':
+      case 'PRICE_LEVEL_CHEAP':
+      case 'PRICE_LEVEL_INEXPENSIVE':
+      case '\$':
+        return 'Bình dân';
+      case 'MODERATE':
+      case 'PRICE_LEVEL_MODERATE':
+      case '\$\$':
+        return 'Vừa túi tiền';
+      case 'EXPENSIVE':
+      case 'PRICE_LEVEL_EXPENSIVE':
+      case '\$\$\$':
+        return 'Cao cấp';
+      case 'VERY_EXPENSIVE':
+      case 'PRICE_LEVEL_VERY_EXPENSIVE':
+      case '\$\$\$\$':
+      case '\$\$\$\$\$':
+        return 'Sang trọng';
+      case 'FREE':
+      case 'PRICE_LEVEL_FREE':
+        return 'Miễn phí';
+      default:
+        return level;
+    }
   }
 }
