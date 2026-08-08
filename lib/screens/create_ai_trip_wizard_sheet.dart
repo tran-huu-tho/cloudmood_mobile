@@ -4024,6 +4024,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                             fontSize: 15,
                             fontWeight: FontWeight.normal,
                           ),
+                          filled: false,
+                          fillColor: Colors.transparent,
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,

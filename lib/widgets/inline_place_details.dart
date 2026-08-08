@@ -540,7 +540,7 @@ class InlinePlaceBottomInfo extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildActionButton(Icons.search, 'Hỏi AI', true, context, onTap: () {
+                _buildActionButton(Icons.auto_awesome, '', true, context, onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(

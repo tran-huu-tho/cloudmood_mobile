@@ -5360,22 +5360,10 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                         color: const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.auto_awesome,
-                            color: AppTheme.darkText,
-                            size: 16,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Hỏi AI',
-                            style: TextStyle(
-                              color: AppTheme.darkText,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      child: Icon(
+                        Icons.auto_awesome,
+                        color: AppTheme.darkText,
+                        size: 16,
                       ),
                     ),
                   ),

@@ -543,10 +543,10 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                     ),
               const SizedBox(width: 8),
               _buildActionButton(
-                Icons.search,
-                'Hỏi AI',
-                Colors.red[50]!,
-                Colors.red,
+                Icons.auto_awesome,
+                '',
+                Colors.purple[50]!,
+                Colors.purple,
                 onTap: () {
                   Navigator.push(
                     context,

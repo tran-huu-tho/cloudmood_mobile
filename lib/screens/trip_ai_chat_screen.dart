@@ -852,7 +852,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
 
   Widget _buildMessageContent(String content, bool isUser) {
     if (isUser) {
-      return Text(content, style: const TextStyle(color: Colors.white, fontSize: 15));
+      return Text(content, style: const TextStyle(color: Colors.white, fontSize: 13.5));
     }
     final lines = content.split('\n');
     final widgets = <Widget>[];
@@ -865,11 +865,11 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
         continue;
       }
       if (line.startsWith('### ')) {
-        widgets.add(Padding(padding: const EdgeInsets.only(top: 8, bottom: 4), child: Text(line.substring(4), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.darkText))));
+        widgets.add(Padding(padding: const EdgeInsets.only(top: 8, bottom: 4), child: Text(line.substring(4), style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.darkText))));
       } else if (line.startsWith('## ')) {
-        widgets.add(Padding(padding: const EdgeInsets.only(top: 10, bottom: 4), child: Text(line.substring(3), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.darkText))));
+        widgets.add(Padding(padding: const EdgeInsets.only(top: 10, bottom: 4), child: Text(line.substring(3), style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: AppTheme.darkText))));
       } else if (line.startsWith('# ')) {
-        widgets.add(Padding(padding: const EdgeInsets.only(top: 12, bottom: 4), child: Text(line.substring(2), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.darkText))));
+        widgets.add(Padding(padding: const EdgeInsets.only(top: 12, bottom: 4), child: Text(line.substring(2), style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: AppTheme.darkText))));
       } else if (line.trimLeft().startsWith('- ') || line.trimLeft().startsWith('* ')) {
         final indent = line.length - line.trimLeft().length;
         final text = line.trimLeft().substring(2);
@@ -886,7 +886,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
           widgets.add(Padding(
             padding: const EdgeInsets.only(top: 2, bottom: 2),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 24, child: Text('${match.group(1)}.', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.darkText))),
+              SizedBox(width: 24, child: Text('${match.group(1)}.', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppTheme.darkText))),
               Expanded(child: _buildRichText(match.group(2) ?? '', false)),
             ]),
           ));
@@ -907,7 +907,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
     }
     if (lastEnd < text.length) spans.add(TextSpan(text: text.substring(lastEnd)));
     if (spans.isEmpty) spans.add(TextSpan(text: text));
-    return RichText(text: TextSpan(style: TextStyle(color: isUser ? Colors.white : AppTheme.darkText, fontSize: 15, height: 1.4), children: spans));
+    return Text.rich(TextSpan(style: TextStyle(color: isUser ? Colors.white : AppTheme.darkText, fontSize: 13.5, height: 1.4), children: spans));
   }
 
   Widget _buildStreamingBubble() {
@@ -1539,7 +1539,6 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                               Expanded(
                                 child: TextField(
                                   controller: _controller,
-                                  onSubmitted: (_) => _sendMessage(),
                                   decoration: InputDecoration(
                                     hintText:
                                         'Hỏi các câu hỏi liên quan đến du lịch',
@@ -1548,11 +1547,19 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                                       fontSize: 14,
                                     ),
                                     border: InputBorder.none,
-                                    contentPadding: EdgeInsets.symmetric(
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
+                                    focusedErrorBorder: InputBorder.none,
+                                    errorBorder: InputBorder.none,
+                                    filled: false,
+                                    fillColor: Colors.transparent,
+                                    contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 20,
                                       vertical: 14,
                                     ),
                                   ),
+                                  onSubmitted: (_) => _sendMessage(),
                                 ),
                               ),
                               Padding(
@@ -1563,9 +1570,7 @@ class _TripAIChatScreenState extends State<TripAIChatScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: const BoxDecoration(
-                                      color: Color(
-                                        0xFFA5B4FC,
-                                      ), // Light indigo for the button
+                                      color: Color(0xFFA5B4FC),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(

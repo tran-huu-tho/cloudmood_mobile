@@ -948,7 +948,7 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
     if (isUser) {
       return Text(
         content,
-        style: const TextStyle(color: Colors.white, fontSize: 15),
+        style: const TextStyle(color: Colors.white, fontSize: 13.5),
       );
     }
 
@@ -976,7 +976,7 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
             child: Text(
               line.substring(4),
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.darkText,
               ),
@@ -990,7 +990,7 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
             child: Text(
               line.substring(3),
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 14.5,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.darkText,
               ),
@@ -1004,7 +1004,7 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
             child: Text(
               line.substring(2),
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 15.5,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.darkText,
               ),
@@ -1059,7 +1059,7 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                     child: Text(
                       '${match.group(1)}.',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.darkText,
                       ),
@@ -1116,11 +1116,11 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
       spans.add(TextSpan(text: text));
     }
 
-    return RichText(
-      text: TextSpan(
+    return Text.rich(
+      TextSpan(
         style: TextStyle(
           color: isUser ? Colors.white : AppTheme.darkText,
-          fontSize: 15,
+          fontSize: 13.5,
           height: 1.4,
         ),
         children: spans,
@@ -1603,6 +1603,13 @@ class _PlaceAIChatScreenState extends State<PlaceAIChatScreen> {
                                       fontSize: 14,
                                     ),
                                     border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
+                                    focusedErrorBorder: InputBorder.none,
+                                    errorBorder: InputBorder.none,
+                                    filled: false,
+                                    fillColor: Colors.transparent,
                                     contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 20,
                                       vertical: 14,

@@ -778,13 +778,7 @@ class _ExplorePostMapScreenState extends State<ExplorePostMapScreen> {
                                     color: const Color(0xFFF1F5F9),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.auto_awesome, color: AppTheme.darkText, size: 16),
-                                      const SizedBox(width: 4),
-                                      Text('Hỏi AI', style: TextStyle(color: AppTheme.darkText, fontSize: 13, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
+                                  child: Icon(Icons.auto_awesome, color: AppTheme.darkText, size: 16),
                                 ),
                               ),
                             ],
