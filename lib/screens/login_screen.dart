@@ -147,7 +147,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
   Future<void> _handleFacebookSignIn() async {
     setState(() => _isLoading = true);
     try {
-      // Đăng xuất phiên cũ để bắt buộc hiển thị hộp thoại đăng nhập Facebook
+      // Đăng xuất phiên cũ để đảm bảo lấy dữ liệu Facebook mới nhất
       await FacebookAuth.instance.logOut();
       final LoginResult result = await FacebookAuth.instance.login(
         permissions: ['public_profile', 'email'],
@@ -156,10 +156,40 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
         final AccessToken accessToken = result.accessToken!;
         final userData = await FacebookAuth.instance.getUserData();
         
+        final String name = userData['name'] as String? ?? 'Người dùng Facebook';
+        final String email = userData['email'] as String? ?? '';
+        final String? avatarUrl = userData['picture']?['data']?['url'] as String?;
+
+        if (!mounted) return;
+
+        // Tạm ẩn loading indicator để hiển thị khung xác nhận
+        setState(() => _isLoading = false);
+
+        // Hiển thị khung xác nhận "Bạn có muốn tiếp tục dưới tên..."
+        final bool? confirmed = await showModalBottomSheet<bool>(
+          context: context,
+          backgroundColor: Colors.transparent,
+          isScrollControlled: true,
+          builder: (ctx) => _buildFacebookConfirmBottomSheet(
+            name: name,
+            email: email,
+            avatarUrl: avatarUrl,
+          ),
+        );
+
+        if (confirmed != true) {
+          // Người dùng hủy xác nhận -> đăng xuất Facebook
+          await FacebookAuth.instance.logOut();
+          return;
+        }
+
+        // Đã xác nhận -> tiến hành đăng nhập vào ứng dụng CloudMood
+        setState(() => _isLoading = true);
+
         final response = await _authService.loginWithFacebook(
-          email: userData['email'] ?? 'facebook-user@example.com',
-          fullName: userData['name'] ?? 'Người dùng Facebook',
-          avatarUrl: userData['picture']?['data']?['url'],
+          email: email.isNotEmpty ? email : 'facebook-user@example.com',
+          fullName: name,
+          avatarUrl: avatarUrl,
           token: accessToken.token,
         );
         
@@ -203,6 +233,184 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
     }
   }
 
+  // Khung xác nhận tài khoản Facebook
+  Widget _buildFacebookConfirmBottomSheet({
+    required String name,
+    required String email,
+    String? avatarUrl,
+  }) {
+    const facebookBlue = Color(0xFF1877F2);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Thanh kéo nhỏ trên cùng
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Icon Facebook Badge
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: facebookBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.facebook,
+                color: facebookBlue,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Tiêu đề
+            const Text(
+              'Xác nhận đăng nhập',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            Text(
+              'Bạn có muốn tiếp tục với tài khoản Facebook này?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Card thông tin tài khoản Facebook
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  // Avatar người dùng
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: facebookBlue, width: 2),
+                    ),
+                    child: ClipOval(
+                      child: avatarUrl != null && avatarUrl.isNotEmpty
+                          ? Image.network(
+                              avatarUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 30, color: Colors.grey),
+                            )
+                          : const Icon(Icons.person, size: 30, color: Colors.grey),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  // Tên & Email
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (email.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            email,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Nút Đồng ý: Tiếp tục dưới tên ...
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: facebookBlue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: Text(
+                  'Tiếp tục dưới tên $name',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Nút Hủy / Đổi tài khoản
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  'Hủy / Đổi tài khoản',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -218,7 +426,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
               // Top Blue Gradient Hero Header (Matching Guest Screen UI)
               Container(
                 width: double.infinity,
-                height: 280,
+                height: 310,
                 decoration: const BoxDecoration(
                   gradient: AppTheme.heroGradient,
                   borderRadius: BorderRadius.only(
@@ -255,7 +463,7 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                     ),
                     SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -284,18 +492,18 @@ class _CloudmoodLoginScreenState extends State<CloudmoodLoginScreen>
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.all(18),
+                                      padding: const EdgeInsets.all(14),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withOpacity(0.2),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(
                                         Icons.person_rounded,
-                                        size: 48,
+                                        size: 42,
                                         color: Colors.white,
                                       ),
                                     ),
-                                    const SizedBox(height: 14),
+                                    const SizedBox(height: 10),
                                     const Text(
                                       'Đăng nhập tài khoản',
                                       style: TextStyle(

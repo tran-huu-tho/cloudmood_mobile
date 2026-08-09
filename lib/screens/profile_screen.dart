@@ -621,7 +621,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
         children: [
           // Top gradient blob
           Container(
-            height: 280,
+            height: 310,
             decoration: const BoxDecoration(
               gradient: AppTheme.heroGradient,
               borderRadius: BorderRadius.only(
@@ -673,7 +673,7 @@ class _CloudmoodProfileScreenState extends State<CloudmoodProfileScreen>
           SafeArea(
             child: Column(
               children: [
-                const SizedBox(height: 250),
+                const SizedBox(height: 280),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 28),

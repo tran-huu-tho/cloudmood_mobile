@@ -553,14 +553,16 @@ class DatabaseService {
   }
 
   /// Updates an itinerary detail
-  Future<bool> updateItineraryDetail(int id, Map<String, dynamic> data) async {
+  Future<bool> updateItineraryDetail(int id, Map<String, dynamic> data, {bool notifyRefresh = false}) async {
     try {
       final response = await ApiClient.put(
         '/itineraries/details/$id',
         body: data,
       );
       if (response.statusCode == 200) {
-        refreshTrigger.value++;
+        if (notifyRefresh) {
+          refreshTrigger.value++;
+        }
         return true;
       }
       return false;

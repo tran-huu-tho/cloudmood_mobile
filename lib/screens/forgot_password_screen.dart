@@ -159,7 +159,7 @@ class _CloudmoodForgotPasswordScreenState
               // Top Blue Gradient Hero Header (Matching Guest Screen UI)
               Container(
                 width: double.infinity,
-                height: 280,
+                height: 310,
                 decoration: const BoxDecoration(
                   gradient: AppTheme.heroGradient,
                   borderRadius: BorderRadius.only(
@@ -196,7 +196,7 @@ class _CloudmoodForgotPasswordScreenState
                     ),
                     SafeArea(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -225,18 +225,18 @@ class _CloudmoodForgotPasswordScreenState
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.all(18),
+                                      padding: const EdgeInsets.all(14),
                                       decoration: BoxDecoration(
                                         color: Colors.white.withOpacity(0.2),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(
                                         Icons.lock_reset_rounded,
-                                        size: 48,
+                                        size: 42,
                                         color: Colors.white,
                                       ),
                                     ),
-                                    const SizedBox(height: 14),
+                                    const SizedBox(height: 10),
                                     Text(
                                       _codeSent ? 'Đặt lại mật khẩu' : 'Quên mật khẩu',
                                       style: const TextStyle(
@@ -270,7 +270,7 @@ class _CloudmoodForgotPasswordScreenState
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 16),
 
               // Form content body
               Padding(

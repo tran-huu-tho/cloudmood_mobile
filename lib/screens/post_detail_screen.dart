@@ -1118,17 +1118,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ),
 
           // 7. Write Comment Box
-          Container(
-            padding: EdgeInsets.only(
-              left: 14,
-              right: 14,
-              top: 10,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 10,
-            ),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
-            ),
+          SafeArea(
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+              ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1356,8 +1353,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ],
             ),
           ),
-        ],
-      ),
-    ));
+        ),
+      ],
+    ),
+    ),
+    );
   }
 }

@@ -10963,9 +10963,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     List<Map<String, dynamic>> updatedDayItems = [];
 
+    final String detailIdStr = (detail['id'] ?? detail['detailId'] ?? '').toString();
+
     setState(() {
       if (isItineraryDetail) {
-        final idx = _details.indexWhere((d) => d['id'] == detailId);
+        final idx = _details.indexWhere((d) => (d['id'] ?? '').toString() == detailIdStr);
         if (idx != -1) {
           _details[idx]['startTime'] = startStr;
           _details[idx]['endTime'] = endStr;
@@ -10976,10 +10978,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
           final updated = _recalculateDayTimeline(
             dayDetails,
-            pinnedDetailId: detailId,
+            pinnedDetailId: detailIdStr,
           );
           for (final item in updated) {
-            final itemIdx = _details.indexWhere((d) => d['id'] == item['id']);
+            final itemIdx = _details.indexWhere((d) => (d['id'] ?? '').toString() == (item['id'] ?? '').toString());
             if (itemIdx != -1) {
               _details[itemIdx]['startTime'] = item['startTime'];
               _details[itemIdx]['endTime'] = item['endTime'];
@@ -11781,7 +11783,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   List<Map<String, dynamic>> _recalculateDayTimeline(
     List<Map<String, dynamic>> items, {
-    int? pinnedDetailId,
+    dynamic pinnedDetailId,
     bool forceResetUnpinned = true,
   }) {
     if (items.isEmpty) return items;
@@ -11790,19 +11792,29 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         .map((i) => Map<String, dynamic>.from(i))
         .toList();
 
-    if (pinnedDetailId != null) {
-      final pIdx = sorted.indexWhere((d) => d['id'] == pinnedDetailId);
+    final String targetPinnedStr = (pinnedDetailId ?? '').toString();
+    if (targetPinnedStr.isNotEmpty) {
+      final pIdx = sorted.indexWhere((d) => (d['id'] ?? '').toString() == targetPinnedStr);
       if (pIdx != -1) {
         sorted[pIdx]['isUserPinned'] = true;
       }
     }
 
-    // Sort items sequence based on sortOrder (with Floating Market at top priority for early morning)
+    // Sort items sequence based on startTime if set/pinned, then sortOrder
+    int _getMin(dynamic item) {
+      final String st = (item['startTime'] ?? '').toString();
+      if (!st.contains(':')) return 99999;
+      final parts = st.split(':');
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts[1]) ?? 0;
+      return h * 60 + m;
+    }
+
     sorted.sort((a, b) {
       final placeA = a['place'] ?? {};
       final placeB = b['place'] ?? {};
-      final String nameA = (placeA['name'] ?? '').toString().toLowerCase();
-      final String nameB = (placeB['name'] ?? '').toString().toLowerCase();
+      final String nameA = (placeA['name'] ?? a['name'] ?? '').toString().toLowerCase();
+      final String nameB = (placeB['name'] ?? b['name'] ?? '').toString().toLowerCase();
       final isMarketA =
           nameA.contains('chợ nổi') ||
           nameA.contains('cái răng') ||
@@ -11813,6 +11825,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           nameB.contains('floating market');
       if (isMarketA && !isMarketB) return -1;
       if (!isMarketA && isMarketB) return 1;
+
+      // Chronological sort by startTime if both have explicit/pinned times
+      final String idA = (a['id'] ?? '').toString();
+      final String idB = (b['id'] ?? '').toString();
+      final bool isPinnedA = a['isUserPinned'] == true || (targetPinnedStr.isNotEmpty && idA == targetPinnedStr);
+      final bool isPinnedB = b['isUserPinned'] == true || (targetPinnedStr.isNotEmpty && idB == targetPinnedStr);
+
+      if (isPinnedA || isPinnedB) {
+        final int minA = _getMin(a);
+        final int minB = _getMin(b);
+        if (minA != minB) return minA.compareTo(minB);
+      }
 
       final int orderA = (a['sortOrder'] as num?)?.toInt() ?? 0;
       final int orderB = (b['sortOrder'] as num?)?.toInt() ?? 0;
@@ -11856,11 +11880,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           placeName.contains('club') ||
           placeName.contains('lounge');
 
-      final bool isExplicitlyPinned =
-          item['isUserPinned'] == true || item['id'] == pinnedDetailId;
-
-      if (isExplicitlyPinned && hasValidTime && !forceResetUnpinned) {
-        // 100% PRIORITY FOR USER-PINNED PLACE: Keep exact startTime & endTime
+      if (hasValidTime) {
+        // 100% PRIORITY FOR EXPLICIT PLACE TIME: Keep exact startTime & endTime set by user or preset
         final startParts = item['startTime'].toString().split(':');
         final endParts = (item['endTime']?.toString() ?? '').split(':');
 
@@ -11878,7 +11899,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         item['endTime'] =
             '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
 
-        currentCursorMinutes = (eH * 60 + eM + 30);
+        currentCursorMinutes = (eH * 60 + eM + 15);
       } else {
         // UNPINNED / OPTIMIZING: Recalculate timeline sequentially from cursor
         if (isMarket && i == 0) {
@@ -11889,10 +11910,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           currentCursorMinutes = 18 * 60; // 18:00 PM
           item['startTime'] = '18:00';
           item['endTime'] = '19:30';
-          currentCursorMinutes = 19 * 60 + 30 + 30; // 20:00 PM
+          currentCursorMinutes = 19 * 60 + 30 + 15; // 20:15 PM
         } else {
           int startM = currentCursorMinutes;
-          int duration = 90; // Default 1.5h
+          
+          // Dynamic & Elastic Duration based on Place Category
+          int duration = 75; // Default 75 min
+          final placeCat = ((place['category']?['name'] ?? '').toString()).toLowerCase();
+          if (placeCat.contains('cà phê') || placeCat.contains('cafe') || placeName.contains('cà phê') || placeName.contains('highland') || placeName.contains('coffee')) {
+            duration = 60; // 60 min (1h) flexible for Cafe
+          } else if (placeCat.contains('nhà hàng') || placeCat.contains('quán ăn') || placeCat.contains('ẩm thực') || placeName.contains('nhà hàng') || placeName.contains('quán')) {
+            duration = 60; // 60 min (1h) flexible for Dining
+          } else if (isMarket || placeName.contains('cồn sơn')) {
+            duration = 120; // 120 min (2h) for Markets
+          } else if (placeCat.contains('khách sạn') || placeName.contains('hotel')) {
+            duration = 60; // 60 min for Hotel check-in
+          }
 
           int sH = (startM ~/ 60) % 24;
           int sM = startM % 60;
@@ -11905,7 +11938,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           item['endTime'] =
               '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
 
-          currentCursorMinutes = eTotal + 30; // 30 min travel & rest
+          currentCursorMinutes = eTotal + 15; // 15 min travel & rest
         }
       }
 
