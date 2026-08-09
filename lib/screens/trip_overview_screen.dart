@@ -311,14 +311,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       return;
     }
 
-    final primaryId = prefs.getInt('primary_itinerary_id');
     final currentItinId = (_itineraryData['id'] is num)
         ? (_itineraryData['id'] as num).toInt()
         : int.tryParse(_itineraryData['id']?.toString() ?? '') ?? 0;
 
-    // Allow notifications for current open trip if primaryId matches or is not set yet
-    if (primaryId != null && primaryId > 0 && currentItinId != primaryId) {
-      return;
+    if (currentItinId > 0) {
+      await prefs.setInt('primary_itinerary_id', currentItinId);
     }
     final place = nextLoc['place'] ?? {};
     final String name = place['name'] ?? 'Điểm đến tiếp theo';
@@ -1187,6 +1185,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _itineraryData = widget.itinerary;
+
+    // Request Android notification permission on foreground init & sync primary trip ID
+    try {
+      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+      const initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initializationSettingsDarwin = DarwinInitializationSettings();
+      flutterLocalNotificationsPlugin.initialize(
+        const InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin),
+      );
+      flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.requestNotificationsPermission();
+    } catch (_) {}
+
+    final currentItinId = (_itineraryData['id'] is num)
+        ? (_itineraryData['id'] as num).toInt()
+        : int.tryParse(_itineraryData['id']?.toString() ?? '') ?? 0;
+
     final currentUser = AuthService().currentUser.value;
     final currentUserIdStr = currentUser?.id?.toString();
     final ownerIdStr =
@@ -1208,6 +1224,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     }
     _privacySetting = 'private';
     SharedPreferences.getInstance().then((prefs) {
+      if (currentItinId > 0) {
+        prefs.setInt('primary_itinerary_id', currentItinId);
+      }
       final saved = prefs.getString('privacy_${_itineraryData['id']}');
       if (saved != null && mounted) {
         setState(() => _privacySetting = saved);
@@ -2083,23 +2102,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             'ai',
           );
 
-      if (!isAiTrip) {
-        final List<Map<String, dynamic>> processedDetails = [];
-        final Set<int> days = cleanDetails
-            .map((d) => (d['day'] as num?)?.toInt() ?? 1)
-            .toSet();
-        for (final day in days) {
-          final dayDetails = cleanDetails
-              .where((d) => (d['day'] as num?)?.toInt() == day)
-              .toList();
-          processedDetails.addAll(_recalculateDayTimeline(dayDetails));
-        }
-        _details = processedDetails.isNotEmpty
-            ? processedDetails
-            : cleanDetails;
-      } else {
-        _details = cleanDetails;
-      }
+      cleanDetails.sort((a, b) {
+        final dayA = (a['day'] as num?)?.toInt() ?? 1;
+        final dayB = (b['day'] as num?)?.toInt() ?? 1;
+        if (dayA != dayB) return dayA.compareTo(dayB);
+        final ordA = (a['sortOrder'] as num?)?.toInt() ?? 0;
+        final ordB = (b['sortOrder'] as num?)?.toInt() ?? 0;
+        return ordA.compareTo(ordB);
+      });
+      _details = cleanDetails;
       _savedPlaces = cleanSaved;
     }
 
@@ -10974,22 +10985,52 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           _details[idx]['isUserPinned'] = true;
 
           final int day = (_details[idx]['day'] as num?)?.toInt() ?? 1;
-          final dayDetails = _details.where((d) => d['day'] == day).toList();
+          
+          // Fetch all items for this day
+          final dayDetails = _details.where((d) => (d['day'] as num?)?.toInt() == day).toList();
 
-          final updated = _recalculateDayTimeline(
+          int _getMin(dynamic item) {
+            final String st = (item['startTime'] ?? '').toString();
+            if (!st.contains(':')) return 99999;
+            final parts = st.split(':');
+            final h = int.tryParse(parts[0]) ?? 0;
+            final m = int.tryParse(parts[1]) ?? 0;
+            return h * 60 + m;
+          }
+
+          // Chronologically sort day items by startTime so cards set to earlier times jump up immediately
+          dayDetails.sort((a, b) {
+            final minA = _getMin(a);
+            final minB = _getMin(b);
+            if (minA != minB) return minA.compareTo(minB);
+            return ((a['sortOrder'] as num?)?.toInt() ?? 0).compareTo((b['sortOrder'] as num?)?.toInt() ?? 0);
+          });
+
+          for (int i = 0; i < dayDetails.length; i++) {
+            dayDetails[i]['sortOrder'] = i;
+          }
+
+          // Run timeline recalculation using the edited card as the center anchor
+          final recalculatedDayItems = _recalculateDayTimeline(
             dayDetails,
             pinnedDetailId: detailIdStr,
+            forceResetUnpinned: false,
           );
-          for (final item in updated) {
-            final itemIdx = _details.indexWhere((d) => (d['id'] ?? '').toString() == (item['id'] ?? '').toString());
+
+          for (int i = 0; i < recalculatedDayItems.length; i++) {
+            final rItem = recalculatedDayItems[i];
+            rItem['sortOrder'] = i;
+            final itemIdx = _details.indexWhere((d) => (d['id'] ?? '').toString() == (rItem['id'] ?? '').toString());
             if (itemIdx != -1) {
-              _details[itemIdx]['startTime'] = item['startTime'];
-              _details[itemIdx]['endTime'] = item['endTime'];
-              _details[itemIdx]['sortOrder'] = item['sortOrder'];
-              _details[itemIdx]['isUserPinned'] = item['isUserPinned'];
+              _details[itemIdx]['startTime'] = rItem['startTime'];
+              _details[itemIdx]['endTime'] = rItem['endTime'];
+              _details[itemIdx]['sortOrder'] = i;
+              if ((rItem['id'] ?? '').toString() == detailIdStr) {
+                _details[itemIdx]['isUserPinned'] = true;
+              }
             }
           }
-          updatedDayItems = updated;
+          updatedDayItems = recalculatedDayItems;
         }
       } else {
         final idx = _savedPlaces.indexWhere((sp) => sp['id'] == detailId);
@@ -11001,13 +11042,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     });
 
     _showPremiumNotification(
-      title: 'Đã cập nhật & tự động sắp xếp',
-      message: 'Thời gian: $startStr - $endStr (Đã tự xếp vào timeline)',
+      title: 'Đã cập nhật & tự động sắp xếp vị trí',
+      message: 'Thời gian: $startStr - $endStr',
       icon: Icons.access_time_rounded,
       color: AppTheme.primary,
     );
 
-    if (isItineraryDetail) {
+    if (isItineraryDetail && updatedDayItems.isNotEmpty) {
       final List<Future<bool>> futures = [];
       for (final item in updatedDayItems) {
         final itemId = item['id'] as int;
@@ -11800,48 +11841,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
 
-    // Sort items sequence based on startTime if set/pinned, then sortOrder
-    int _getMin(dynamic item) {
-      final String st = (item['startTime'] ?? '').toString();
-      if (!st.contains(':')) return 99999;
-      final parts = st.split(':');
-      final h = int.tryParse(parts[0]) ?? 0;
-      final m = int.tryParse(parts[1]) ?? 0;
-      return h * 60 + m;
-    }
-
-    sorted.sort((a, b) {
-      final placeA = a['place'] ?? {};
-      final placeB = b['place'] ?? {};
-      final String nameA = (placeA['name'] ?? a['name'] ?? '').toString().toLowerCase();
-      final String nameB = (placeB['name'] ?? b['name'] ?? '').toString().toLowerCase();
-      final isMarketA =
-          nameA.contains('chợ nổi') ||
-          nameA.contains('cái răng') ||
-          nameA.contains('floating market');
-      final isMarketB =
-          nameB.contains('chợ nổi') ||
-          nameB.contains('cái răng') ||
-          nameB.contains('floating market');
-      if (isMarketA && !isMarketB) return -1;
-      if (!isMarketA && isMarketB) return 1;
-
-      // Chronological sort by startTime if both have explicit/pinned times
-      final String idA = (a['id'] ?? '').toString();
-      final String idB = (b['id'] ?? '').toString();
-      final bool isPinnedA = a['isUserPinned'] == true || (targetPinnedStr.isNotEmpty && idA == targetPinnedStr);
-      final bool isPinnedB = b['isUserPinned'] == true || (targetPinnedStr.isNotEmpty && idB == targetPinnedStr);
-
-      if (isPinnedA || isPinnedB) {
-        final int minA = _getMin(a);
-        final int minB = _getMin(b);
-        if (minA != minB) return minA.compareTo(minB);
-      }
-
-      final int orderA = (a['sortOrder'] as num?)?.toInt() ?? 0;
-      final int orderB = (b['sortOrder'] as num?)?.toInt() ?? 0;
-      return orderA.compareTo(orderB);
-    });
+    // Preserve exact list sequence passed in (from drag & drop reorder or day list)
 
     final firstPlace = sorted.first['place'] ?? {};
     final String firstName = (firstPlace['name'] ?? sorted.first['name'] ?? '')
@@ -11859,6 +11859,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       final bool hasValidTime =
           item['startTime'] != null &&
           item['startTime'].toString().contains(':');
+
       final place = item['place'] ?? {};
       final String placeName = (place['name'] ?? item['name'] ?? '')
           .toString()
@@ -11880,8 +11881,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           placeName.contains('club') ||
           placeName.contains('lounge');
 
-      if (hasValidTime) {
-        // 100% PRIORITY FOR EXPLICIT PLACE TIME: Keep exact startTime & endTime set by user or preset
+      final String idStr = (item['id'] ?? '').toString();
+      final bool isExplicitlyPinned =
+          item['isUserPinned'] == true ||
+          (targetPinnedStr.isNotEmpty && idStr == targetPinnedStr);
+
+      if (isExplicitlyPinned &&
+          item['startTime'] != null &&
+          item['startTime'].toString().contains(':')) {
+        // STRICT LOCK: Keep 100% immutable custom time set by user via clock picker
         final startParts = item['startTime'].toString().split(':');
         final endParts = (item['endTime']?.toString() ?? '').split(':');
 
@@ -11901,44 +11909,46 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
         currentCursorMinutes = (eH * 60 + eM + 15);
       } else {
-        // UNPINNED / OPTIMIZING: Recalculate timeline sequentially from cursor
+        // DRAG & DROP / SWAP REORDER: Assign exact standard time slots matching initial creation
         if (isMarket && i == 0) {
           item['startTime'] = '05:30';
           item['endTime'] = '07:30';
-          currentCursorMinutes = 7 * 60 + 30; // 07:30 AM
-        } else if (isNightScene && currentCursorMinutes < (18 * 60)) {
-          currentCursorMinutes = 18 * 60; // 18:00 PM
-          item['startTime'] = '18:00';
-          item['endTime'] = '19:30';
-          currentCursorMinutes = 19 * 60 + 30 + 15; // 20:15 PM
+          currentCursorMinutes = 7 * 60 + 30;
         } else {
-          int startM = currentCursorMinutes;
-          
-          // Dynamic & Elastic Duration based on Place Category
-          int duration = 75; // Default 75 min
-          final placeCat = ((place['category']?['name'] ?? '').toString()).toLowerCase();
-          if (placeCat.contains('cà phê') || placeCat.contains('cafe') || placeName.contains('cà phê') || placeName.contains('highland') || placeName.contains('coffee')) {
-            duration = 60; // 60 min (1h) flexible for Cafe
-          } else if (placeCat.contains('nhà hàng') || placeCat.contains('quán ăn') || placeCat.contains('ẩm thực') || placeName.contains('nhà hàng') || placeName.contains('quán')) {
-            duration = 60; // 60 min (1h) flexible for Dining
-          } else if (isMarket || placeName.contains('cồn sơn')) {
-            duration = 120; // 120 min (2h) for Markets
-          } else if (placeCat.contains('khách sạn') || placeName.contains('hotel')) {
-            duration = 60; // 60 min for Hotel check-in
+          final List<Map<String, String>> standardSlots = [
+            {'startTime': '07:00', 'endTime': '08:30'},
+            {'startTime': '08:30', 'endTime': '10:30'},
+            {'startTime': '10:30', 'endTime': '12:30'},
+            {'startTime': '12:30', 'endTime': '14:00'},
+            {'startTime': '14:00', 'endTime': '15:30'},
+            {'startTime': '15:30', 'endTime': '17:00'},
+            {'startTime': '17:00', 'endTime': '18:30'},
+            {'startTime': '18:30', 'endTime': '20:00'},
+            {'startTime': '20:00', 'endTime': '21:30'},
+          ];
+
+          final slotIndex = i < standardSlots.length ? i : (standardSlots.length - 1);
+          final stdStartParts = standardSlots[slotIndex]['startTime']!.split(':');
+          final stdEndParts = standardSlots[slotIndex]['endTime']!.split(':');
+          final stdStartM = (int.tryParse(stdStartParts[0]) ?? 7) * 60 + (int.tryParse(stdStartParts[1]) ?? 0);
+          final stdEndM = (int.tryParse(stdEndParts[0]) ?? 8) * 60 + (int.tryParse(stdEndParts[1]) ?? 30);
+          final stdDuration = (stdEndM - stdStartM).clamp(45, 120);
+
+          int startM = stdStartM;
+          if (currentCursorMinutes > 0 && startM < currentCursorMinutes) {
+            startM = currentCursorMinutes;
           }
 
+          int eTotal = startM + stdDuration;
           int sH = (startM ~/ 60) % 24;
           int sM = startM % 60;
-          int eTotal = startM + duration;
           int eH = (eTotal ~/ 60) % 24;
           int eM = eTotal % 60;
 
-          item['startTime'] =
-              '${sH.toString().padLeft(2, '0')}:${sM.toString().padLeft(2, '0')}';
-          item['endTime'] =
-              '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
+          item['startTime'] = '${sH.toString().padLeft(2, '0')}:${sM.toString().padLeft(2, '0')}';
+          item['endTime'] = '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
 
-          currentCursorMinutes = eTotal + 15; // 15 min travel & rest
+          currentCursorMinutes = eTotal;
         }
       }
 
@@ -17647,142 +17657,153 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               ),
                               child: Row(
                                 children: [
-                                  // 📝 Ghi chú
-                                  Builder(
-                                    builder: (context) {
-                                      final hasNote = _getEffectivePlaceNote(
-                                        detail,
-                                      ).isNotEmpty;
-                                      return _buildCardActionIcon(
-                                        icon: hasNote
-                                            ? Icons.description_rounded
-                                            : Icons.description_outlined,
-                                        active: hasNote,
-                                        badge: null,
-                                        disabled: isVisited,
-                                        onTap: () =>
-                                            _showInlineNoteBottomSheet(detail),
-                                      );
-                                    },
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      physics: const BouncingScrollPhysics(),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // 📝 Ghi chú
+                                          Builder(
+                                            builder: (context) {
+                                              final hasNote = _getEffectivePlaceNote(
+                                                detail,
+                                              ).isNotEmpty;
+                                              return _buildCardActionIcon(
+                                                icon: hasNote
+                                                    ? Icons.description_rounded
+                                                    : Icons.description_outlined,
+                                                active: hasNote,
+                                                badge: null,
+                                                disabled: isVisited,
+                                                onTap: () =>
+                                                    _showInlineNoteBottomSheet(detail),
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(width: 4),
+                                          // ✓ Danh sách công việc
+                                          Builder(
+                                            builder: (ctx) {
+                                              final List tl =
+                                                  detail['todoItems'] is List
+                                                  ? (detail['todoItems'] as List)
+                                                  : (detail['todoItems'] is String
+                                                        ? (json.decode(
+                                                                    detail['todoItems'],
+                                                                  )
+                                                                  as List? ??
+                                                              [])
+                                                        : []);
+                                              final bool hasItems = tl.isNotEmpty;
+                                              final int done = hasItems
+                                                  ? tl
+                                                        .where((x) => x['done'] == true)
+                                                        .length
+                                                  : 0;
+                                              return _buildCardActionIcon(
+                                                disabled: isVisited,
+                                                icon: Icons.checklist_rounded,
+                                                active: hasItems,
+                                                badge: hasItems
+                                                    ? '$done/${tl.length}'
+                                                    : null,
+                                                onTap: () =>
+                                                    _showInlineChecklistBottomSheet(
+                                                      detail,
+                                                    ),
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(width: 4),
+                                          // 💬 Phản hồi / Báo cáo sự cố
+                                          _buildCardActionIcon(
+                                            icon: detail['incidentReport'] != null
+                                                ? Icons.report_problem_rounded
+                                                : Icons.chat_bubble_outline_rounded,
+                                            disabled: isVisited,
+                                            active: detail['incidentReport'] != null,
+                                            badge: detail['incidentReport'] != null
+                                                ? '!'
+                                                : null,
+                                            onTap: () =>
+                                                _showPlaceIncidentReportSheet(detail),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          // 💰 Chi phí
+                                          Builder(
+                                            builder: (ctx) {
+                                              final expObj = detail['expense'];
+                                              double amt = 0;
+                                              if (expObj is Map<String, dynamic>) {
+                                                final v = expObj['amount'];
+                                                if (v is num)
+                                                  amt = v.toDouble();
+                                                else if (v is String)
+                                                  amt = double.tryParse(v) ?? 0;
+                                              }
+                                              return _buildCardActionIcon(
+                                                disabled: isVisited,
+                                                icon: Icons.attach_money_rounded,
+                                                active: amt > 0,
+                                                badge: null,
+                                                onTap: () => _openPlaceExpenseSheet(
+                                                  detail,
+                                                  isItineraryDetail: true,
+                                                  dayIndex:
+                                                      (detail['day'] as int? ?? 1) - 1,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(width: 4),
+                                          // ℹ️ Xem chi tiết
+                                          _buildCardActionIcon(
+                                            icon: Icons.info_outline_rounded,
+                                            active: false,
+                                            badge: null,
+                                            disabled: false,
+                                            onTap: () {
+                                              if (place.isNotEmpty) {
+                                                PlaceDetailBottomSheet.show(
+                                                  context,
+                                                  place,
+                                                  currentItinerary: _itineraryData,
+                                                  onTripUpdated: () =>
+                                                      _loadData(silent: true),
+                                                );
+                                              }
+                                            },
+                                          ),
+                                          const SizedBox(width: 4),
+                                          // 🤖 Hỏi AI
+                                          _buildCardActionIcon(
+                                            icon: Icons.auto_awesome_rounded,
+                                            active: true,
+                                            badge: null,
+                                            customColor: const Color(0xFF8B5CF6),
+                                            disabled: false,
+                                            onTap: () {
+                                              final placeName =
+                                                  place['name'] ?? 'Địa điểm';
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      PlaceAIChatScreen(
+                                                        placeName: placeName,
+                                                        placeInfo: place,
+                                                      ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(width: 4),
-                                  // ✓ Danh sách công việc
-                                  Builder(
-                                    builder: (ctx) {
-                                      final List tl =
-                                          detail['todoItems'] is List
-                                          ? (detail['todoItems'] as List)
-                                          : (detail['todoItems'] is String
-                                                ? (json.decode(
-                                                            detail['todoItems'],
-                                                          )
-                                                          as List? ??
-                                                      [])
-                                                : []);
-                                      final bool hasItems = tl.isNotEmpty;
-                                      final int done = hasItems
-                                          ? tl
-                                                .where((x) => x['done'] == true)
-                                                .length
-                                          : 0;
-                                      return _buildCardActionIcon(
-                                        disabled: isVisited,
-                                        icon: Icons.checklist_rounded,
-                                        active: hasItems,
-                                        badge: hasItems
-                                            ? '$done/${tl.length}'
-                                            : null,
-                                        onTap: () =>
-                                            _showInlineChecklistBottomSheet(
-                                              detail,
-                                            ),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(width: 4),
-                                  // 💬 Phản hồi / Báo cáo sự cố
-                                  _buildCardActionIcon(
-                                    icon: detail['incidentReport'] != null
-                                        ? Icons.report_problem_rounded
-                                        : Icons.chat_bubble_outline_rounded,
-                                    disabled: isVisited,
-                                    active: detail['incidentReport'] != null,
-                                    badge: detail['incidentReport'] != null
-                                        ? '!'
-                                        : null,
-                                    onTap: () =>
-                                        _showPlaceIncidentReportSheet(detail),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  // 💰 Chi phí
-                                  Builder(
-                                    builder: (ctx) {
-                                      final expObj = detail['expense'];
-                                      double amt = 0;
-                                      if (expObj is Map<String, dynamic>) {
-                                        final v = expObj['amount'];
-                                        if (v is num)
-                                          amt = v.toDouble();
-                                        else if (v is String)
-                                          amt = double.tryParse(v) ?? 0;
-                                      }
-                                      return _buildCardActionIcon(
-                                        disabled: isVisited,
-                                        icon: Icons.attach_money_rounded,
-                                        active: amt > 0,
-                                        badge: null,
-                                        onTap: () => _openPlaceExpenseSheet(
-                                          detail,
-                                          isItineraryDetail: true,
-                                          dayIndex:
-                                              (detail['day'] as int? ?? 1) - 1,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(width: 4),
-                                  // ℹ️ Xem chi tiết
-                                  _buildCardActionIcon(
-                                    icon: Icons.info_outline_rounded,
-                                    active: false,
-                                    badge: null,
-                                    disabled: false,
-                                    onTap: () {
-                                      if (place.isNotEmpty) {
-                                        PlaceDetailBottomSheet.show(
-                                          context,
-                                          place,
-                                          currentItinerary: _itineraryData,
-                                          onTripUpdated: () =>
-                                              _loadData(silent: true),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                  const SizedBox(width: 4),
-                                  // 🤖 Hỏi AI
-                                  _buildCardActionIcon(
-                                    icon: Icons.auto_awesome_rounded,
-                                    active: true,
-                                    badge: null,
-                                    customColor: const Color(0xFF8B5CF6),
-                                    disabled: false,
-                                    onTap: () {
-                                      final placeName =
-                                          place['name'] ?? 'Địa điểm';
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              PlaceAIChatScreen(
-                                                placeName: placeName,
-                                                placeInfo: place,
-                                              ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  const Spacer(),
                                   // ▼/▲ Expand / collapse
                                   GestureDetector(
                                     onTap: () {
