@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'dart:async';
+import 'package:app_links/app_links.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/places_screen.dart';
@@ -76,6 +78,43 @@ class CloudmoodMainShell extends StatefulWidget {
 class _CloudmoodMainShellState extends State<CloudmoodMainShell> {
   int _currentIndex = 0;
   String? _placesInitialQuery;
+  final _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _initDeepLinks() {
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    });
+  }
+
+  void _handleDeepLink(Uri uri) async {
+    final token = uri.queryParameters['token'];
+    if (token != null && token.isNotEmpty) {
+      final res = await DatabaseService().acceptInvite(token);
+      if (res != null && mounted) {
+        final bool isSuccess = res['success'] == true && (res['isJoined'] == true || (res['message']?.contains('Chúc mừng') ?? false));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res['message'] ?? 'Đã xác nhận lời mời chuyến đi!'),
+            backgroundColor: isSuccess ? Colors.green : Colors.blue,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
 
   // Render current body based on bottom navigation index
   Widget _buildBody() {
