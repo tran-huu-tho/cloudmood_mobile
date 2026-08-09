@@ -18921,8 +18921,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               !rawAvatar.contains('default-avatar')) {
             final trimmed = rawAvatar.trim();
             if (trimmed.startsWith('http')) return trimmed;
-            if (trimmed.startsWith('/')) return 'http://localhost:3000$trimmed';
-            return 'http://localhost:3000/$trimmed';
+            if (trimmed.startsWith('/')) return '${ApiClient.baseUrl}$trimmed';
+            return '${ApiClient.baseUrl}/$trimmed';
           }
         }
       }
@@ -18933,8 +18933,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         currentUser.avatar!.isNotEmpty) {
       final raw = currentUser.avatar!.trim();
       if (raw.startsWith('http')) return raw;
-      if (raw.startsWith('/')) return 'http://localhost:3000$raw';
-      return 'http://localhost:3000/$raw';
+      if (raw.startsWith('/')) return '${ApiClient.baseUrl}$raw';
+      return '${ApiClient.baseUrl}/$raw';
     }
     return null;
   }
@@ -22228,9 +22228,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             if (trimmed.startsWith('http')) {
                               avatarUrl = trimmed;
                             } else if (trimmed.startsWith('/')) {
-                              avatarUrl = 'http://localhost:3000$trimmed';
+                              avatarUrl = '${ApiClient.baseUrl}$trimmed';
                             } else {
-                              avatarUrl = 'http://localhost:3000/$trimmed';
+                              avatarUrl = '${ApiClient.baseUrl}/$trimmed';
                             }
                           }
                           final Color avatarBgColor =
@@ -22628,9 +22628,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           if (trimmed.startsWith('http')) {
                             avatarUrl = trimmed;
                           } else if (trimmed.startsWith('/')) {
-                            avatarUrl = 'http://localhost:3000$trimmed';
+                            avatarUrl = '${ApiClient.baseUrl}$trimmed';
                           } else {
-                            avatarUrl = 'http://localhost:3000/$trimmed';
+                            avatarUrl = '${ApiClient.baseUrl}/$trimmed';
                           }
                         }
                         final Color avatarBgColor =

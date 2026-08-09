@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_client.dart';
 import '../services/database_service.dart';
 
 class ManageMembersModal extends StatefulWidget {
@@ -173,9 +174,9 @@ class _ManageMembersModalState extends State<ManageMembersModal> {
                                if (trimmed.startsWith('http')) {
                                  avatarUrl = trimmed;
                                } else if (trimmed.startsWith('/')) {
-                                 avatarUrl = 'http://localhost:3000$trimmed';
+                                 avatarUrl = '${ApiClient.baseUrl}$trimmed';
                                } else {
-                                 avatarUrl = 'http://localhost:3000/$trimmed';
+                                 avatarUrl = '${ApiClient.baseUrl}/$trimmed';
                                }
                              }
                              final Color avatarBgColor = Colors.primaries[name.hashCode.abs() % Colors.primaries.length];

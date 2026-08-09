@@ -5,8 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
 class ApiClient {
-  // 📶 Kết nối trực tiếp qua Wi-Fi (Không cần cắm cáp USB):
-  static const String _pcIpAddress = 'http://127.0.0.1:3000';
+  // 🌐 Kết nối tới Render Backend Server:
+  static const String _pcIpAddress = 'https://cloudmood-backend.onrender.com';
 
   static String get baseUrl {
     if (_pcIpAddress.isNotEmpty) return _pcIpAddress;
