@@ -204,7 +204,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
 
   Future<void> _launchURL(Uri url) async {
     try {
-      await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (e) {
       try {
         await launchUrl(url, mode: LaunchMode.platformDefault);
@@ -826,24 +826,19 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                   await _launchURL(url);
                 },
               ),
-              _buildOpenInImageButton(
-                'assets/images/tripadvisor.jpg',
-                'Tripadvisor',
-                () async {
-                  final String? urlString = currentPlace['tripadvisorUrl'];
-                  final String suffix =
-                      address.toLowerCase().contains('cần thơ')
-                      ? ' Cần Thơ'
-                      : '';
-                  final String query = (currentPlace['name'] ?? '') + suffix;
-                  final url = Uri.parse(
-                    (urlString != null && urlString.isNotEmpty)
-                        ? urlString
-                        : 'https://www.tripadvisor.com/Search?q=${Uri.encodeComponent(query)}',
-                  );
-                  await _launchURL(url);
-                },
-              ),
+              if (currentPlace['tripadvisorUrl'] != null &&
+                  currentPlace['tripadvisorUrl'].toString().trim().isNotEmpty &&
+                  currentPlace['tripadvisorUrl'].toString().trim() != 'null')
+                _buildOpenInImageButton(
+                  'assets/images/tripadvisor.jpg',
+                  'Tripadvisor',
+                  () async {
+                    final String urlString =
+                        currentPlace['tripadvisorUrl'].toString().trim();
+                    final url = Uri.parse(urlString);
+                    await _launchURL(url);
+                  },
+                ),
               _buildOpenInImageButton(
                 'assets/images/google.png',
                 'Google',
@@ -900,10 +895,11 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
   }
 
   Widget _buildReviewsTab() {
-    double rating = 0.0;
-    int userRatingCount = 0;
+    double rating = (currentPlace['rating'] as num?)?.toDouble() ?? 0.0;
+    int userRatingCount =
+        (currentPlace['userRatingCount'] as num?)?.toInt() ?? 0;
 
-    if (_reviews.isNotEmpty) {
+    if (rating == 0.0 && userRatingCount == 0 && _reviews.isNotEmpty) {
       userRatingCount = _reviews.length;
       double totalRatingSum = 0;
       for (final r in _reviews) {
@@ -911,14 +907,6 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
         totalRatingSum += rVal;
       }
       rating = totalRatingSum / userRatingCount;
-    } else {
-      final double? dbRating = (currentPlace['rating'] as num?)?.toDouble();
-      final int? dbCount = (currentPlace['userRatingCount'] as num?)?.toInt();
-
-      if (dbRating != null && dbRating > 0 && dbCount != null && dbCount > 0) {
-        rating = dbRating;
-        userRatingCount = dbCount;
-      }
     }
 
     return SingleChildScrollView(
@@ -1006,7 +994,7 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
                           const SizedBox(width: 6),
                           const Expanded(
                             child: Text(
-                              'Đánh giá dựa trên CloudMood & TripAdvisor',
+                              'Đánh giá dựa trên TripAdvisor',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: Colors.white70,
@@ -1045,17 +1033,17 @@ class _PlaceDetailBottomSheetState extends State<PlaceDetailBottomSheet>
             ..._reviews.map((r) => _buildReviewCard(r)),
 
           if (currentPlace['tripadvisorUrl'] != null &&
-              currentPlace['tripadvisorUrl'].toString().isNotEmpty) ...[
+              currentPlace['tripadvisorUrl'].toString().trim().isNotEmpty &&
+              currentPlace['tripadvisorUrl'].toString().trim() != 'null') ...[
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () async {
-                  final String? urlString = currentPlace['tripadvisorUrl'];
-                  if (urlString != null && urlString.isNotEmpty) {
-                    final url = Uri.parse(urlString);
-                    if (await canLaunchUrl(url)) await launchUrl(url);
-                  }
+                  final String urlString =
+                      currentPlace['tripadvisorUrl'].toString().trim();
+                  final url = Uri.parse(urlString);
+                  await _launchURL(url);
                 },
                 icon: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
