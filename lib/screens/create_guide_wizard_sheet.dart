@@ -227,7 +227,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
       }
     }
 
-    if (_currentStep < 2) {
+    if (_currentStep < 1) {
       setState(() {
         _currentStep++;
       });
@@ -980,7 +980,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                               ),
                             ),
                             Text(
-                              '${_currentStep + 1}/3',
+                              '${_currentStep + 1}/2',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -991,12 +991,12 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                         ),
                         const SizedBox(height: 6),
                         Row(
-                          children: List.generate(3, (index) {
+                          children: List.generate(2, (index) {
                             final isActive = index <= _currentStep;
                             return Expanded(
                               child: Container(
                                 height: 5,
-                                margin: EdgeInsets.only(right: index == 2 ? 0 : 4),
+                                margin: EdgeInsets.only(right: index == 1 ? 0 : 4),
                                 decoration: BoxDecoration(
                                   color: isActive ? guidePrimary : Colors.grey[200],
                                   borderRadius: BorderRadius.circular(10),
@@ -1037,7 +1037,6 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                 children: [
                   _buildStep1Destination(),
                   _buildStep2PrivacyCompanions(),
-                  _buildStep3Categories(),
                 ],
               ),
             ),
@@ -1893,123 +1892,6 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
     );
   }
 
-  // STEP 3: Categories & Topics
-  Widget _buildStep3Categories() {
-    final categoriesListToDisplay = _dbCategories.isNotEmpty ? _dbCategories : _defaultCategoriesData;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-          ShaderMask(
-            shaderCallback: (bounds) => guideGradient.createShader(bounds),
-            child: const Text(
-              'Chủ đề cẩm nang',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Chọn danh mục để người xem dễ dàng tìm thấy.',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-
-
-          const SizedBox(height: 24),
-          Text(
-            'Chủ đề trọng tâm:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.darkText,
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Categories Selection Grid
-          if (_isLoadingCategories)
-            const Center(child: CircularProgressIndicator(color: guidePrimary))
-          else
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: categoriesListToDisplay.map((cat) {
-                final String name = cat['name'];
-                final isSelected = _selectedCategories.contains(name);
-
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (isSelected) {
-                        _selectedCategories.remove(name);
-                      } else {
-                        _selectedCategories.add(name);
-                      }
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: isSelected ? guideGradient : null,
-                      color: isSelected ? null : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(30),
-                      border: isSelected ? null : Border.all(color: Colors.grey[200]!),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: guidePrimary.withOpacity(0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              )
-                            ]
-                          : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildCategoryLeading(cat),
-                        const SizedBox(width: 8),
-                        Text(
-                          name,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: isSelected ? Colors.white : AppTheme.darkText,
-                          ),
-                        ),
-                        if (isSelected) ...[
-                          const SizedBox(width: 6),
-                          const Icon(Icons.check_circle_rounded, size: 16, color: Colors.white),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          const SizedBox(height: 32),
-        ],
-      ),
-    );
-  }
-
   // BOTTOM NAVIGATION BAR
   Widget _buildBottomBar() {
     return Container(
@@ -2083,7 +1965,7 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
                               ),
                               const SizedBox(width: 8),
                               Icon(
-                                _currentStep == 3 ? Icons.rocket_launch_rounded : Icons.arrow_forward_rounded,
+                                _currentStep == 1 ? Icons.rocket_launch_rounded : Icons.arrow_forward_rounded,
                                 color: Colors.white,
                                 size: 20,
                               ),
@@ -2094,65 +1976,12 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
               ),
             ),
           ),
-
-          // Secondary Text Button
-          if (_currentStep == 2) ...[
-            const SizedBox(height: 10),
-            GestureDetector(
-              onTap: () {
-                _nextStep();
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(
-                  'Bỏ qua bước này',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[500],
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 
-  Widget _buildCategoryLeading(dynamic cat) {
-    if (cat is Map<String, dynamic>) {
-      final int? iconCode = cat['iconCode'] != null
-          ? (cat['iconCode'] is int ? cat['iconCode'] : int.tryParse(cat['iconCode'].toString()))
-          : null;
 
-      if (iconCode != null && iconCode > 0) {
-        return Icon(
-          IconData(iconCode, fontFamily: 'MaterialIcons'),
-          size: 18,
-          color: guidePrimary,
-        );
-      }
-
-      final String name = (cat['name'] ?? '').toString().toLowerCase();
-      if (cat['emoji'] != null && cat['emoji'].toString().isNotEmpty && cat['emoji'] != '📍') {
-        return Text(cat['emoji'].toString(), style: const TextStyle(fontSize: 18));
-      }
-
-      if (name.contains('nhà hàng')) return const Icon(Icons.restaurant_rounded, size: 18, color: guidePrimary);
-      if (name.contains('khách sạn')) return const Icon(Icons.hotel_rounded, size: 18, color: guidePrimary);
-      if (name.contains('quán ăn')) return const Icon(Icons.fastfood_rounded, size: 18, color: guidePrimary);
-      if (name.contains('cà phê') || name.contains('cafe')) return const Icon(Icons.local_cafe_rounded, size: 18, color: guidePrimary);
-      if (name.contains('trung tâm thương mại') || name.contains('mua sắm')) return const Icon(Icons.shopping_bag_rounded, size: 18, color: guidePrimary);
-      if (name.contains('công viên') || name.contains('thiên nhiên')) return const Icon(Icons.park_rounded, size: 18, color: guidePrimary);
-      if (name.contains('bảo tàng') || name.contains('văn hóa')) return const Icon(Icons.museum_rounded, size: 18, color: guidePrimary);
-      if (name.contains('điểm tham quan') || name.contains('tham quan')) return const Icon(Icons.tour_rounded, size: 18, color: guidePrimary);
-      if (name.contains('trường học')) return const Icon(Icons.school_rounded, size: 18, color: guidePrimary);
-      if (name.contains('bar') || name.contains('đêm')) return const Icon(Icons.local_bar_rounded, size: 18, color: guidePrimary);
-      if (name.contains('check-in') || name.contains('sống ảo')) return const Icon(Icons.camera_alt_rounded, size: 18, color: guidePrimary);
-    }
-    return const Icon(Icons.location_on_rounded, size: 18, color: guidePrimary);
-  }
 
   String _getStepTitleLabel(int step) {
     switch (step) {
@@ -2160,8 +1989,6 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
         return 'Điểm đến & Tên bài viết';
       case 1:
         return 'Quyền xem';
-      case 2:
-        return 'Chủ đề';
       default:
         return '';
     }
@@ -2172,8 +1999,6 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
       case 0:
         return 'Tiếp tục';
       case 1:
-        return 'Mời đồng tác giả';
-      case 2:
         return 'Hoàn tất & Tạo hướng dẫn';
       default:
         return 'Tiếp tục';
