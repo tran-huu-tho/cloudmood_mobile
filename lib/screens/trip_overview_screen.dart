@@ -668,142 +668,181 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     if (_activeNavStartPlace == null || _activeNavEndPlace == null) {
       return const SizedBox.shrink();
     }
-    final name1 =
-        _activeNavStartPlace!['name'] ??
-        _activeNavStartPlace!['place']?['name'] ??
-        'Điểm đi';
-    final name2 =
-        _activeNavEndPlace!['name'] ??
-        _activeNavEndPlace!['place']?['name'] ??
-        'Điểm đến';
-    final travelInfo = _getMockTravelInfo(
-      _activeNavStartPlace!,
-      _activeNavEndPlace!,
-    );
+    final p1 = _activeNavStartPlace!;
+    final p2 = _activeNavEndPlace!;
+    final name1 = p1['name'] ?? p1['place']?['name'] ?? 'Điểm đi';
+    final name2 = p2['name'] ?? p2['place']?['name'] ?? 'Điểm đến';
+    final p1Id = p1['id'] ?? p1['place']?['id'] ?? 'p1';
+    final p2Id = p2['id'] ?? p2['place']?['id'] ?? 'p2';
+    final String key = '${p1Id}_$p2Id';
+    final String currentMode = _segmentTransportModes[key] ?? 'motorcycle';
+
+    final travelInfo = _getMockTravelInfo(p1, p2, mode: currentMode);
+    final duration = travelInfo['duration'];
+    final distance = travelInfo['distance'];
+    final IconData modeIcon = travelInfo['icon'] as IconData;
+
+    final topOffset = MediaQuery.of(context).padding.top + 64;
 
     return Positioned(
-      top: MediaQuery.of(context).padding.top + 12,
-      left: 16,
-      right: 16,
+      top: topOffset,
+      left: 14,
+      right: 14,
       child: Material(
         elevation: 8,
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        color: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            color: Colors.white.withOpacity(0.96),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: AppTheme.primary.withOpacity(0.3),
+              color: AppTheme.primary.withOpacity(0.2),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Line 1: Header status badge & exit button
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withOpacity(0.12),
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.navigation_rounded,
-                      color: AppTheme.primary,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primary,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'ĐANG CHỈ ĐƯỜNG',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            if (_isLoadingNavRoute) ...[
-                              const SizedBox(width: 8),
-                              const SizedBox(
-                                width: 10,
-                                height: 10,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 1.5,
-                                ),
-                              ),
-                            ],
-                          ],
+                        Icon(
+                          Icons.near_me_rounded,
+                          color: AppTheme.primary,
+                          size: 12,
                         ),
-                        const SizedBox(height: 3),
+                        SizedBox(width: 4),
                         Text(
-                          '$name1 ➔ $name2',
+                          'ĐANG CHỈ ĐƯỜNG',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.darkText,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '🚗 ${travelInfo['duration']} phút • ${travelInfo['distance']} km',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w500,
+                            color: AppTheme.primary,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  if (_isLoadingNavRoute) ...[
+                    const SizedBox(width: 8),
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
                   InkWell(
                     onTap: _exitNavigationMode,
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: Colors.grey.shade100,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.close_rounded,
-                        color: Colors.grey,
-                        size: 20,
+                        color: Color(0xFF64748B),
+                        size: 18,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
+
+              // Line 2: Route title & Interactive Transport Mode Pill Button
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '$name1 ➔ $name2',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () => _showTransportModeSheet(p1, p2),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF2563EB).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            modeIcon,
+                            size: 15,
+                            color: const Color(0xFF2563EB),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '$duration phút • $distance km',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2563EB),
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: Color(0xFF2563EB),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Line 3: Single-line GPS Action Button
               SizedBox(
                 width: double.infinity,
+                height: 42,
                 child: ElevatedButton.icon(
                   onPressed: () {
                     if (_activeNavStartPlace != null &&
@@ -817,16 +856,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2563EB),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    elevation: 2,
+                    shadowColor: const Color(0xFF2563EB).withOpacity(0.3),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    elevation: 2,
                   ),
-                  icon: const Icon(Icons.turn_right_rounded, size: 18),
+                  icon: const Icon(Icons.near_me_rounded, size: 16),
                   label: const Text(
-                    'Bắt đầu điều hướng GPS (Google Maps giọng nói)',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    'Mở điều hướng Google Maps',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.2,
+                    ),
                   ),
                 ),
               ),
@@ -5514,45 +5558,97 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               navMarkers.add(
                                 Marker(
                                   width: 140,
-                                  height: 70,
+                                  height: 60,
                                   point: LatLng(lat1, lng1),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () {
+                                      final placeObj =
+                                          (p1['place'] is Map)
+                                              ? Map<String, dynamic>.from(
+                                                p1['place'],
+                                              )
+                                              : Map<String, dynamic>.from(p1);
+                                      PlaceDetailBottomSheet.show(
+                                        context,
+                                        placeObj,
+                                        currentItinerary: widget.itinerary,
+                                        onTripUpdated: () => _loadData(),
+                                      );
+                                    },
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
                                           ),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black26,
-                                              blurRadius: 4,
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFF059669),
+                                                Color(0xFF10B981),
+                                              ],
                                             ),
-                                          ],
-                                        ),
-                                        child: Text(
-                                          '🚩 $name1',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(
+                                                  0xFF059669,
+                                                ).withOpacity(0.4),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  2,
+                                                ),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.white,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Text(
+                                                  'A',
+                                                  style: TextStyle(
+                                                    color: Color(0xFF059669),
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Flexible(
+                                                child: Text(
+                                                  name1,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      const Icon(
-                                        Icons.location_on_rounded,
-                                        color: Color(0xFF10B981),
-                                        size: 34,
-                                      ),
-                                    ],
+                                        const SizedBox(height: 2),
+                                        const Icon(
+                                          Icons.location_on_rounded,
+                                          color: Color(0xFF059669),
+                                          size: 28,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
@@ -5565,45 +5661,97 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               navMarkers.add(
                                 Marker(
                                   width: 140,
-                                  height: 70,
+                                  height: 60,
                                   point: LatLng(lat2, lng2),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFEF4444),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () {
+                                      final placeObj =
+                                          (p2['place'] is Map)
+                                              ? Map<String, dynamic>.from(
+                                                p2['place'],
+                                              )
+                                              : Map<String, dynamic>.from(p2);
+                                      PlaceDetailBottomSheet.show(
+                                        context,
+                                        placeObj,
+                                        currentItinerary: widget.itinerary,
+                                        onTripUpdated: () => _loadData(),
+                                      );
+                                    },
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
                                           ),
-                                          boxShadow: const [
-                                            BoxShadow(
-                                              color: Colors.black26,
-                                              blurRadius: 4,
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFFDC2626),
+                                                Color(0xFFEF4444),
+                                              ],
                                             ),
-                                          ],
-                                        ),
-                                        child: Text(
-                                          '🏁 $name2',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(
+                                                  0xFFDC2626,
+                                                ).withOpacity(0.4),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
                                           ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  2,
+                                                ),
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.white,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Text(
+                                                  'B',
+                                                  style: TextStyle(
+                                                    color: Color(0xFFDC2626),
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Flexible(
+                                                child: Text(
+                                                  name2,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      const Icon(
-                                        Icons.location_on_rounded,
-                                        color: Color(0xFFEF4444),
-                                        size: 34,
-                                      ),
-                                    ],
+                                        const SizedBox(height: 2),
+                                        const Icon(
+                                          Icons.location_on_rounded,
+                                          color: Color(0xFFDC2626),
+                                          size: 28,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
