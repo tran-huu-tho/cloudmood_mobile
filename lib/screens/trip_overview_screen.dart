@@ -1057,6 +1057,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   // Overview Tab section names
   final List<String> _sectionNames = [];
   final TextEditingController _guideIntroController = TextEditingController();
+  final FocusNode _guideIntroFocusNode = FocusNode();
   final Map<String, TextEditingController> _searchControllers = {};
   final Map<String, List<Map<String, dynamic>>> _searchResults = {};
 
@@ -1074,6 +1075,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   final Map<String, IconData> _sectionIcons = {};
   final Map<String, String> _sectionTypes = {};
   final Map<String, ExpansibleController> _expansionControllers = {};
+  final Map<String, bool> _guideSectionCollapsed = {};
 
   bool _isSelectionMode = false;
   final Set<int> _selectedItemIds = {};
@@ -1229,6 +1231,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _itineraryData = widget.itinerary;
+
+    _guideIntroFocusNode.addListener(() {
+      if (!_guideIntroFocusNode.hasFocus) {
+        _saveGuideIntro();
+      }
+    });
 
     // Request Android notification permission on foreground init & sync primary trip ID
     try {
@@ -1536,8 +1544,31 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     for (final ctrl in _todoAddControllers.values) {
       ctrl.dispose();
     }
-    DatabaseService.refreshTrigger.value++;
+    _saveGuideIntro();
+    _guideIntroFocusNode.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      DatabaseService.refreshTrigger.value++;
+    });
     super.dispose();
+  }
+
+  Future<void> _saveGuideIntro() async {
+    final newIntro = _guideIntroController.text.trim();
+    if (_itineraryData['description'] == newIntro) return;
+    _itineraryData['description'] = newIntro;
+
+    final rawId = _itineraryData['id'];
+    final itinId = (rawId is int)
+        ? rawId
+        : (rawId != null ? int.tryParse(rawId.toString()) : null);
+    if (itinId != null) {
+      await DatabaseService().updateItinerary(itinId, {
+        'description': newIntro,
+      });
+      if (_privacySetting == 'public') {
+        _syncPublicPostIfNeeded();
+      }
+    }
   }
 
   void _saveSectionTitle(String oldTitle, String newTitle) {
@@ -1589,12 +1620,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           _sectionIcons[newTitle] = _sectionIcons.remove(oldTitle)!;
         }
       }
+      _deletedSectionNames.add(oldTitle.toLowerCase().trim());
       _editingSection = null;
     });
 
     // Sync the rename to database (delete old, insert new)
+    final itinId = _itineraryData['id'] as int;
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setStringList('deleted_sections_$itinId', _deletedSectionNames.toList());
+    });
     DatabaseService().deleteItinerarySection(
-      _itineraryData['id'] as int,
+      itinId,
       oldTitle,
     );
     _syncSectionsToDatabase();
@@ -1980,8 +2016,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     if (_itineraryData['isGuide'] == true) {
       const defaultSec = 'Địa điểm tham quan';
-      if (!_deletedSectionNames.contains(defaultSec.toLowerCase()) &&
-          !_sectionNames.contains(defaultSec)) {
+      if (_sectionNames.isEmpty &&
+          !_deletedSectionNames.contains(defaultSec.toLowerCase())) {
         _sectionNames.insert(0, defaultSec);
         _searchControllers.putIfAbsent(
           defaultSec,
@@ -12558,26 +12594,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               const SizedBox(height: 14),
               TextField(
                 controller: _guideIntroController,
+                focusNode: _guideIntroFocusNode,
                 maxLines: 4,
                 minLines: 3,
                 onChanged: (val) {
                   _itineraryData['description'] = val;
-                  _introDebounceTimer?.cancel();
-                  _introDebounceTimer = Timer(const Duration(milliseconds: 500), () async {
-                    final newIntro = val.trim();
-                    final rawId = _itineraryData['id'];
-                    final itinId = (rawId is int)
-                        ? rawId
-                        : (rawId != null ? int.tryParse(rawId.toString()) : null);
-                    if (itinId != null) {
-                      await DatabaseService().updateItinerary(itinId, {
-                        'description': newIntro,
-                      });
-                      if (_privacySetting == 'public') {
-                        _syncPublicPostIfNeeded();
-                      }
-                    }
-                  });
+                },
+                onEditingComplete: () {
+                  _saveGuideIntro();
+                  FocusScope.of(context).unfocus();
+                },
+                onSubmitted: (_) {
+                  _saveGuideIntro();
+                  FocusScope.of(context).unfocus();
                 },
                 style: const TextStyle(
                   fontSize: 14,
@@ -12876,8 +12905,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               }
             }
           }
+          // Mark old section name as deleted so default section logic doesn't re-create it
+          _deletedSectionNames.add(oldSectionName.toLowerCase().trim());
+          final itineraryId = _itineraryData['id'] as int;
+          SharedPreferences.getInstance().then((prefs) {
+            prefs.setStringList(
+              'deleted_sections_$itineraryId',
+              _deletedSectionNames.toList(),
+            );
+          });
         });
 
+        final itineraryId = _itineraryData['id'] as int;
+        await DatabaseService().deleteItinerarySection(
+          itineraryId,
+          oldSectionName,
+        );
         await _syncSectionsToDatabase();
 
         _showPremiumNotification(
@@ -13137,6 +13180,119 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }
     }
 
+    return _buildGuideSectionCardWithPlaces(sectionName, sectionPlaces);
+  }
+
+  void _showGuideSectionOptionsSheet(String sectionName) {
+    if (!_checkCanEdit()) return;
+    final bool isCollapsed = _guideSectionCollapsed[sectionName] ?? false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: Icon(Icons.edit_outlined, color: AppTheme.darkText),
+                  title: const Text('Chỉnh sửa tiêu đề'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showRenameSectionDialog(sectionName);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.palette_outlined,
+                    color: AppTheme.darkText,
+                  ),
+                  title: const Text('Thay đổi màu sắc'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showSectionStyleSheet(
+                      context,
+                      sectionName,
+                      initialTabIndex: 0,
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    isCollapsed
+                        ? Icons.unfold_more_rounded
+                        : Icons.unfold_less_rounded,
+                    color: AppTheme.darkText,
+                  ),
+                  title: Text(
+                    isCollapsed ? 'Mở rộng phần này' : 'Thu gọn phần này',
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _guideSectionCollapsed[sectionName] = !isCollapsed;
+                    });
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                  ),
+                  title: const Text(
+                    'Xóa phần',
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _deleteGuideSection(sectionName);
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: Icon(Icons.sort_rounded, color: AppTheme.darkText),
+                  title: const Text('Sắp xếp lại các phần'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showSectionStyleSheet(
+                      context,
+                      sectionName,
+                      initialTabIndex: 1,
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGuideSectionCardWithPlaces(
+    String sectionName,
+    List<Map<String, dynamic>> sectionPlaces,
+  ) {
+    if (sectionName == 'Mẹo chung' && sectionPlaces.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final sectionIcon =
         _sectionIcons[sectionName] ??
         (sectionName == 'Mẹo chung'
@@ -13146,6 +13302,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                   : Icons.place_rounded));
 
     final sectionColor = _sectionColors[sectionName] ?? AppTheme.primary;
+
+    final bool isCollapsed = _guideSectionCollapsed[sectionName] ?? false;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -13170,13 +13328,33 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           // Section Header Row
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: sectionColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _guideSectionCollapsed[sectionName] = !isCollapsed;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: sectionColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isCollapsed
+                            ? Icons.keyboard_arrow_right_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 16,
+                        color: sectionColor,
+                      ),
+                      const SizedBox(width: 2),
+                      Icon(sectionIcon, size: 16, color: sectionColor),
+                    ],
+                  ),
                 ),
-                child: Icon(sectionIcon, size: 17, color: sectionColor),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -13232,125 +13410,128 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => _deleteGuideSection(sectionName),
+                onTap: () => _showGuideSectionOptionsSheet(sectionName),
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFEF2F2),
+                    color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: Color(0xFFEF4444),
-                    size: 16,
+                  child: Icon(
+                    Icons.more_horiz_rounded,
+                    color: AppTheme.darkText,
+                    size: 18,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
 
-          // List of places in this section
-          if (sectionPlaces.isEmpty)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: const Color(0xFFE2E8F0),
-                  style: BorderStyle.solid,
+          if (!isCollapsed) ...[
+            const SizedBox(height: 12),
+
+            // List of places in this section
+            if (sectionPlaces.isEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFFE2E8F0),
+                    style: BorderStyle.solid,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: sectionColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.add_location_alt_outlined,
+                        size: 16,
+                        color: sectionColor,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Chưa có địa điểm trong $sectionName',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Bấm nút bên dưới để chọn và thêm địa điểm hấp dẫn',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: sectionPlaces.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final placeItem = sectionPlaces[index];
+                  return _buildGuidePlaceHighlightCard(placeItem, index + 1);
+                },
+              ),
+            const SizedBox(height: 4),
+
+            // Button "+ Thêm địa điểm vào [sectionName]"
+            InkWell(
+              onTap: () => _showAddPlaceBottomSheet(sectionName),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: sectionColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: sectionColor.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline_rounded,
+                      color: sectionColor,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Thêm địa điểm vào $sectionName',
+                      style: TextStyle(
+                        color: sectionColor,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: sectionColor.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.add_location_alt_outlined,
-                      size: 16,
-                      color: sectionColor,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Chưa có địa điểm trong $sectionName',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF1E293B),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Bấm nút bên dưới để chọn và thêm địa điểm hấp dẫn',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: sectionPlaces.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final placeItem = sectionPlaces[index];
-                return _buildGuidePlaceHighlightCard(placeItem, index + 1);
-              },
             ),
-          const SizedBox(height: 4),
-
-          // Button "+ Thêm địa điểm vào [sectionName]"
-          InkWell(
-            onTap: () => _showAddPlaceBottomSheet(sectionName),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: sectionColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: sectionColor.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.add_circle_outline_rounded,
-                    color: sectionColor,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Thêm địa điểm vào $sectionName',
-                    style: TextStyle(
-                      color: sectionColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          ],
         ],
       ),
     );

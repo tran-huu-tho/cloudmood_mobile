@@ -244,15 +244,19 @@ class _ItineraryStyleSheetState extends State<ItineraryStyleSheet> {
             ),
           ),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SizedBox(width: 80),
-              Text(
-                _selectedTabIndex == 0 ? 'Sắp xếp & màu sắc' : 'Sắp xếp lại',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.darkText,
+              const SizedBox(width: 70),
+              Expanded(
+                child: Text(
+                  _selectedTabIndex == 0 ? 'Sắp xếp & màu sắc' : 'Sắp xếp lại',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.darkText,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               TextButton(

@@ -807,7 +807,16 @@ class _ProfileDashboardState extends State<ProfileDashboard>
     );
     _loadData();
     _loadNotes();
-    DatabaseService.refreshTrigger.addListener(_loadData);
+    DatabaseService.refreshTrigger.addListener(_onRefreshTrigger);
+  }
+
+  void _onRefreshTrigger() {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadData();
+      }
+    });
   }
 
   @override
@@ -821,7 +830,7 @@ class _ProfileDashboardState extends State<ProfileDashboard>
 
   @override
   void dispose() {
-    DatabaseService.refreshTrigger.removeListener(_loadData);
+    DatabaseService.refreshTrigger.removeListener(_onRefreshTrigger);
     _itinerarySearchController.dispose();
     _tabController.dispose();
     super.dispose();
