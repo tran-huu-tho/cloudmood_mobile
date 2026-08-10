@@ -3573,13 +3573,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             decoration: InputDecoration(
                               hintText: selectedRole == 'EDITOR'
                                   ? 'Nhập email để mời chỉnh sửa...'
-                                  : 'Chỉ chia sẻ qua Link cho người xem',
+                                  : 'Nhập email để mời xem...',
                               prefixIcon: const Icon(
                                 Icons.person_add_alt_1_rounded,
                               ),
                               filled: true,
                               fillColor: Colors.grey.shade100,
-                              enabled: selectedRole == 'EDITOR',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide: BorderSide.none,
@@ -3587,158 +3586,94 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             ),
                           ),
                         ),
-                        if (selectedRole == 'EDITOR') ...[
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: isSending
-                                ? null
-                                : () async {
-                                    final email = emailController.text.trim();
-                                    if (email.isEmpty || !email.contains('@')) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Vui lòng nhập email hợp lệ',
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    setModalState(() => isSending = true);
-                                    final itinId = _itineraryData['id'] is int
-                                        ? _itineraryData['id']
-                                        : int.parse(
-                                            _itineraryData['id'].toString(),
-                                          );
-                                    final res = await DatabaseService()
-                                        .inviteByEmail(itinId, email);
-                                    setModalState(() => isSending = false);
-
-                                    if (res != null && res['success'] == true) {
-                                      emailController.clear();
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            res['message'] ??
-                                                'Đã gửi lời mời thành công!',
-                                          ),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    } else {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            res?['message'] ?? 'Gửi thất bại',
-                                          ),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: isSending
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Gửi',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        InkWell(
-                          onTap: isGenerating
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: isSending
                               ? null
                               : () async {
-                                  setModalState(() => isGenerating = true);
+                                  final email = emailController.text.trim();
+                                  if (email.isEmpty || !email.contains('@')) {
+                                    ScaffoldMessenger.of(
+                                      context,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Vui lòng nhập email hợp lệ',
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  setModalState(() => isSending = true);
                                   final itinId = _itineraryData['id'] is int
                                       ? _itineraryData['id']
                                       : int.parse(
                                           _itineraryData['id'].toString(),
                                         );
                                   final res = await DatabaseService()
-                                      .getShareLink(itinId);
-                                  setModalState(() => isGenerating = false);
+                                      .inviteByEmail(
+                                    itinId,
+                                    email,
+                                    role: selectedRole,
+                                  );
+                                  setModalState(() => isSending = false);
 
-                                  if (res != null && res['shareUrl'] != null) {
-                                    Clipboard.setData(
-                                      ClipboardData(text: res['shareUrl']),
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
+                                  if (res != null && res['success'] == true) {
+                                    emailController.clear();
+                                    ScaffoldMessenger.of(
+                                      context,
+                                    ).showSnackBar(
+                                      SnackBar(
                                         content: Text(
-                                          'Đã sao chép liên kết chia sẻ (Chỉ xem)!',
+                                          res['message'] ??
+                                              'Đã gửi lời mời thành công!',
                                         ),
                                         backgroundColor: Colors.green,
                                       ),
                                     );
+                                  } else {
+                                    ScaffoldMessenger.of(
+                                      context,
+                                    ).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          res?['message'] ?? 'Gửi thất bại',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
                                   }
                                 },
-                          borderRadius: BorderRadius.circular(30),
-                          child: _buildShareIconOption(
-                            Icons.link_rounded,
-                            isGenerating ? 'Đang tạo...' : 'Sao chép\nliên kết',
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
-                        ),
-                        InkWell(
-                          onTap: () async {
-                            final itinId = _itineraryData['id'] is int
-                                ? _itineraryData['id']
-                                : int.parse(_itineraryData['id'].toString());
-                            final res = await DatabaseService().getShareLink(
-                              itinId,
-                            );
-                            if (res != null && res['shareUrl'] != null) {
-                              Clipboard.setData(
-                                ClipboardData(text: res['shareUrl']),
-                              );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Đã chép liên kết để chia sẻ qua các ứng dụng khác!',
+                          child: isSending
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Gửi',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              );
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(30),
-                          child: _buildShareIconOption(
-                            Icons.ios_share_rounded,
-                            'Khác',
-                          ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
                     const SizedBox(height: 20),
                     const Divider(),
                     ListTile(
@@ -3774,23 +3709,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  Widget _buildShareIconOption(IconData icon, String label) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 28,
-          backgroundColor: Colors.grey.shade100,
-          child: Icon(icon, color: AppTheme.darkText, size: 28),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: AppTheme.subtitleText),
-        ),
-      ],
-    );
-  }
+
 
   void _showMapSettingsSheet() {
     showModalBottomSheet(

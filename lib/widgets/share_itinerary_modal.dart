@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../services/database_service.dart';
 
 class ShareItineraryModal extends StatefulWidget {
@@ -7,31 +6,22 @@ class ShareItineraryModal extends StatefulWidget {
   final String itineraryTitle;
 
   const ShareItineraryModal({
-    Key? key,
+    super.key,
     required this.itineraryId,
     required this.itineraryTitle,
-  }) : super(key: key);
+  });
 
   @override
   State<ShareItineraryModal> createState() => _ShareItineraryModalState();
 }
 
-class _ShareItineraryModalState extends State<ShareItineraryModal> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _ShareItineraryModalState extends State<ShareItineraryModal> {
   final TextEditingController _emailController = TextEditingController();
   bool _isSendingEmail = false;
-  bool _isGeneratingLink = false;
-  String? _shareUrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
+  String _selectedRole = 'EDITOR'; // 'EDITOR' hoặc 'VIEWER'
 
   @override
   void dispose() {
-    _tabController.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -47,13 +37,18 @@ class _ShareItineraryModalState extends State<ShareItineraryModal> with SingleTi
 
     setState(() => _isSendingEmail = true);
 
-    final res = await DatabaseService().inviteByEmail(widget.itineraryId, email);
+    final res = await DatabaseService().inviteByEmail(
+      widget.itineraryId,
+      email,
+      role: _selectedRole,
+    );
 
     setState(() => _isSendingEmail = false);
 
     if (mounted) {
       if (res != null && res['success'] == true) {
         _emailController.clear();
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(res['message'] ?? 'Đã gửi lời mời qua email thành công!'),
@@ -71,176 +66,218 @@ class _ShareItineraryModalState extends State<ShareItineraryModal> with SingleTi
     }
   }
 
-  Future<void> _fetchShareLink() async {
-    if (_shareUrl != null) return;
-    setState(() => _isGeneratingLink = true);
-
-    final res = await DatabaseService().getShareLink(widget.itineraryId);
-
-    setState(() => _isGeneratingLink = false);
-
-    if (mounted && res != null && res['shareUrl'] != null) {
-      setState(() {
-        _shareUrl = res['shareUrl'];
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 420,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Chia sẻ chuyến đi',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          Text(
-            widget.itineraryTitle,
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 16),
-          TabBar(
-            controller: _tabController,
-            labelColor: const Color(0xFF2563EB),
-            unselectedLabelColor: Colors.grey[600],
-            indicatorColor: const Color(0xFF2563EB),
-            onTap: (index) {
-              if (index == 1) _fetchShareLink();
-            },
-            tabs: const [
-              Tab(icon: Icon(Icons.email_outlined), text: 'Mời qua Email'),
-              Tab(icon: Icon(Icons.link_rounded), text: 'Copy Link (Chỉ xem)'),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            const SizedBox(height: 16),
+            Row(
               children: [
-                // TAB 1: Gửi Email (Chỉnh sửa)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Mời thành viên cùng chỉnh sửa:',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        hintText: 'Nhập email người bạn muốn mời...',
-                        prefixIcon: const Icon(Icons.mail_outline),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '* Người được mời qua Email sẽ nhận được quyền CHỈNH SỬA chuyến đi.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
-                    ),
-                    const Spacer(),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: _isSendingEmail ? null : _sendEmailInvite,
-                        icon: _isSendingEmail
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Icon(Icons.send_rounded),
-                        label: Text(_isSendingEmail ? 'Đang gửi...' : 'Gửi lời mời Email'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.mail_outline_rounded, color: Color(0xFF2563EB)),
                 ),
-
-                // TAB 2: Copy Link / Social (Chỉ xem)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Tạo link chia sẻ xem chuyến đi:',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_isGeneratingLink)
-                      const Center(child: CircularProgressIndicator())
-                    else if (_shareUrl != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _shareUrl!,
-                                style: const TextStyle(fontSize: 12),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.copy_rounded, color: Color(0xFF2563EB)),
-                              onPressed: () {
-                                Clipboard.setData(ClipboardData(text: _shareUrl!));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Đã chép đường dẫn chia sẻ vào bộ nhớ tạm!')),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Mời tham gia chuyến đi',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                       ),
-                      const SizedBox(height: 10),
                       Text(
-                        '* Người mở link này chỉ có quyền CHỈ XEM và có thể Sao chép chuyến đi về tài khoản riêng.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                        widget.itineraryTitle,
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+
+            // Nhập Email
+            const Text(
+              'Địa chỉ Email người nhận:',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                hintText: 'Nhập email người bạn muốn mời...',
+                prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF2563EB)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Chọn Quyền (Role)
+            const Text(
+              'Quyền hạn tham gia:',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[200]!),
+                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFFF8FAFC),
+              ),
+              child: Column(
+                children: [
+                  InkWell(
+                    onTap: () => setState(() => _selectedRole = 'EDITOR'),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _selectedRole == 'EDITOR' ? Icons.radio_button_checked : Icons.radio_button_off,
+                            color: const Color(0xFF2563EB),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF2563EB)),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Có thể chỉnh sửa (Editor)',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Người được mời có thể thêm, sửa, xóa địa điểm trong lịch trình.',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  InkWell(
+                    onTap: () => setState(() => _selectedRole = 'VIEWER'),
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _selectedRole == 'VIEWER' ? Icons.radio_button_checked : Icons.radio_button_off,
+                            color: const Color(0xFF2563EB),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF0EA5E9)),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Chỉ xem (Viewer)',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Người được mời chỉ xem được nội dung chuyến đi mà không thể chỉnh sửa.',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Nút Gửi Lời Mời
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _isSendingEmail ? null : _sendEmailInvite,
+                icon: _isSendingEmail
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_rounded),
+                label: Text(
+                  _isSendingEmail ? 'Đang gửi...' : 'Gửi lời mời Email',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

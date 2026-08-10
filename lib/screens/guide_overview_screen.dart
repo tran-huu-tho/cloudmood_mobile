@@ -28,6 +28,7 @@ import '../widgets/explore_post_card.dart';
 import 'explore_post_detail_screen.dart';
 import '../services/auth_service.dart';
 import '../services/api_client.dart';
+import '../widgets/share_itinerary_modal.dart';
 
 class GuideOverviewScreen extends StatefulWidget {
   final Map<String, dynamic> itinerary;
@@ -1738,114 +1739,19 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
   }
 
   void _showShareDialog() {
+    final itinId = _itineraryData['id'] is int
+        ? _itineraryData['id']
+        : int.parse((_itineraryData['id'] ?? 0).toString());
+    final itinTitle = (_itineraryData['title'] ?? 'Chuyến đi').toString();
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      backgroundColor: Colors.transparent,
+      builder: (context) => ShareItineraryModal(
+        itineraryId: itinId,
+        itineraryTitle: itinTitle,
       ),
-      builder: (context) => SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                margin: const EdgeInsets.only(bottom: 20),
-                child: Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-              ),
-              const Text(
-                'Mời bạn đồng hành',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppTheme.primary),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Có thể chỉnh sửa',
-                        style: TextStyle(
-                          color: AppTheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'Chỉ xem',
-                        style: TextStyle(color: AppTheme.subtitleText),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                decoration: InputDecoration(
-                  hintText: 'Mời qua email',
-                  prefixIcon: const Icon(Icons.person_add_alt_1_rounded),
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildShareIconOption(
-                    Icons.link_rounded,
-                    'Sao chép\nliên kết',
-                  ),
-                  _buildShareIconOption(Icons.ios_share_rounded, 'Khác'),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Divider(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.manage_accounts_rounded),
-                title: const Text(
-                  'Quản lý bạn đồng hành',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                onTap: () {},
-              ),
-            ],
-          ),
-        ),
-      ), // Close SingleChildScrollView
     );
   }
 
