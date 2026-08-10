@@ -1058,6 +1058,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   final List<String> _sectionNames = [];
   final TextEditingController _guideIntroController = TextEditingController();
   final FocusNode _guideIntroFocusNode = FocusNode();
+  String? _lastSavedGuideIntro;
   final Map<String, TextEditingController> _searchControllers = {};
   final Map<String, List<Map<String, dynamic>>> _searchResults = {};
 
@@ -1554,7 +1555,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   Future<void> _saveGuideIntro() async {
     final newIntro = _guideIntroController.text.trim();
-    if (_itineraryData['description'] == newIntro) return;
+    if (_lastSavedGuideIntro == newIntro) return;
+    _lastSavedGuideIntro = newIntro;
     _itineraryData['description'] = newIntro;
 
     final rawId = _itineraryData['id'];
@@ -2010,8 +2012,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         rawDesc != 'Công khai' &&
         rawDesc != 'null') {
       _guideIntroController.text = rawDesc;
+      _lastSavedGuideIntro = rawDesc;
     } else {
       _guideIntroController.text = '';
+      _lastSavedGuideIntro = '';
     }
 
     if (_itineraryData['isGuide'] == true) {
