@@ -6986,7 +6986,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 if (!_isMapExpanded)
                                   Positioned(
                                     right: 16,
-                                    bottom: 16,
+                                    bottom: 16 + MediaQuery.of(context).padding.bottom,
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -7046,7 +7046,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           if (_isMapExpanded && _selectedMapPlace == null && !_isSheetHalf)
             Positioned(
               left: 16,
-              bottom: 75.0 + 16.0,
+              bottom: 75.0 + 16.0 + MediaQuery.of(context).padding.bottom,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -7725,7 +7725,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     return Positioned(
       left: 16,
       right: 16,
-      bottom: 16.0,
+      bottom: 16.0 + MediaQuery.of(context).padding.bottom,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -19020,7 +19020,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              80 + MediaQuery.of(context).padding.bottom,
+            ),
             sliver: SliverList(
               delegate: SliverChildBuilderDelegate((context, index) {
                 final post = filteredPosts[index];
@@ -24831,7 +24836,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       child: Stack(
         children: [
           ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              80 + MediaQuery.of(context).padding.bottom,
+            ),
             itemCount: sortedExpenses.isEmpty ? 2 : sortedExpenses.length + 1,
             itemBuilder: (context, idx) {
               if (idx == 0) {

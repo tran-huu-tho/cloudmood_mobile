@@ -2482,7 +2482,12 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
   // BOTTOM ACTION BAR (Identical to Manual Itinerary Creation)
   Widget _buildBottomBar() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        16,
+        20,
+        16 + MediaQuery.of(context).padding.bottom,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey[200]!)),
