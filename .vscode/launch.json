@@ -5,7 +5,9 @@
             "name": "cloudmood_mobile (Web & Mobile)",
             "request": "launch",
             "type": "dart",
+            "preLaunchTask": "CloudMood: kết nối backend Android",
             "args": [
+                "--dart-define=CLOUDMOOD_API_URL=http://127.0.0.1:3000",
                 "--web-port=5566"
             ]
         }

@@ -66,8 +66,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       'desc': 'Trợ lý AI đọc hiểu yêu cầu và chọn lọc địa điểm...',
     },
     {
-      'title': 'AI lên kế hoạch từng ngày',
-      'desc': 'Sắp xếp lộ trình tối ưu, viết ghi chú cho mỗi điểm đến...',
+      'title': 'Đang tối ưu lịch theo thời tiết',
+      'desc':
+          'Kiểm tra từng khung giờ mưa, tự dời hoặc thay bằng điểm trong nhà...',
     },
     {
       'title': 'Hoàn tất và khởi tạo lịch trình',
@@ -473,6 +474,36 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     }
   }
 
+  String _buildWeatherOptimizationSuccessMessage(Map<String, dynamic> summary) {
+    final base = 'Trợ lý AI đã tạo lịch trình $_days ngày cho bạn!';
+    final status = (summary['status'] ?? '').toString();
+    final rescheduled =
+        int.tryParse((summary['rescheduledCount'] ?? 0).toString()) ?? 0;
+    final replaced =
+        int.tryParse((summary['replacementCount'] ?? 0).toString()) ?? 0;
+    final removed =
+        int.tryParse((summary['removedUnsafeCount'] ?? 0).toString()) ?? 0;
+    final unresolved =
+        int.tryParse((summary['unresolvedCount'] ?? 0).toString()) ?? 0;
+
+    if (status == 'UNAVAILABLE') {
+      return '$base Dự báo chưa khả dụng nên hệ thống chưa tự điều chỉnh theo mưa.';
+    }
+    if (rescheduled > 0 || replaced > 0 || removed > 0) {
+      final unresolvedText = unresolved > 0
+          ? ' Còn $unresolved điểm chưa có phương án ở khu vực khô ráo phù hợp.'
+          : '';
+      final removedText = removed > 0
+          ? ' Đã loại $removed địa điểm thuộc vùng có mưa vì không có phương án khô ráo phù hợp.'
+          : '';
+      return '$base Đã dời $rescheduled và thay $replaced địa điểm để tránh các khu vực có mưa.$removedText$unresolvedText';
+    }
+    if (unresolved > 0) {
+      return '$base Có $unresolved điểm chưa có phương án ở khu vực khô ráo phù hợp.';
+    }
+    return base;
+  }
+
   Future<void> _createAIItinerary() async {
     final user = AuthService().currentUser.value;
     final int currentUserId = user?.id ?? 1;
@@ -514,9 +545,14 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     final startDate = _selectedDateRange?.start ?? DateTime.now();
 
     Map<String, dynamic>? result;
+    Map<String, dynamic> weatherOptimization = <String, dynamic>{};
     int itineraryId = 0;
 
     try {
+      // Không tạo vỏ lịch hoặc dùng fallback cũ nếu backend chưa có Rule Engine
+      // thời tiết mới; điều đó có thể làm điểm ngoài trời lọt vào slot mưa.
+      await DatabaseService().ensureDynamicAiBackend();
+
       // ── STEP A: Create the empty itinerary shell in DB ──────────────────────
       result = await DatabaseService().createUserItinerary(
         userId: currentUserId,
@@ -603,6 +639,10 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         startDate: startDate,
         customRequest: customReq.isNotEmpty ? customReq : null,
       );
+      final dynamic weatherSummary = aiPlan['weatherOptimization'];
+      if (weatherSummary is Map) {
+        weatherOptimization = Map<String, dynamic>.from(weatherSummary);
+      }
 
       if (mounted) {
         setState(() {
@@ -662,15 +702,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       }
 
       if (totalAdded == 0) {
-        await _autoPopulatePlacesForAIItinerary(
-          itineraryId,
-          finalDestination,
-          _days,
-          'Vừa phải',
-          _selectedCategories,
-          true,
-          selectedBudgetLevel: _selectedBudgetLevel,
-          budgetInVND: budgetInVND,
+        throw Exception(
+          'Backend không trả về lịch trình đã kiểm tra thời tiết; hệ thống dừng để tránh lưu địa điểm ngoài trời vào khung giờ mưa.',
         );
       }
 
@@ -708,7 +741,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Trợ lý AI đã tạo lịch trình $_days ngày cho bạn!',
+                      _buildWeatherOptimizationSuccessMessage(
+                        weatherOptimization,
+                      ),
                     ),
                   ),
                 ],
@@ -721,52 +756,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       }
     } catch (e) {
       debugPrint('AI Generation error: $e');
-      // Fallback: Populate itinerary with RAG places if AI call fails
-      if (itineraryId > 0) {
-        try {
-          await _autoPopulatePlacesForAIItinerary(
-            itineraryId,
-            finalDestination,
-            _days,
-            'Vừa phải',
-            _selectedCategories,
-            true,
-            selectedBudgetLevel: _selectedBudgetLevel,
-            budgetInVND: budgetInVND,
-          );
-
-          if (mounted) {
-            setState(() {
-              _creationProgress = 1.0;
-              _activeStepIndex = 3;
-            });
-            await Future.delayed(const Duration(milliseconds: 400));
-
-            final updatedResult =
-                await DatabaseService().fetchItineraryById(itineraryId) ??
-                result;
-
-            _progressTimer?.cancel();
-
-            if (mounted) {
-              Navigator.of(context).pop();
-
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => TripOverviewScreen(
-                    itinerary: updatedResult!,
-                    initialTabIndex: 1,
-                  ),
-                ),
-              );
-              return;
-            }
-          }
-        } catch (fallbackErr) {
-          debugPrint('Fallback auto-populate error: $fallbackErr');
-        }
-      }
-
       if (mounted) {
         _progressTimer?.cancel();
         setState(() => _isCreating = false);
@@ -1451,7 +1440,10 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               ),
               backgroundColor: Colors.white,
               elevation: 8,
-              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 24,
+              ),
               child: Container(
                 width: 340,
                 padding: const EdgeInsets.all(22),
@@ -1578,7 +1570,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                             emailErrorMessage = null;
                             selectedUser = null;
                           });
-                          if (debounceTimer?.isActive ?? false) debounceTimer!.cancel();
+                          if (debounceTimer?.isActive ?? false)
+                            debounceTimer!.cancel();
                           if (val.trim().isEmpty) {
                             setDialogState(() {
                               suggestions = [];
@@ -1586,14 +1579,28 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                             });
                             return;
                           }
-                          debounceTimer = Timer(const Duration(milliseconds: 300), () async {
-                            final results = await DatabaseService().searchUsersByEmail(val.trim());
-                            final alreadyInvited = _invitedCompanionsList.map((c) => c.email.toLowerCase()).toSet();
-                            setDialogState(() {
-                              suggestions = results.where((u) => !alreadyInvited.contains((u['email'] ?? '').toString().toLowerCase())).toList();
-                              isSearching = false;
-                            });
-                          });
+                          debounceTimer = Timer(
+                            const Duration(milliseconds: 300),
+                            () async {
+                              final results = await DatabaseService()
+                                  .searchUsersByEmail(val.trim());
+                              final alreadyInvited = _invitedCompanionsList
+                                  .map((c) => c.email.toLowerCase())
+                                  .toSet();
+                              setDialogState(() {
+                                suggestions = results
+                                    .where(
+                                      (u) => !alreadyInvited.contains(
+                                        (u['email'] ?? '')
+                                            .toString()
+                                            .toLowerCase(),
+                                      ),
+                                    )
+                                    .toList();
+                                isSearching = false;
+                              });
+                            },
+                          );
                         },
                       ),
 
@@ -1637,30 +1644,48 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                 itemCount: suggestions.length,
                                 itemBuilder: (context, index) {
                                   final user = suggestions[index];
-                                  final String fullName = user['fullName'] ?? 'Người dùng CloudMood';
+                                  final String fullName =
+                                      user['fullName'] ??
+                                      'Người dùng CloudMood';
                                   final String email = user['email'] ?? '';
                                   final String? avatar = user['avatar'];
 
                                   return ListTile(
                                     dense: true,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 2,
+                                    ),
                                     leading: CircleAvatar(
                                       radius: 16,
-                                      backgroundColor: _aiPurple.withOpacity(0.1),
-                                      backgroundImage: (avatar != null && avatar.isNotEmpty)
+                                      backgroundColor: _aiPurple.withOpacity(
+                                        0.1,
+                                      ),
+                                      backgroundImage:
+                                          (avatar != null && avatar.isNotEmpty)
                                           ? NetworkImage(avatar)
                                           : null,
                                       child: (avatar == null || avatar.isEmpty)
-                                          ? const Icon(Icons.person, size: 18, color: _aiPurple)
+                                          ? const Icon(
+                                              Icons.person,
+                                              size: 18,
+                                              color: _aiPurple,
+                                            )
                                           : null,
                                     ),
                                     title: Text(
                                       fullName,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
                                     ),
                                     subtitle: Text(
                                       email,
-                                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey[600],
+                                      ),
                                     ),
                                     onTap: () {
                                       setDialogState(() {
@@ -1720,7 +1745,10 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
                             color: dialogSelectedRole == 'EDITOR'
                                 ? _aiPurple.withOpacity(0.08)
@@ -1783,7 +1811,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                 activeColor: _aiPurple,
                                 onChanged: (val) {
                                   if (val != null) {
-                                    setDialogState(() => dialogSelectedRole = val);
+                                    setDialogState(
+                                      () => dialogSelectedRole = val,
+                                    );
                                   }
                                 },
                               ),
@@ -1799,7 +1829,10 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
                             color: dialogSelectedRole == 'VIEWER'
                                 ? _aiPurple.withOpacity(0.08)
@@ -1862,7 +1895,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                 activeColor: _aiPurple,
                                 onChanged: (val) {
                                   if (val != null) {
-                                    setDialogState(() => dialogSelectedRole = val);
+                                    setDialogState(
+                                      () => dialogSelectedRole = val,
+                                    );
                                   }
                                 },
                               ),
@@ -1913,7 +1948,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                   elevation: 0,
                                 ),
                                 onPressed: () async {
-                                  final email = _companionInputController.text.trim();
+                                  final email = _companionInputController.text
+                                      .trim();
                                   if (email.isEmpty || !email.contains('@')) {
                                     setDialogState(() {
                                       emailErrorMessage = 'Email không hợp lệ!';
@@ -1921,12 +1957,16 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                     return;
                                   }
 
-                                  final isAlreadyAdded = _invitedCompanionsList.any(
-                                    (c) => c.email.toLowerCase() == email.toLowerCase(),
-                                  );
+                                  final isAlreadyAdded = _invitedCompanionsList
+                                      .any(
+                                        (c) =>
+                                            c.email.toLowerCase() ==
+                                            email.toLowerCase(),
+                                      );
                                   if (isAlreadyAdded) {
                                     setDialogState(() {
-                                      emailErrorMessage = 'Người dùng này đã có trong danh sách bạn đồng hành';
+                                      emailErrorMessage =
+                                          'Người dùng này đã có trong danh sách bạn đồng hành';
                                     });
                                     return;
                                   }
@@ -2230,7 +2270,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                 spreadRadius: 6,
                               ),
                               BoxShadow(
-                                color: const Color(0xFF0EA5E9).withOpacity(0.15),
+                                color: const Color(
+                                  0xFF0EA5E9,
+                                ).withOpacity(0.15),
                                 blurRadius: 20,
                                 spreadRadius: 2,
                               ),
@@ -2305,10 +2347,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: Colors.grey[200]!,
-                          width: 1,
-                        ),
+                        border: Border.all(color: Colors.grey[200]!, width: 1),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.05),
@@ -2399,12 +2438,16 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                               final isCurrent = index == _activeStepIndex;
 
                               return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 6,
+                                ),
                                 child: Row(
                                   children: [
                                     // Icon Indicator
                                     AnimatedContainer(
-                                      duration: const Duration(milliseconds: 300),
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
                                       width: 24,
                                       height: 24,
                                       decoration: BoxDecoration(
@@ -2437,7 +2480,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                                                       style: TextStyle(
                                                         fontSize: 11,
                                                         color: Colors.grey[500],
-                                                        fontWeight: FontWeight.bold,
+                                                        fontWeight:
+                                                            FontWeight.bold,
                                                       ),
                                                     )),
                                       ),
@@ -3911,17 +3955,11 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           const SizedBox(height: 12),
 
           // Preset Option 2: Vừa phải
-          _buildBudgetPresetCard(
-            'Vừa phải',
-            '7.000.000 VNĐ / chuyến đi',
-          ),
+          _buildBudgetPresetCard('Vừa phải', '7.000.000 VNĐ / chuyến đi'),
           const SizedBox(height: 12),
 
           // Preset Option 3: Sang trọng
-          _buildBudgetPresetCard(
-            'Sang trọng',
-            '15.000.000 VNĐ / chuyến đi',
-          ),
+          _buildBudgetPresetCard('Sang trọng', '15.000.000 VNĐ / chuyến đi'),
           const SizedBox(height: 12),
 
           // Custom Option 4: Tự nhập số tiền (Directly below!)
@@ -3948,9 +3986,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
         duration: const Duration(milliseconds: 250),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected
-              ? _aiPurple.withOpacity(0.08)
-              : Colors.grey.shade50,
+          color: isSelected ? _aiPurple.withOpacity(0.08) : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isSelected ? _aiPurple : Colors.grey.shade200,
@@ -4001,7 +4037,10 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
             if (isSelected) ...[
               const SizedBox(height: 14),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
@@ -4038,7 +4077,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                           disabledBorder: InputBorder.none,
                           focusedErrorBorder: InputBorder.none,
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                          ),
                         ),
                         onChanged: (val) {
                           setState(() {});
@@ -4124,10 +4165,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               const SizedBox(height: 4),
               Text(
                 'Tùy chọn — AI sẽ cá nhân hóa lịch trình theo sở thích bạn',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
               ),
             ],
           ),
@@ -4160,10 +4198,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(18),
-                borderSide: const BorderSide(
-                  color: _aiPurple,
-                  width: 1.5,
-                ),
+                borderSide: const BorderSide(color: _aiPurple, width: 1.5),
               ),
               counterStyle: TextStyle(
                 fontSize: 12,

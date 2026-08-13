@@ -10,6 +10,10 @@ class DatabaseService {
 
   DatabaseService._internal();
 
+  Future<void> ensureDynamicAiBackend() {
+    return ApiClient.requireDynamicAiBackend();
+  }
+
   /// Checks if categories and places are empty in the database, and if so, seeds them with default data
   Future<void> checkAndSeedData() async {
     // This logic is usually handled on the backend or triggered via a specific endpoint
@@ -263,6 +267,7 @@ class DatabaseService {
     required DateTime startDate,
     String? customRequest,
   }) async {
+    await ApiClient.requireDynamicAiBackend();
     final body = {
       'destination': destination,
       'days': days,
@@ -278,6 +283,7 @@ class DatabaseService {
     final response = await ApiClient.post(
       '/mobile/ai/generate-itinerary',
       body: body,
+      allowRemoteFallback: false,
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -300,6 +306,142 @@ class DatabaseService {
         'Trợ lý AI gặp lỗi (${response.statusCode}). Vui lòng thử lại.',
       );
     }
+  }
+
+  /// Phân tích động một ngày dựa trên thời tiết, Rule Engine, RAG và Haversine.
+  /// API chỉ trả bản xem trước; chưa thay đổi dữ liệu lịch trình.
+  Future<Map<String, dynamic>> optimizeDynamicItineraryDay({
+    required int itineraryId,
+    required int day,
+    required List<int> lockedDetailIds,
+    required List<Map<String, dynamic>> weatherSnapshots,
+    String? customRequest,
+  }) async {
+    await ApiClient.requireDynamicAiBackend();
+    final response = await ApiClient.post(
+      '/mobile/ai/dynamic-optimize-day',
+      body: {
+        'itineraryId': itineraryId,
+        'day': day,
+        'lockedDetailIds': lockedDetailIds,
+        'weatherSnapshots': weatherSnapshots,
+        'rainThreshold': 70,
+        if (customRequest != null && customRequest.trim().isNotEmpty)
+          'customRequest': customRequest.trim(),
+      },
+      allowRemoteFallback: false,
+    );
+    final decoded = jsonDecode(response.body);
+    if ((response.statusCode == 200 || response.statusCode == 201) &&
+        decoded is Map &&
+        decoded['success'] == true &&
+        decoded['data'] != null) {
+      return Map<String, dynamic>.from(decoded['data']);
+    }
+    final message = decoded is Map
+        ? (decoded['message'] ??
+              decoded['error'] ??
+              'Không thể tối ưu lịch trình.')
+        : 'Không thể tối ưu lịch trình.';
+    throw Exception(message.toString());
+  }
+
+  /// Áp dụng nguyên tử bản đề xuất sau khi người dùng xác nhận.
+  Future<bool> applyDynamicItineraryOptimization({
+    required int itineraryId,
+    required int day,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    await ApiClient.requireDynamicAiBackend();
+    final response = await ApiClient.post(
+      '/mobile/ai/apply-dynamic-optimization',
+      body: {'itineraryId': itineraryId, 'day': day, 'items': items},
+      allowRemoteFallback: false,
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = jsonDecode(response.body);
+      final success = decoded is Map && decoded['success'] == true;
+      if (success) refreshTrigger.value++;
+      return success;
+    }
+    try {
+      final decoded = jsonDecode(response.body);
+      throw Exception(decoded['message'] ?? 'Không thể áp dụng bản tối ưu.');
+    } catch (error) {
+      if (error is Exception) rethrow;
+      throw Exception('Không thể áp dụng bản tối ưu.');
+    }
+  }
+
+  /// Lấy tối đa ba địa điểm thật từ CSDL đã vượt qua Rule Engine.
+  Future<Map<String, dynamic>> proposePlaceReplacements({
+    required int itineraryId,
+    required int detailId,
+    required String prompt,
+    required bool requireIndoor,
+  }) async {
+    await ApiClient.requireDynamicAiBackend();
+    final response = await ApiClient.post(
+      '/mobile/ai/replacement-proposals',
+      body: {
+        'itineraryId': itineraryId,
+        'detailId': detailId,
+        'prompt': prompt.trim(),
+        'requireIndoor': requireIndoor,
+        'reason': requireIndoor ? 'WEATHER' : 'MANUAL',
+      },
+      allowRemoteFallback: false,
+    );
+    final decoded = jsonDecode(response.body);
+    if ((response.statusCode == 200 || response.statusCode == 201) &&
+        decoded is Map &&
+        decoded['success'] == true &&
+        decoded['data'] != null) {
+      return Map<String, dynamic>.from(decoded['data']);
+    }
+    final message = decoded is Map
+        ? (decoded['message'] ??
+              decoded['error'] ??
+              'Không thể tìm địa điểm thay thế.')
+        : 'Không thể tìm địa điểm thay thế.';
+    throw Exception(message.toString());
+  }
+
+  /// Áp dụng một đề xuất sau khi backend kiểm tra lại toàn bộ luật bắt buộc.
+  Future<Map<String, dynamic>> applyPlaceReplacementProposal({
+    required int itineraryId,
+    required int detailId,
+    required int newPlaceId,
+    required String prompt,
+    required bool requireIndoor,
+  }) async {
+    await ApiClient.requireDynamicAiBackend();
+    final response = await ApiClient.post(
+      '/mobile/ai/apply-replacement-proposal',
+      body: {
+        'itineraryId': itineraryId,
+        'detailId': detailId,
+        'newPlaceId': newPlaceId,
+        'prompt': prompt.trim(),
+        'requireIndoor': requireIndoor,
+        'reason': requireIndoor ? 'WEATHER' : 'MANUAL',
+      },
+      allowRemoteFallback: false,
+    );
+    final decoded = jsonDecode(response.body);
+    if ((response.statusCode == 200 || response.statusCode == 201) &&
+        decoded is Map &&
+        decoded['success'] == true &&
+        decoded['data'] != null) {
+      refreshTrigger.value++;
+      return Map<String, dynamic>.from(decoded['data']);
+    }
+    final message = decoded is Map
+        ? (decoded['message'] ??
+              decoded['error'] ??
+              'Không thể áp dụng địa điểm thay thế.')
+        : 'Không thể áp dụng địa điểm thay thế.';
+    throw Exception(message.toString());
   }
 
   /// Shifts day numbers for itinerary details greater than targetDay by offset
@@ -553,7 +695,11 @@ class DatabaseService {
   }
 
   /// Updates an itinerary detail
-  Future<bool> updateItineraryDetail(int id, Map<String, dynamic> data, {bool notifyRefresh = false}) async {
+  Future<bool> updateItineraryDetail(
+    int id,
+    Map<String, dynamic> data, {
+    bool notifyRefresh = false,
+  }) async {
     try {
       final response = await ApiClient.put(
         '/itineraries/details/$id',

@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CloudMood: kết nối backend Android",
+            "type": "shell",
+            "command": "$device = adb devices | Select-String '\\tdevice$'; if ($device) { adb reverse tcp:3000 tcp:3000 }",
+            "problemMatcher": []
+        }
+    ]
+}

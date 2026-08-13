@@ -1225,6 +1225,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
   bool _isReordering = false;
   bool _isUpdatingDatabase = false;
+  final Set<int> _optimizingDayNumbers = <int>{};
   final Map<String, String> _segmentTransportModes = {};
 
   @override
@@ -1242,13 +1243,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     // Request Android notification permission on foreground init & sync primary trip ID
     try {
       final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-      const initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initializationSettingsAndroid = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
       const initializationSettingsDarwin = DarwinInitializationSettings();
       flutterLocalNotificationsPlugin.initialize(
-        const InitializationSettings(android: initializationSettingsAndroid, iOS: initializationSettingsDarwin),
+        const InitializationSettings(
+          android: initializationSettingsAndroid,
+          iOS: initializationSettingsDarwin,
+        ),
       );
       flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
           ?.requestNotificationsPermission();
     } catch (_) {}
 
@@ -1629,12 +1637,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     // Sync the rename to database (delete old, insert new)
     final itinId = _itineraryData['id'] as int;
     SharedPreferences.getInstance().then((prefs) {
-      prefs.setStringList('deleted_sections_$itinId', _deletedSectionNames.toList());
+      prefs.setStringList(
+        'deleted_sections_$itinId',
+        _deletedSectionNames.toList(),
+      );
     });
-    DatabaseService().deleteItinerarySection(
-      itinId,
-      oldTitle,
-    );
+    DatabaseService().deleteItinerarySection(itinId, oldTitle);
     _syncSectionsToDatabase();
   }
 
@@ -3677,9 +3685,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               : () async {
                                   final email = emailController.text.trim();
                                   if (email.isEmpty || !email.contains('@')) {
-                                    ScaffoldMessenger.of(
-                                      context,
-                                    ).showSnackBar(
+                                    ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
                                           'Vui lòng nhập email hợp lệ',
@@ -3696,17 +3702,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         );
                                   final res = await DatabaseService()
                                       .inviteByEmail(
-                                    itinId,
-                                    email,
-                                    role: selectedRole,
-                                  );
+                                        itinId,
+                                        email,
+                                        role: selectedRole,
+                                      );
                                   setModalState(() => isSending = false);
 
                                   if (res != null && res['success'] == true) {
                                     emailController.clear();
-                                    ScaffoldMessenger.of(
-                                      context,
-                                    ).showSnackBar(
+                                    ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
                                           res['message'] ??
@@ -3716,9 +3720,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       ),
                                     );
                                   } else {
-                                    ScaffoldMessenger.of(
-                                      context,
-                                    ).showSnackBar(
+                                    ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
                                           res?['message'] ?? 'Gửi thất bại',
@@ -3750,9 +3752,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 )
                               : const Text(
                                   'Gửi',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
                         ),
                       ],
@@ -3792,8 +3792,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       }, // Close SingleChildScrollView
     );
   }
-
-
 
   void _showMapSettingsSheet() {
     showModalBottomSheet(
@@ -5603,12 +5601,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   child: GestureDetector(
                                     behavior: HitTestBehavior.opaque,
                                     onTap: () {
-                                      final placeObj =
-                                          (p1['place'] is Map)
-                                              ? Map<String, dynamic>.from(
-                                                p1['place'],
-                                              )
-                                              : Map<String, dynamic>.from(p1);
+                                      final placeObj = (p1['place'] is Map)
+                                          ? Map<String, dynamic>.from(
+                                              p1['place'],
+                                            )
+                                          : Map<String, dynamic>.from(p1);
                                       PlaceDetailBottomSheet.show(
                                         context,
                                         placeObj,
@@ -5706,12 +5703,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   child: GestureDetector(
                                     behavior: HitTestBehavior.opaque,
                                     onTap: () {
-                                      final placeObj =
-                                          (p2['place'] is Map)
-                                              ? Map<String, dynamic>.from(
-                                                p2['place'],
-                                              )
-                                              : Map<String, dynamic>.from(p2);
+                                      final placeObj = (p2['place'] is Map)
+                                          ? Map<String, dynamic>.from(
+                                              p2['place'],
+                                            )
+                                          : Map<String, dynamic>.from(p2);
                                       PlaceDetailBottomSheet.show(
                                         context,
                                         placeObj,
@@ -6986,7 +6982,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 if (!_isMapExpanded)
                                   Positioned(
                                     right: 16,
-                                    bottom: 16 + MediaQuery.of(context).padding.bottom,
+                                    bottom:
+                                        16 +
+                                        MediaQuery.of(context).padding.bottom,
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -9578,131 +9576,125 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   }
 
   final Map<String, Map<String, dynamic>> _placeWeatherCache = {};
+  final Map<String, Future<Map<String, dynamic>?>> _weatherCellRequests = {};
 
-  Map<String, dynamic> _getMockWeather(int hour) {
-    final bool isNight = (hour >= 18 || hour < 6);
-    if (hour >= 5 && hour < 8) {
-      return <String, dynamic>{
-        'hour': hour,
-        'temp': 27,
-        'desc': 'Nắng sớm dịu nhẹ',
-        'icon': Icons.wb_twilight_rounded,
-        'color': const Color(0xFFD97706),
-        'bg': const Color(0xFFFEF3C7),
-        'humidity': 75,
-        'wind': 8,
-        'rainProb': 10,
-        'rainAmount': 0.0,
-        'uv': 'Thấp (2)',
-        'advice':
-            'Thời tiết hừng đông rất dễ chịu, thích hợp đi dạo ngắm bình minh & ăn sáng.',
-      };
-    } else if (hour >= 8 && hour < 11) {
-      return <String, dynamic>{
-        'hour': hour,
-        'temp': 30,
-        'desc': 'Nắng nhẹ mát mẻ',
-        'icon': Icons.wb_sunny_rounded,
-        'color': const Color(0xFFEA580C),
-        'bg': const Color(0xFFFFEDD5),
-        'humidity': 65,
-        'wind': 10,
-        'rainProb': 15,
-        'rainAmount': 0.0,
-        'uv': 'Vừa (5)',
-        'advice':
-            'Trời nắng nhẹ đẹp, lý tưởng để di chuyển tham quan các di tích & chụp ảnh.',
-      };
-    } else if (hour >= 11 && hour < 14) {
-      return <String, dynamic>{
-        'hour': hour,
-        'temp': 33,
-        'desc': 'Nắng trong & ấm',
-        'icon': Icons.wb_sunny_rounded,
-        'color': const Color(0xFFB45309),
-        'bg': const Color(0xFFFEF3C7),
-        'humidity': 58,
-        'wind': 12,
-        'rainProb': 20,
-        'rainAmount': 0.0,
-        'uv': 'Cao (8)',
-        'advice':
-            'Trời đứng bóng khá nắng. Bạn nên dùng bữa trưa ở không gian máy lạnh hoặc có bóng râm!',
-      };
-    } else if (hour >= 14 && hour < 17) {
-      return <String, dynamic>{
-        'hour': hour,
-        'temp': 31,
-        'desc': 'Nắng chiều có mây',
-        'icon': Icons.wb_cloudy_rounded,
-        'color': const Color(0xFF0284C7),
-        'bg': const Color(0xFFE0F2FE),
-        'humidity': 64,
-        'wind': 14,
-        'rainProb': 30,
-        'rainAmount': 0.1,
-        'uv': 'Vừa (4)',
-        'advice':
-            'Nắng chiều đã hạ nhiệt, có mây lộng gió thích hợp cho các hoạt động vui chơi giải trí.',
-      };
-    } else if (hour >= 17 && hour < 19) {
-      return <String, dynamic>{
-        'hour': hour,
-        'temp': 28,
-        'desc': 'Hoàng hôn mát mẻ',
-        'icon': Icons.brightness_6_rounded,
-        'color': const Color(0xFF7C3AED),
-        'bg': const Color(0xFFF3E8FF),
-        'humidity': 72,
-        'wind': 11,
-        'rainProb': 25,
-        'rainAmount': 0.0,
-        'uv': 'Thấp (1)',
-        'advice':
-            'Thời điểm tuyệt vời nhất trong ngày để ngắm hoàng hôn và tận hưởng gió mát.',
-      };
-    } else {
-      return <String, dynamic>{
-        'hour': hour,
-        'temp': 26,
-        'desc': 'Trời đêm thoáng mát',
-        'icon': Icons.nightlight_round,
-        'color': const Color(0xFF1E293B),
-        'bg': const Color(0xFFF1F5F9),
-        'humidity': 78,
-        'wind': 9,
-        'rainProb': 10,
-        'rainAmount': 0.0,
-        'uv': 'Không có (0)',
-        'advice':
-            'Không khí đêm dịu mát, rất tuyệt vời để thưởng thức ẩm thực đêm & đi dạo.',
-      };
+  String _weatherCellKey(double lat, double lon) {
+    const double cellSize = 0.05;
+    final double cellLat = (lat / cellSize).round() * cellSize;
+    final double cellLon = (lon / cellSize).round() * cellSize;
+    return '${cellLat.toStringAsFixed(2)},${cellLon.toStringAsFixed(2)}';
+  }
+
+  Future<Map<String, dynamic>?> _requestWeatherCellPayload(
+    double lat,
+    double lon,
+  ) async {
+    try {
+      final response = await ApiClient.get(
+        '/weather/hourly',
+        query: {'lat': '$lat', 'lon': '$lon'},
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['hourly'] is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+      }
+      debugPrint(
+        '[Weather] Backend hourly trả HTTP ${response.statusCode}; chuyển sang Open-Meteo trực tiếp.',
+      );
+    } catch (error) {
+      debugPrint(
+        '[Weather] Backend hourly lỗi: $error; chuyển sang Open-Meteo trực tiếp.',
+      );
     }
+
+    // Fallback độc lập nếu backend local/cloud chưa cập nhật endpoint mới.
+    // Thử hai lần với timeout rộng hơn thay vì đánh dấu thiếu dự báo sau 4 giây.
+    for (int attempt = 1; attempt <= 2; attempt++) {
+      try {
+        final url = Uri.parse(
+          'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation&timezone=auto&forecast_days=16',
+        );
+        final response = await http
+            .get(url)
+            .timeout(const Duration(seconds: 8));
+        if (response.statusCode != 200) {
+          debugPrint(
+            '[Weather] Open-Meteo HTTP ${response.statusCode}, lần $attempt/2.',
+          );
+          continue;
+        }
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map && decoded['hourly'] is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+      } catch (error) {
+        debugPrint('[Weather] Open-Meteo lỗi lần $attempt/2: $error');
+      }
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _getWeatherCellPayload(
+    double lat,
+    double lon,
+  ) async {
+    final key = _weatherCellKey(lat, lon);
+    final existing = _weatherCellRequests[key];
+    if (existing != null) return existing;
+
+    final request = _requestWeatherCellPayload(lat, lon);
+    _weatherCellRequests[key] = request;
+    final result = await request;
+    if (result == null) _weatherCellRequests.remove(key);
+    return result;
   }
 
   Map<String, dynamic> _getWeatherForPlace(
     Map place, [
     String? startTime,
     DateTime? date,
+    String? endTime,
   ]) {
     final int placeId = (place['id'] as num?)?.toInt() ?? 0;
 
-    int hour = 9;
-    if (startTime != null && startTime.contains(':')) {
-      hour = int.tryParse(startTime.split(':')[0]) ?? 9;
+    int parseClockMinutes(String? value, int fallback) {
+      if (value == null || !value.contains(':')) return fallback;
+      final parts = value.split(':');
+      final parsedHour = int.tryParse(parts[0]);
+      final parsedMinute = parts.length > 1 ? int.tryParse(parts[1]) : 0;
+      if (parsedHour == null ||
+          parsedMinute == null ||
+          parsedHour < 0 ||
+          parsedHour > 23 ||
+          parsedMinute < 0 ||
+          parsedMinute > 59) {
+        return fallback;
+      }
+      return parsedHour * 60 + parsedMinute;
     }
+
+    final int startMinutes = parseClockMinutes(startTime, 9 * 60);
+    final int endMinutes = parseClockMinutes(endTime, startMinutes);
+    final int targetMinutes = endMinutes > startMinutes
+        ? startMinutes + ((endMinutes - startMinutes) ~/ 2)
+        : startMinutes;
+    final int hour = targetMinutes ~/ 60;
 
     final targetDate = date ?? DateTime.now();
     final dateStr =
         "${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}";
-    final String cacheKey = "$placeId-$dateStr-$hour";
+    final String cacheKey = "$placeId-$dateStr-$targetMinutes";
 
     if (_placeWeatherCache.containsKey(cacheKey)) {
       return _placeWeatherCache[cacheKey]!;
     }
 
-    final double lat = (place['latitude'] as num?)?.toDouble() ?? 10.0371;
-    final double lon = (place['longitude'] as num?)?.toDouble() ?? 105.7882;
+    // Không âm thầm dùng tọa độ trung tâm Cần Thơ cho điểm thiếu tọa độ vì
+    // như vậy thẻ trông có dữ liệu nhưng lại không phải dự báo của địa điểm.
+    final double lat = (place['latitude'] as num?)?.toDouble() ?? double.nan;
+    final double lon = (place['longitude'] as num?)?.toDouble() ?? double.nan;
 
     final Map<String, dynamic> weather = <String, dynamic>{
       'hour': hour,
@@ -9721,7 +9713,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     };
 
     _placeWeatherCache[cacheKey] = weather;
-    _fetchRealHourlyWeather(placeId, lat, lon, targetDate, hour, cacheKey);
+    _fetchRealHourlyWeather(
+      placeId,
+      lat,
+      lon,
+      targetDate,
+      targetMinutes,
+      cacheKey,
+    );
     return weather;
   }
 
@@ -9730,161 +9729,249 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     double lat,
     double lon,
     DateTime targetDate,
-    int hour,
+    int targetMinutes,
     String cacheKey,
   ) async {
-    final bool isNight = (hour >= 18 || hour < 6);
+    final int hour = targetMinutes ~/ 60;
+    String unavailableReason =
+        'Không tải được dữ liệu dự báo sau khi đã thử backend và Open-Meteo.';
     try {
-      final url = Uri.parse(
-        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability,precipitation&timezone=auto',
-      );
-      final response = await http.get(url).timeout(const Duration(seconds: 4));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final hourly = data['hourly'];
-        if (hourly != null && hourly['time'] is List) {
-          final List times = hourly['time'];
-          final List temps = hourly['temperature_2m'];
-          final List humidities = hourly['relative_humidity_2m'];
-          final List codes = hourly['weather_code'];
-          final List winds = hourly['wind_speed_10m'];
-          final List? rainProbs = hourly['precipitation_probability'];
-          final List? rainAmounts = hourly['precipitation'];
+      if (!lat.isFinite || !lon.isFinite || lat == 0 || lon == 0) {
+        unavailableReason =
+            'Địa điểm chưa có tọa độ hợp lệ nên không thể đối chiếu dự báo.';
+      } else {
+        final data = await _getWeatherCellPayload(lat, lon);
+        if (data != null) {
+          final hourly = data['hourly'];
+          if (hourly != null && hourly['time'] is List) {
+            final List times = hourly['time'];
+            final List temps = hourly['temperature_2m'];
+            final List humidities = hourly['relative_humidity_2m'];
+            final List codes = hourly['weather_code'];
+            final List winds = hourly['wind_speed_10m'];
+            final List? rainProbs = hourly['precipitation_probability'];
+            final List? rainAmounts = hourly['precipitation'];
 
-          final String targetTimeStr =
-              "${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}T${hour.toString().padLeft(2, '0')}:00";
-          int matchIndex = times.indexOf(targetTimeStr);
-          if (matchIndex == -1) {
-            final today = DateTime.now();
-            final String todayTimeStr =
-                "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}T${hour.toString().padLeft(2, '0')}:00";
-            matchIndex = times.indexOf(todayTimeStr);
-          }
-          if (matchIndex == -1) {
-            matchIndex = hour;
-          }
-          if (matchIndex < 0 || matchIndex >= times.length) matchIndex = 12;
-
-          final double tempDouble =
-              (temps[matchIndex] as num?)?.toDouble() ?? 26.0;
-          final int temp = tempDouble.round();
-          final int code = (codes[matchIndex] as num?)?.toInt() ?? 0;
-          final int humidity = (humidities[matchIndex] as num?)?.toInt() ?? 70;
-          final int wind = ((winds[matchIndex] as num?)?.toDouble() ?? 10.0)
-              .round();
-          final int rainProb =
-              rainProbs != null && matchIndex < rainProbs.length
-              ? (rainProbs[matchIndex] as num?)?.toInt() ?? 0
-              : 0;
-          final double rainAmount =
-              rainAmounts != null && matchIndex < rainAmounts.length
-              ? (rainAmounts[matchIndex] as num?)?.toDouble() ?? 0.0
-              : 0.0;
-
-          String desc = isNight ? 'Đêm quang đãng' : 'Nắng đẹp';
-          IconData icon = isNight
-              ? Icons.nightlight_round
-              : Icons.wb_sunny_rounded;
-          Color color = isNight
-              ? const Color(0xFF1E293B)
-              : const Color(0xFFD97706);
-          Color bg = isNight
-              ? const Color(0xFFF1F5F9)
-              : const Color(0xFFFEF3C7);
-          String advice = isNight
-              ? 'Đêm dịu mát, không khí rất tuyệt vời để thưởng thức ẩm thực đêm & dạo phố.'
-              : 'Thời tiết rất tốt cho các hoạt động ngoài trời.';
-
-          if (code == 0) {
-            desc = isNight ? 'Đêm quang đãng' : 'Trời quang nắng';
-            icon = isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded;
-            color = isNight ? const Color(0xFF1E293B) : const Color(0xFFD97706);
-            bg = isNight ? const Color(0xFFF1F5F9) : const Color(0xFFFEF3C7);
-          } else if (code >= 1 && code <= 3) {
-            desc = isNight
-                ? 'Đêm nhiều mây'
-                : ((code == 3) ? 'Nhiều mây' : 'Nắng nhẹ mát');
-            if (isNight) {
-              icon = Icons.nightlight_round;
-              color = const Color(0xFF334155);
-              bg = const Color(0xFFF1F5F9);
-              advice =
-                  'Đêm nhiều mây lộng gió, thích hợp ăn uống & dạo phố đêm.';
-            } else if (code == 3) {
-              // Nhiều mây -> Màu xám mây râm mát
-              icon = Icons.wb_cloudy_rounded;
-              color = const Color(
-                0xFF1E293B,
-              ); // Dark grey/slate for readability
-              bg = const Color(0xFFF1F5F9); // Light grey
-              advice =
-                  'Trời nhiều mây lộng gió, thời tiết râm mát thích hợp đi chơi.';
-            } else {
-              // Nắng nhẹ mát (code 1, 2) -> Màu vàng cam ấm
-              icon = Icons.wb_sunny_rounded;
-              color = const Color(0xFFEA580C);
-              bg = const Color(0xFFFFEDD5);
-              advice =
-                  'Trời nắng nhẹ đẹp, lý tưởng để di chuyển tham quan & chụp ảnh.';
+            final String dateKey =
+                '${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}';
+            int matchIndex = -1;
+            int bestDifference = 24 * 60;
+            for (int index = 0; index < times.length; index++) {
+              final rawTime = times[index]?.toString() ?? '';
+              if (!rawTime.startsWith('${dateKey}T')) continue;
+              final parsedTime = DateTime.tryParse(rawTime);
+              if (parsedTime == null) continue;
+              final candidateMinutes = parsedTime.hour * 60 + parsedTime.minute;
+              final difference = (candidateMinutes - targetMinutes).abs();
+              if (difference < bestDifference) {
+                bestDifference = difference;
+                matchIndex = index;
+              }
             }
-          } else if (code == 45 || code == 48) {
-            desc = 'Có sương mù';
-            icon = Icons.blur_on_rounded;
-            color = const Color(0xFF334155); // Darker slate for readability
-            bg = const Color(0xFFF1F5F9);
-            advice = 'Trời có sương mù, tầm nhìn giảm. Di chuyển cẩn thận!';
-          } else if (code >= 51 && code <= 67) {
-            desc = 'Có mưa rào';
-            icon = Icons.grain_rounded;
-            color = const Color(0xFF2563EB);
-            bg = const Color(0xFFDBEAFE);
-            advice =
-                'Dự báo thời điểm này có mưa rào. Bạn nhớ mang theo ô/dù nhỏ nhé!';
-          } else if (code >= 80 && code <= 99) {
-            desc = 'Mưa giông';
-            icon = Icons.thunderstorm_rounded;
-            color = const Color(0xFF7C3AED);
-            bg = const Color(0xFFF3E8FF);
-            advice =
-                'Trời có khả năng mưa giông. Ưu tiên di chuyển các điểm tham quan trong nhà!';
-          }
+            if (matchIndex == -1) {
+              final firstTime = times.isNotEmpty ? times.first.toString() : '';
+              final lastTime = times.isNotEmpty ? times.last.toString() : '';
+              unavailableReason =
+                  'Ngày $dateKey nằm ngoài phạm vi dự báo hiện có${firstTime.isNotEmpty ? ' ($firstTime đến $lastTime)' : ''}.';
+            } else {
+              final matchedTime = DateTime.tryParse(
+                times[matchIndex].toString(),
+              );
+              final matchedHour = matchedTime?.hour ?? hour;
+              final bool isNight = matchedHour >= 18 || matchedHour < 6;
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              final forecastDay = DateTime(
+                targetDate.year,
+                targetDate.month,
+                targetDate.day,
+              );
+              final int forecastLeadDays = math.max(
+                0,
+                forecastDay.difference(today).inDays,
+              );
 
-          if (mounted) {
-            setState(() {
-              _placeWeatherCache[cacheKey] = <String, dynamic>{
-                'hour': hour,
-                'temp': temp,
-                'desc': desc,
-                'icon': icon,
-                'color': color,
-                'bg': bg,
-                'humidity': humidity,
-                'wind': wind,
-                'rainProb': rainProb,
-                'rainAmount': rainAmount,
-                'uv': isNight
-                    ? 'Không có (0)'
-                    : (temp > 32 ? 'Cao (8)' : 'Vừa (4)'),
-                'advice': advice,
-                'isRealApi': true,
-              };
-            });
+              final double tempDouble =
+                  (temps[matchIndex] as num?)?.toDouble() ?? 26.0;
+              final int temp = tempDouble.round();
+              final int code = (codes[matchIndex] as num?)?.toInt() ?? 0;
+              final int humidity =
+                  (humidities[matchIndex] as num?)?.toInt() ?? 70;
+              final int wind = ((winds[matchIndex] as num?)?.toDouble() ?? 10.0)
+                  .round();
+              final int rainProb =
+                  rainProbs != null && matchIndex < rainProbs.length
+                  ? (rainProbs[matchIndex] as num?)?.toInt() ?? 0
+                  : 0;
+              final double rainAmount =
+                  rainAmounts != null && matchIndex < rainAmounts.length
+                  ? (rainAmounts[matchIndex] as num?)?.toDouble() ?? 0.0
+                  : 0.0;
+
+              String desc = isNight ? 'Đêm quang đãng' : 'Nắng đẹp';
+              IconData icon = isNight
+                  ? Icons.nightlight_round
+                  : Icons.wb_sunny_rounded;
+              Color color = isNight
+                  ? const Color(0xFF1E293B)
+                  : const Color(0xFFD97706);
+              Color bg = isNight
+                  ? const Color(0xFFF1F5F9)
+                  : const Color(0xFFFEF3C7);
+              String advice = isNight
+                  ? 'Đêm dịu mát, không khí rất tuyệt vời để thưởng thức ẩm thực đêm & dạo phố.'
+                  : 'Thời tiết rất tốt cho các hoạt động ngoài trời.';
+
+              if (code == 0) {
+                desc = isNight ? 'Đêm quang đãng' : 'Trời quang nắng';
+                icon = isNight
+                    ? Icons.nightlight_round
+                    : Icons.wb_sunny_rounded;
+                color = isNight
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFD97706);
+                bg = isNight
+                    ? const Color(0xFFF1F5F9)
+                    : const Color(0xFFFEF3C7);
+              } else if (code >= 1 && code <= 3) {
+                desc = isNight
+                    ? 'Đêm nhiều mây'
+                    : ((code == 3) ? 'Nhiều mây' : 'Nắng nhẹ mát');
+                if (isNight) {
+                  icon = Icons.nightlight_round;
+                  color = const Color(0xFF334155);
+                  bg = const Color(0xFFF1F5F9);
+                  advice =
+                      'Đêm nhiều mây lộng gió, thích hợp ăn uống & dạo phố đêm.';
+                } else if (code == 3) {
+                  // Nhiều mây -> Màu xám mây râm mát
+                  icon = Icons.wb_cloudy_rounded;
+                  color = const Color(
+                    0xFF1E293B,
+                  ); // Dark grey/slate for readability
+                  bg = const Color(0xFFF1F5F9); // Light grey
+                  advice =
+                      'Trời nhiều mây lộng gió, thời tiết râm mát thích hợp đi chơi.';
+                } else {
+                  // Nắng nhẹ mát (code 1, 2) -> Màu vàng cam ấm
+                  icon = Icons.wb_sunny_rounded;
+                  color = const Color(0xFFEA580C);
+                  bg = const Color(0xFFFFEDD5);
+                  advice =
+                      'Trời nắng nhẹ đẹp, lý tưởng để di chuyển tham quan & chụp ảnh.';
+                }
+              } else if (code == 45 || code == 48) {
+                desc = 'Có sương mù';
+                icon = Icons.blur_on_rounded;
+                color = const Color(0xFF334155); // Darker slate for readability
+                bg = const Color(0xFFF1F5F9);
+                advice = 'Trời có sương mù, tầm nhìn giảm. Di chuyển cẩn thận!';
+              } else if ((code >= 51 && code <= 67) ||
+                  (code >= 80 && code <= 94)) {
+                final bool highConfidenceRain =
+                    rainProb >= 70 || rainAmount >= 0.5;
+                final bool possibleLightRain =
+                    rainProb >= 40 || rainAmount >= 0.2;
+                if (highConfidenceRain) {
+                  desc = 'Khả năng mưa cao';
+                  icon = Icons.grain_rounded;
+                  color = const Color(0xFF2563EB);
+                  bg = const Color(0xFFDBEAFE);
+                  advice =
+                      'Khả năng mưa tại khung giờ này khá cao. Bạn nên chuẩn bị ô hoặc ưu tiên điểm trong nhà.';
+                } else if (possibleLightRain) {
+                  desc = 'Có thể mưa nhẹ';
+                  icon = Icons.grain_rounded;
+                  color = const Color(0xFF0369A1);
+                  bg = const Color(0xFFE0F2FE);
+                  advice =
+                      'Mô hình chỉ ghi nhận khả năng mưa nhẹ. Đây chưa phải kết luận chắc chắn sẽ mưa.';
+                } else {
+                  desc = 'Khả năng mưa thấp';
+                  icon = Icons.wb_cloudy_rounded;
+                  color = const Color(0xFF475569);
+                  bg = const Color(0xFFF1F5F9);
+                  advice =
+                      'Mô hình có tín hiệu mưa rất nhẹ nhưng xác suất và lượng mưa đều thấp; lịch trình không bị xem là gặp mưa.';
+                }
+              } else if (code >= 95 && code <= 99) {
+                desc = 'Nguy cơ mưa giông';
+                icon = Icons.thunderstorm_rounded;
+                color = const Color(0xFF7C3AED);
+                bg = const Color(0xFFF3E8FF);
+                advice =
+                    'Trời có khả năng mưa giông. Ưu tiên di chuyển các điểm tham quan trong nhà!';
+              }
+
+              if (mounted) {
+                setState(() {
+                  _placeWeatherCache[cacheKey] = <String, dynamic>{
+                    'hour': matchedHour,
+                    'temp': temp,
+                    'desc': desc,
+                    'icon': icon,
+                    'color': color,
+                    'bg': bg,
+                    'humidity': humidity,
+                    'wind': wind,
+                    'rainProb': rainProb,
+                    'rainAmount': rainAmount,
+                    'weatherCode': code,
+                    'forecastLeadDays': forecastLeadDays,
+                    'forecastTime': times[matchIndex].toString(),
+                    'uv': isNight
+                        ? 'Không có (0)'
+                        : (temp > 32 ? 'Cao (8)' : 'Vừa (4)'),
+                    'advice': advice,
+                    'isRealApi': true,
+                    'isAvailable': true,
+                    'isLoading': false,
+                  };
+                });
+              }
+            }
           }
         }
       }
-    } catch (_) {}
+    } catch (error) {
+      unavailableReason = 'Dữ liệu dự báo không hợp lệ: $error';
+      debugPrint('[Weather] Không thể xử lý dự báo cho place $placeId: $error');
+    }
 
-    // Fallback nếu API lỗi
+    // Không dùng dữ liệu giả khi API lỗi hoặc ngày nằm ngoài phạm vi dự báo.
     if (mounted && (_placeWeatherCache[cacheKey]?['isLoading'] == true)) {
       setState(() {
-        _placeWeatherCache[cacheKey] = _getMockWeather(hour);
+        _placeWeatherCache[cacheKey] = <String, dynamic>{
+          'hour': hour,
+          'temp': '--',
+          'desc': 'Chưa có dự báo',
+          'icon': Icons.cloud_off_rounded,
+          'color': const Color(0xFF64748B),
+          'bg': const Color(0xFFF1F5F9),
+          'humidity': 0,
+          'wind': 0,
+          'rainProb': 0,
+          'rainAmount': 0.0,
+          'weatherCode': null,
+          'uv': '--',
+          'advice':
+              '$unavailableReason Ứng dụng sẽ không tự suy đoán thời tiết.',
+          'isRealApi': false,
+          'isAvailable': false,
+          'isLoading': false,
+        };
       });
     }
   }
 
-  Widget _buildWeatherChip(Map place, [String? startTime, DateTime? date]) {
+  Widget _buildWeatherChip(
+    Map place, [
+    String? startTime,
+    DateTime? date,
+    String? endTime,
+  ]) {
     if (place.isEmpty) return const SizedBox.shrink();
-    final weather = _getWeatherForPlace(place, startTime, date);
+    final weather = _getWeatherForPlace(place, startTime, date, endTime);
     final bool isLoading = weather['isLoading'] == true;
 
     return GestureDetector(
@@ -9941,6 +10028,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   void _showPlaceWeatherDetailsSheet(Map place, Map weather) {
     final String name = place['name'] ?? 'Địa điểm';
     final String address = StringUtils.cleanAddress(place['address'] ?? '');
+    final String forecastTime = (weather['forecastTime'] ?? '')
+        .toString()
+        .replaceFirst('T', ' · ');
+    final String weatherSource = weather['isRealApi'] == true
+        ? 'Nguồn: Open-Meteo${forecastTime.isNotEmpty ? ' · $forecastTime' : ''}'
+        : 'Không có dữ liệu dự báo thật cho khung giờ này';
+    final int forecastLeadDays =
+        (weather['forecastLeadDays'] as num?)?.toInt() ?? 0;
+    final String forecastConfidenceNote = forecastLeadDays >= 8
+        ? 'Dự báo còn cách $forecastLeadDays ngày nên chỉ mang tính tham khảo; hệ thống chưa tự đổi lịch nếu tín hiệu chưa đủ mạnh.'
+        : forecastLeadDays >= 4
+        ? 'Dự báo còn cách $forecastLeadDays ngày; hệ thống áp dụng ngưỡng thận trọng hơn trước khi tự đổi lịch.'
+        : 'Dự báo theo từng khung giờ; xác suất thấp không có nghĩa là chắc chắn sẽ mưa hoặc mưa cả ngày.';
 
     showModalBottomSheet(
       context: context,
@@ -10099,6 +10199,25 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               Icons.grain_rounded,
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          weatherSource,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.subtitleText,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          forecastConfidenceNote,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.subtitleText,
+                          ),
                         ),
                       ],
                     ),
@@ -10473,7 +10592,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     });
   }
 
-  void _showReplacementRequirementDialog(Map<String, dynamic> detail) {
+  void _showReplacementRequirementDialog(
+    Map<String, dynamic> detail, {
+    bool requireIndoor = false,
+  }) {
     final TextEditingController reqCtrl = TextEditingController();
     showDialog(
       context: context,
@@ -10493,9 +10615,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Nhập mong muốn hoặc sở thích của bạn cho địa điểm thay thế:',
-              style: TextStyle(
+            Text(
+              requireIndoor
+                  ? 'Do ảnh hưởng thời tiết, địa điểm thay thế bắt buộc phải có đúng nhãn “Hoạt động trong nhà”. Hãy nhập thêm mong muốn của bạn:'
+                  : 'Nhập mong muốn hoặc sở thích của bạn cho địa điểm thay thế:',
+              style: const TextStyle(
                 fontSize: 13,
                 color: Color(0xFF475569),
                 height: 1.3,
@@ -10507,8 +10631,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               maxLines: 3,
               autofocus: true,
               decoration: InputDecoration(
-                hintText:
-                    'Ví dụ: Quán cà phê máy lạnh yên tĩnh, nhà hàng đặc sản Miền Tây, điểm check-in...',
+                hintText: requireIndoor
+                    ? 'Ví dụ: Quán cà phê yên tĩnh, bảo tàng, nhà hàng đặc sản...'
+                    : 'Ví dụ: Quán cà phê máy lạnh yên tĩnh, nhà hàng đặc sản Miền Tây, điểm check-in...',
                 hintStyle: const TextStyle(
                   fontSize: 12,
                   color: Color(0xFF94A3B8),
@@ -10553,8 +10678,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
             onPressed: () {
+              if (reqCtrl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Vui lòng nhập yêu cầu địa điểm thay thế.'),
+                  ),
+                );
+                return;
+              }
               Navigator.pop(ctx);
-              _processPlaceReplacement(detail, reqCtrl.text.trim());
+              _processPlaceReplacement(
+                detail,
+                reqCtrl.text.trim(),
+                requireIndoor: requireIndoor,
+              );
             },
             icon: const Icon(Icons.search_rounded, size: 18),
             label: const Text(
@@ -10567,349 +10704,421 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
-  Future<void> _processPlaceReplacement(
+  Widget _replacementImagePlaceholder() {
+    return Container(
+      width: 86,
+      height: 86,
+      color: const Color(0xFFF1F5F9),
+      alignment: Alignment.center,
+      child: const Icon(Icons.place_rounded, color: Color(0xFF94A3B8)),
+    );
+  }
+
+  Widget _replacementInfoChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _confirmReplacementProposal({
+    required String oldPlaceName,
+    required String newPlaceName,
+    required String reason,
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            title: const Text('Xác nhận thay địa điểm'),
+            content: Text(
+              'Thay “$oldPlaceName” bằng “$newPlaceName”?\n\n$reason',
+              style: const TextStyle(height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Hủy'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Xác nhận thay'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Widget _replacementProposalCard({
+    required BuildContext sheetContext,
+    required Map<String, dynamic> proposal,
+    required int rank,
+  }) {
+    final place = Map<String, dynamic>.from(
+      proposal['place'] as Map? ?? const {},
+    );
+    final photos = place['photos'] as List? ?? const [];
+    String imageUrl = (place['image'] ?? '').toString();
+    if (imageUrl.isEmpty && photos.isNotEmpty && photos.first is Map) {
+      final photo = photos.first as Map;
+      imageUrl = (photo['urlThumbnail'] ?? photo['urlOriginal'] ?? '')
+          .toString();
+    }
+    final environment = switch (proposal['environmentType']) {
+      'INDOOR' => 'Hoạt động trong nhà',
+      'OUTDOOR' => 'Hoạt động ngoài trời',
+      'MIXED' => 'Hoạt động ngoài trời và trong nhà',
+      _ => 'Chưa xác định môi trường',
+    };
+    final distance =
+        (proposal['distanceKm'] as num?)?.toDouble().toStringAsFixed(1) ??
+        '0.0';
+    final routeIncrease =
+        (proposal['routeIncreaseKm'] as num?)?.toDouble() ?? 0;
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => Navigator.pop(sheetContext, proposal),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(
+                            imageUrl,
+                            width: 86,
+                            height: 86,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                _replacementImagePlaceholder(),
+                          )
+                        : _replacementImagePlaceholder(),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$rank. ${place['name'] ?? 'Địa điểm'}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          (place['category']?['name'] ??
+                                  proposal['categoryGroup'] ??
+                                  '')
+                              .toString(),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 7),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            _replacementInfoChip(
+                              Icons.home_work_outlined,
+                              environment,
+                              const Color(0xFF2563EB),
+                            ),
+                            _replacementInfoChip(
+                              Icons.route_outlined,
+                              '$distance km',
+                              const Color(0xFF7C3AED),
+                            ),
+                            _replacementInfoChip(
+                              Icons.schedule_rounded,
+                              'Mở cửa đúng giờ',
+                              const Color(0xFF059669),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                (proposal['reason'] ?? '').toString(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: Color(0xFF475569),
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                routeIncrease <= 0
+                    ? 'Tuyến đường dự kiến không tăng'
+                    : 'Tuyến đường dự kiến tăng ${routeIncrease.toStringAsFixed(1)} km',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: routeIncrease <= 0
+                      ? const Color(0xFF059669)
+                      : const Color(0xFFD97706),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>?> _showReplacementProposalsSheet({
+    required List<Map<String, dynamic>> proposals,
+    required bool requireIndoor,
+  }) {
+    return showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: 0.84,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Chọn địa điểm thay thế',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      requireIndoor
+                          ? 'Mọi phương án đều có đúng nhãn “Hoạt động trong nhà” và đã qua kiểm tra luật bắt buộc.'
+                          : 'Tối đa 3 phương án từ dữ liệu thật, đã qua Rule Engine và được AI xếp hạng.',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  itemCount: proposals.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (_, index) => _replacementProposalCard(
+                    sheetContext: sheetContext,
+                    proposal: proposals[index],
+                    rank: index + 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectAndApplyReplacement({
+    required int itineraryId,
+    required int detailId,
+    required Map<String, dynamic> detail,
+    required List<Map<String, dynamic>> proposals,
+    required String userPrompt,
+    required bool requireIndoor,
+  }) async {
+    final selected = await _showReplacementProposalsSheet(
+      proposals: proposals,
+      requireIndoor: requireIndoor,
+    );
+    if (!mounted || selected == null) return;
+    final selectedPlace = Map<String, dynamic>.from(
+      selected['place'] as Map? ?? const {},
+    );
+    final int? newPlaceId = (selectedPlace['id'] as num?)?.toInt();
+    if (newPlaceId == null) return;
+    final confirmed = await _confirmReplacementProposal(
+      oldPlaceName: (detail['place']?['name'] ?? 'Địa điểm hiện tại')
+          .toString(),
+      newPlaceName: (selectedPlace['name'] ?? 'Địa điểm mới').toString(),
+      reason: (selected['reason'] ?? '').toString(),
+    );
+    if (!mounted || !confirmed) return;
+
+    final applied = await DatabaseService().applyPlaceReplacementProposal(
+      itineraryId: itineraryId,
+      detailId: detailId,
+      newPlaceId: newPlaceId,
+      prompt: userPrompt,
+      requireIndoor: requireIndoor,
+    );
+    if (!mounted) return;
+    await _loadData(silent: true);
+    if (!mounted) return;
+    final newPlace = Map<String, dynamic>.from(
+      applied['newPlace'] as Map? ?? selectedPlace,
+    );
+    _showPremiumNotification(
+      title: 'Đã thay thế địa điểm',
+      message:
+          'Đã đổi sang “${newPlace['name'] ?? selectedPlace['name']}” sau khi kiểm tra lại các luật bắt buộc.',
+      icon: Icons.swap_horizontal_circle_rounded,
+      color: Colors.green,
+    );
+  }
+
+  Future<void> _processPlaceReplacementWithRules(
     Map<String, dynamic> detail,
-    String userPrompt,
-  ) async {
-    final int detailId = detail['id'] as int;
-    final place = detail['place'] ?? {};
-    final String currentName = place['name'] ?? 'Địa điểm';
+    String userPrompt, {
+    required bool requireIndoor,
+  }) async {
+    if (!_checkCanEdit()) return;
+    final int? itineraryId = (_itineraryData['id'] as num?)?.toInt();
+    final int? detailId = (detail['id'] as num?)?.toInt();
+    if (itineraryId == null || detailId == null) {
+      _showPremiumNotification(
+        title: 'Không thể tìm địa điểm thay thế',
+        message: 'Thông tin lịch trình hoặc địa điểm không hợp lệ.',
+        icon: Icons.error_outline_rounded,
+        color: Colors.orange,
+      );
+      return;
+    }
+    if (_visitedDetailIds.contains(detailId) ||
+        detail['isUserPinned'] == true) {
+      _showPremiumNotification(
+        title: 'Địa điểm đang được khóa',
+        message: 'Điểm đã ghé hoặc được ghim sẽ không bị thay tự động.',
+        icon: Icons.lock_outline_rounded,
+        color: Colors.orange,
+      );
+      return;
+    }
 
     _showPremiumNotification(
       title: 'Đang tìm địa điểm thay thế',
-      message: 'Hệ thống đang tìm gợi ý phù hợp nhất...',
-      icon: Icons.search_rounded,
+      message: 'RAG và Rule Engine đang kiểm tra các phương án trong CSDL...',
+      icon: Icons.auto_awesome_rounded,
       color: AppTheme.primary,
     );
-
-    final String dest = _itineraryData['destination'] ?? 'Cần Thơ';
-    List<Map<String, dynamic>> availablePlaces = [];
-
-    if (userPrompt.isNotEmpty) {
-      availablePlaces = await DatabaseService().searchPlaces(
-        destination: dest,
-        query: userPrompt,
+    try {
+      final result = await DatabaseService().proposePlaceReplacements(
+        itineraryId: itineraryId,
+        detailId: detailId,
+        prompt: userPrompt,
+        requireIndoor: requireIndoor,
       );
-    }
-
-    if (availablePlaces.isEmpty) {
-      if (_allPlaces.isNotEmpty) {
-        availablePlaces = List.from(_allPlaces);
-      } else {
-        availablePlaces = await DatabaseService().fetchPlacesByDestination(
-          dest,
+      if (!mounted) return;
+      final proposals = (result['proposals'] as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+      if (proposals.isEmpty) {
+        _showPremiumNotification(
+          title: 'Chưa có phương án phù hợp',
+          message:
+              (result['emptyReason'] ??
+                      'Địa điểm hiện tại được giữ nguyên vì không có phương án vượt qua toàn bộ luật bắt buộc.')
+                  .toString(),
+          icon: Icons.info_outline_rounded,
+          color: Colors.orange,
         );
+        return;
       }
-    }
-
-    final Set<int> existingPlaceIds = _details
-        .map<int>(
-          (d) => ((d['place']?['id'] ?? d['placeId']) as num?)?.toInt() ?? 0,
-        )
-        .where((id) => id > 0)
-        .toSet();
-
-    List<Map<String, dynamic>> candidates = availablePlaces
-        .where((p) => !existingPlaceIds.contains((p['id'] as num?)?.toInt()))
-        .toList();
-
-    if (candidates.isEmpty) {
-      candidates = availablePlaces;
-    }
-
-    int startHour = 12;
-    final String startStr = (detail['startTime'] ?? '').toString();
-    if (startStr.contains(':')) {
-      startHour = int.tryParse(startStr.split(':')[0]) ?? 12;
-    }
-    final bool isDaytime = startHour < 17; // Morning or Afternoon (< 17:00)
-
-    Map<String, dynamic>? bestMatch;
-    if (userPrompt.isNotEmpty) {
-      final promptLower = userPrompt.toLowerCase().trim();
-      candidates.sort((a, b) {
-        int scoreA = 0;
-        int scoreB = 0;
-
-        final nameA = (a['name'] ?? '').toString().toLowerCase();
-        final nameB = (b['name'] ?? '').toString().toLowerCase();
-        final catA = (a['category']?['name'] ?? a['category'] ?? '')
-            .toString()
-            .toLowerCase();
-        final catB = (b['category']?['name'] ?? b['category'] ?? '')
-            .toString()
-            .toLowerCase();
-        final descA = (a['description'] ?? a['address'] ?? '')
-            .toString()
-            .toLowerCase();
-        final descB = (b['description'] ?? b['address'] ?? '')
-            .toString()
-            .toLowerCase();
-
-        // 1. Full phrase match in name (+100) or category (+50)
-        if (nameA.contains(promptLower)) scoreA += 100;
-        if (nameB.contains(promptLower)) scoreB += 100;
-        if (catA.contains(promptLower)) scoreA += 50;
-        if (catB.contains(promptLower)) scoreB += 50;
-
-        // 2a. Market Intent: "đi chợ" / "chợ" vs "chợ đêm"
-        final bool isMarketPrompt =
-            promptLower.contains('đi chợ') ||
-            (promptLower.contains('chợ') && !promptLower.contains('đêm'));
-        final bool isNightMarketPrompt =
-            promptLower.contains('chợ đêm') ||
-            promptLower.contains('night market');
-
-        if (isMarketPrompt) {
-          final isDayMarketA =
-              (nameA.contains('chợ') && !nameA.contains('đêm')) ||
-              nameA.contains('siêu thị') ||
-              catA.contains('chợ') ||
-              catA.contains('mua sắm');
-          final isDayMarketB =
-              (nameB.contains('chợ') && !nameB.contains('đêm')) ||
-              nameB.contains('siêu thị') ||
-              catB.contains('chợ') ||
-              catB.contains('mua sắm');
-          if (isDayMarketA) scoreA += 200;
-          if (isDayMarketB) scoreB += 200;
-
-          if (nameA.contains('chợ đêm') || catA.contains('chợ đêm'))
-            scoreA -= 800;
-          if (nameB.contains('chợ đêm') || catB.contains('chợ đêm'))
-            scoreB -= 800;
-        }
-
-        if (isNightMarketPrompt) {
-          if (nameA.contains('chợ đêm') || catA.contains('chợ đêm'))
-            scoreA += 300;
-          if (nameB.contains('chợ đêm') || catB.contains('chợ đêm'))
-            scoreB += 300;
-        }
-
-        // 2b. Time-of-Day constraint (Daytime < 17:00 vs Night)
-        if (isDaytime) {
-          final isNightOnlyA =
-              nameA.contains('chợ đêm') ||
-              nameA.contains('night market') ||
-              nameA.contains('pub') ||
-              nameA.contains('quán nhậu đêm') ||
-              catA.contains('chợ đêm');
-          final isNightOnlyB =
-              nameB.contains('chợ đêm') ||
-              nameB.contains('night market') ||
-              nameB.contains('pub') ||
-              nameB.contains('quán nhậu đêm') ||
-              catB.contains('chợ đêm');
-          if (isNightOnlyA && !isNightMarketPrompt) scoreA -= 1000;
-          if (isNightOnlyB && !isNightMarketPrompt) scoreB -= 1000;
-        } else {
-          if (nameA.contains('chợ đêm') || catA.contains('chợ đêm'))
-            scoreA += 100;
-          if (nameB.contains('chợ đêm') || catB.contains('chợ đêm'))
-            scoreB += 100;
-        }
-
-        // 2c. Keyword domain matching for common intent (Mall / Cafe / Food)
-        if (promptLower.contains('trung tâm thương mại') ||
-            promptLower.contains('tttm') ||
-            promptLower.contains('siêu thị') ||
-            promptLower.contains('shopping') ||
-            promptLower.contains('mua sắm')) {
-          final isMallA =
-              nameA.contains('vincom') ||
-              nameA.contains('lotte') ||
-              nameA.contains('sense city') ||
-              nameA.contains('go!') ||
-              nameA.contains('co.op') ||
-              nameA.contains('mall') ||
-              nameA.contains('siêu thị') ||
-              nameA.contains('trung tâm thương mại');
-          final isMallB =
-              nameB.contains('vincom') ||
-              nameB.contains('lotte') ||
-              nameB.contains('sense city') ||
-              nameB.contains('go!') ||
-              nameB.contains('co.op') ||
-              nameB.contains('mall') ||
-              nameB.contains('siêu thị') ||
-              nameB.contains('trung tâm thương mại');
-          if (isMallA) scoreA += 80;
-          if (isMallB) scoreB += 80;
-        }
-
-        if (promptLower.contains('cà phê') ||
-            promptLower.contains('cafe') ||
-            promptLower.contains('nước')) {
-          final isCafeA =
-              nameA.contains('cà phê') ||
-              nameA.contains('cafe') ||
-              catA.contains('cà phê') ||
-              catA.contains('quán nước');
-          final isCafeB =
-              nameB.contains('cà phê') ||
-              nameB.contains('cafe') ||
-              catB.contains('cà phê') ||
-              catB.contains('quán nước');
-          if (isCafeA) scoreA += 150;
-          if (isCafeB) scoreB += 150;
-          if (nameA.contains('steak') ||
-              nameA.contains('wine') ||
-              nameA.contains('hải sản') ||
-              nameA.contains('nhậu') ||
-              nameA.contains('bar'))
-            scoreA -= 500;
-          if (nameB.contains('steak') ||
-              nameB.contains('wine') ||
-              nameB.contains('hải sản') ||
-              nameB.contains('nhậu') ||
-              nameB.contains('bar'))
-            scoreB -= 500;
-        }
-
-        if (promptLower.contains('quán ăn') ||
-            promptLower.contains('nhà hàng') ||
-            promptLower.contains('hải sản') ||
-            promptLower.contains('đặc sản') ||
-            promptLower.contains('ăn uống')) {
-          final isFoodA =
-              catA.contains('quán ăn') ||
-              catA.contains('nhà hàng') ||
-              catA.contains('ẩm thực') ||
-              nameA.contains('quán') ||
-              nameA.contains('nhà hàng') ||
-              nameA.contains('hải sản');
-          final isFoodB =
-              catB.contains('quán ăn') ||
-              catB.contains('nhà hàng') ||
-              catB.contains('ẩm thực') ||
-              nameB.contains('quán') ||
-              nameB.contains('nhà hàng') ||
-              nameB.contains('hải sản');
-          if (isFoodA) scoreA += 80;
-          if (isFoodB) scoreB += 80;
-        }
-
-        // 3. Individual word matches (+10 for name, +5 for category)
-        final words = promptLower.split(' ');
-        for (var w in words) {
-          if (w.length < 3) continue;
-          if (nameA.contains(w)) scoreA += 10;
-          if (nameB.contains(w)) scoreB += 10;
-          if (catA.contains(w)) scoreA += 5;
-          if (catB.contains(w)) scoreB += 5;
-          if (descA.contains(w)) scoreA += 2;
-          if (descB.contains(w)) scoreB += 2;
-        }
-
-        final ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
-        final ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
-
-        if (scoreB != scoreA) return scoreB.compareTo(scoreA);
-        return ratingB.compareTo(ratingA);
-      });
-      bestMatch = candidates.isNotEmpty ? candidates.first : null;
-    } else {
-      final String currentCat =
-          (place['category']?['name'] ?? place['category'] ?? '')
-              .toString()
-              .toLowerCase();
-      candidates.sort((a, b) {
-        int scoreA = 0;
-        int scoreB = 0;
-        final catA = (a['category']?['name'] ?? a['category'] ?? '')
-            .toString()
-            .toLowerCase();
-        final catB = (b['category']?['name'] ?? b['category'] ?? '')
-            .toString()
-            .toLowerCase();
-        final nameA = (a['name'] ?? '').toString().toLowerCase();
-        final nameB = (b['name'] ?? '').toString().toLowerCase();
-
-        if (catA == currentCat) scoreA += 50;
-        if (catB == currentCat) scoreB += 50;
-
-        if (isDaytime) {
-          if (nameA.contains('chợ đêm') || catA.contains('chợ đêm'))
-            scoreA -= 1000;
-          if (nameB.contains('chợ đêm') || catB.contains('chợ đêm'))
-            scoreB -= 1000;
-        }
-
-        if (scoreB != scoreA) return scoreB.compareTo(scoreA);
-        final ratingA = (a['rating'] as num?)?.toDouble() ?? 0.0;
-        final ratingB = (b['rating'] as num?)?.toDouble() ?? 0.0;
-        return ratingB.compareTo(ratingA);
-      });
-      bestMatch = candidates.isNotEmpty ? candidates.first : null;
-    }
-
-    if (bestMatch == null) {
-      _showPremiumNotification(
-        title: 'Không tìm thấy địa điểm phù hợp',
-        message: 'Rất tiếc, chưa tìm thấy địa điểm khác phù hợp hơn.',
-        icon: Icons.error_outline_rounded,
-        color: Colors.orange,
+      await _selectAndApplyReplacement(
+        itineraryId: itineraryId,
+        detailId: detailId,
+        detail: detail,
+        proposals: proposals,
+        userPrompt: userPrompt,
+        requireIndoor: requireIndoor,
       );
-      return;
-    }
-
-    final dynamic rawId = bestMatch['id'];
-    final int? newPlaceId = rawId is num
-        ? rawId.toInt()
-        : int.tryParse(rawId?.toString() ?? '');
-    final String newPlaceName = bestMatch['name'] ?? 'Địa điểm mới';
-
-    if (newPlaceId == null) {
+    } catch (error) {
+      if (!mounted) return;
       _showPremiumNotification(
         title: 'Không thể thay thế địa điểm',
-        message: 'Không tìm thấy ID địa điểm hợp lệ.',
+        message: error.toString().replaceFirst('Exception: ', ''),
         icon: Icons.error_outline_rounded,
         color: Colors.orange,
       );
-      return;
     }
+  }
 
-    setState(() {
-      final idx = _details.indexWhere(
-        (d) => d['id']?.toString() == detailId.toString(),
-      );
-      if (idx != -1) {
-        _details[idx]['placeId'] = newPlaceId;
-        _details[idx]['place'] = bestMatch;
-        _details[idx].remove('incidentReport');
-        _details[idx].remove('incidentTag');
-        _details[idx].remove('incidentNote');
-      }
-      if (_itineraryData['details'] is List) {
-        final iList = _itineraryData['details'] as List;
-        final iIdx = iList.indexWhere(
-          (d) => d['id']?.toString() == detailId.toString(),
-        );
-        if (iIdx != -1) {
-          iList[iIdx]['placeId'] = newPlaceId;
-          iList[iIdx]['place'] = bestMatch;
-          iList[iIdx].remove('incidentReport');
-          iList[iIdx].remove('incidentTag');
-          iList[iIdx].remove('incidentNote');
-        }
-      }
-    });
-
-    final success = await DatabaseService().updateItineraryDetail(detailId, {
-      'placeId': newPlaceId,
-      'incidentReport': null,
-    });
-
-    if (success) {
-      _loadData(silent: true);
-    }
-
-    _showPremiumNotification(
-      title: 'Đã thay thế địa điểm mới',
-      message: 'Thay thế "$currentName" bằng "$newPlaceName".',
-      icon: Icons.swap_horizontal_circle_rounded,
-      color: Colors.green,
+  Future<void> _processPlaceReplacement(
+    Map<String, dynamic> detail,
+    String userPrompt, {
+    bool requireIndoor = false,
+  }) {
+    return _processPlaceReplacementWithRules(
+      detail,
+      userPrompt,
+      requireIndoor: requireIndoor,
     );
   }
 
@@ -10931,7 +11140,137 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     DatabaseService().updateItineraryDetail(detailId, {'incidentReport': null});
   }
 
-  Widget _buildPlaceTags(Map place, {String? startTime, DateTime? date}) {
+  String _getPlaceEnvironmentType(Map place) {
+    final explicitType = (place['environmentType'] ?? '')
+        .toString()
+        .trim()
+        .toUpperCase();
+    if (const {'INDOOR', 'OUTDOOR', 'MIXED'}.contains(explicitType)) {
+      return explicitType;
+    }
+
+    dynamic rawSubCategories = place['subCategories'];
+    if (rawSubCategories is String) {
+      try {
+        final decoded = jsonDecode(rawSubCategories);
+        if (decoded is List) rawSubCategories = decoded;
+      } catch (_) {
+        rawSubCategories = [rawSubCategories];
+      }
+    }
+    final labels = (rawSubCategories is List ? rawSubCategories : const [])
+        .map((value) => value.toString().trim().toLowerCase())
+        .toSet();
+    if (labels.contains('hoạt động ngoài trời và trong nhà') ||
+        labels.contains('ngoài trời và trong nhà')) {
+      return 'MIXED';
+    }
+    if (labels.contains('hoạt động trong nhà') ||
+        labels.contains('trong nhà')) {
+      return 'INDOOR';
+    }
+    if (labels.contains('hoạt động ngoài trời') ||
+        labels.contains('ngoài trời')) {
+      return 'OUTDOOR';
+    }
+    return 'UNKNOWN';
+  }
+
+  Widget _buildRainSafetyChip(String environmentType) {
+    final bool isIndoor = environmentType == 'INDOOR';
+    final bool isMixed = environmentType == 'MIXED';
+    final color = isIndoor
+        ? const Color(0xFF059669)
+        : isMixed
+        ? const Color(0xFFD97706)
+        : const Color(0xFFDC2626);
+    final background = isIndoor
+        ? const Color(0xFFECFDF5)
+        : isMixed
+        ? const Color(0xFFFFFBEB)
+        : const Color(0xFFFEF2F2);
+    final borderColor = isIndoor
+        ? const Color(0xFF6EE7B7)
+        : isMixed
+        ? const Color(0xFFFCD34D)
+        : const Color(0xFFFCA5A5);
+    final icon = isIndoor
+        ? Icons.verified_rounded
+        : Icons.warning_amber_rounded;
+    final label = isIndoor
+        ? 'An toàn trong nhà'
+        : isMixed
+        ? 'Chọn khu trong nhà'
+        : 'Cảnh báo mưa';
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 138),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 3),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _weatherRequiresIndoor(Map<String, dynamic> weather) {
+    if (weather['isLoading'] == true ||
+        weather['isRealApi'] != true ||
+        weather['isAvailable'] == false) {
+      return false;
+    }
+    final int rainProbability = (weather['rainProb'] as num?)?.round() ?? 0;
+    final double rainAmount = (weather['rainAmount'] as num?)?.toDouble() ?? 0;
+    final int? weatherCode = (weather['weatherCode'] as num?)?.toInt();
+    final int forecastLeadDays =
+        (weather['forecastLeadDays'] as num?)?.toInt() ?? 0;
+    final bool hasThunderstormCode =
+        weatherCode != null && weatherCode >= 95 && weatherCode <= 99;
+
+    // Chỉ bật cảnh báo đỏ khi rủi ro đủ lớn. Mã mưa phùn/rào đơn lẻ với
+    // xác suất và lượng mưa thấp vẫn được hiển thị ở chip dự báo nhưng không
+    // bị xem là xung đột bắt buộc phải đổi địa điểm.
+    if (forecastLeadDays >= 8) {
+      return rainProbability >= 90 ||
+          (rainProbability >= 75 && rainAmount >= 1) ||
+          (hasThunderstormCode && rainProbability >= 70);
+    }
+    if (forecastLeadDays >= 4) {
+      return rainProbability >= 80 ||
+          (rainProbability >= 65 && rainAmount >= 0.5) ||
+          (hasThunderstormCode && rainProbability >= 50);
+    }
+    return hasThunderstormCode || rainAmount >= 0.5 || rainProbability >= 70;
+  }
+
+  Widget _buildPlaceTags(
+    Map place, {
+    String? startTime,
+    DateTime? date,
+    String? endTime,
+  }) {
     List<dynamic> tags = [];
 
     if (place['category'] != null && place['category']['name'] != null) {
@@ -10940,23 +11279,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       tags = ['Điểm tham quan'];
     }
 
-    final weather = _getWeatherForPlace(place, startTime, date);
-    final String wDesc = (weather['desc'] ?? '').toString().toLowerCase();
-    final bool isNoRainDesc =
-        wDesc.contains('không mưa') ||
-        wDesc.contains('nắng') ||
-        wDesc.contains('quang đãng') ||
-        wDesc.contains('nhiều mây') ||
-        wDesc.contains('ít mây');
-    final bool hasExplicitRain =
-        (wDesc.contains('mưa') ||
-            wDesc.contains('dông') ||
-            wDesc.contains('bão') ||
-            wDesc.contains('rào')) &&
-        !wDesc.contains('không mưa');
-    final int rainProb = (weather['rainProb'] as num?)?.toInt() ?? 0;
-
-    final bool isRainy = hasExplicitRain || (rainProb >= 75 && !isNoRainDesc);
+    final weather = _getWeatherForPlace(place, startTime, date, endTime);
+    final bool isRainy = _weatherRequiresIndoor(weather);
+    final String environmentType = _getPlaceEnvironmentType(place);
 
     return Wrap(
       spacing: 6,
@@ -10980,35 +11305,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             ),
           ),
         ),
-        _buildWeatherChip(place, startTime, date),
-        if (isRainy)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFFCA5A5)),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  size: 12,
-                  color: Color(0xFFDC2626),
-                ),
-                SizedBox(width: 3),
-                Text(
-                  'Cảnh báo mưa',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFFDC2626),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _buildWeatherChip(place, startTime, date, endTime),
+        if (isRainy) _buildRainSafetyChip(environmentType),
       ],
     );
   }
@@ -11081,20 +11379,25 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     List<Map<String, dynamic>> updatedDayItems = [];
 
-    final String detailIdStr = (detail['id'] ?? detail['detailId'] ?? '').toString();
+    final String detailIdStr = (detail['id'] ?? detail['detailId'] ?? '')
+        .toString();
 
     setState(() {
       if (isItineraryDetail) {
-        final idx = _details.indexWhere((d) => (d['id'] ?? '').toString() == detailIdStr);
+        final idx = _details.indexWhere(
+          (d) => (d['id'] ?? '').toString() == detailIdStr,
+        );
         if (idx != -1) {
           _details[idx]['startTime'] = startStr;
           _details[idx]['endTime'] = endStr;
           _details[idx]['isUserPinned'] = true;
 
           final int day = (_details[idx]['day'] as num?)?.toInt() ?? 1;
-          
+
           // Fetch all items for this day
-          final dayDetails = _details.where((d) => (d['day'] as num?)?.toInt() == day).toList();
+          final dayDetails = _details
+              .where((d) => (d['day'] as num?)?.toInt() == day)
+              .toList();
 
           int _getMin(dynamic item) {
             final String st = (item['startTime'] ?? '').toString();
@@ -11110,7 +11413,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             final minA = _getMin(a);
             final minB = _getMin(b);
             if (minA != minB) return minA.compareTo(minB);
-            return ((a['sortOrder'] as num?)?.toInt() ?? 0).compareTo((b['sortOrder'] as num?)?.toInt() ?? 0);
+            return ((a['sortOrder'] as num?)?.toInt() ?? 0).compareTo(
+              (b['sortOrder'] as num?)?.toInt() ?? 0,
+            );
           });
 
           for (int i = 0; i < dayDetails.length; i++) {
@@ -11127,7 +11432,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           for (int i = 0; i < recalculatedDayItems.length; i++) {
             final rItem = recalculatedDayItems[i];
             rItem['sortOrder'] = i;
-            final itemIdx = _details.indexWhere((d) => (d['id'] ?? '').toString() == (rItem['id'] ?? '').toString());
+            final itemIdx = _details.indexWhere(
+              (d) =>
+                  (d['id'] ?? '').toString() == (rItem['id'] ?? '').toString(),
+            );
             if (itemIdx != -1) {
               _details[itemIdx]['startTime'] = rItem['startTime'];
               _details[itemIdx]['endTime'] = rItem['endTime'];
@@ -11473,6 +11781,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             child: _buildPlaceTags(
                                               place,
                                               startTime: detail['startTime']
+                                                  ?.toString(),
+                                              endTime: detail['endTime']
                                                   ?.toString(),
                                               date: _getDateForDetail(detail),
                                             ),
@@ -11942,7 +12252,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     final String targetPinnedStr = (pinnedDetailId ?? '').toString();
     if (targetPinnedStr.isNotEmpty) {
-      final pIdx = sorted.indexWhere((d) => (d['id'] ?? '').toString() == targetPinnedStr);
+      final pIdx = sorted.indexWhere(
+        (d) => (d['id'] ?? '').toString() == targetPinnedStr,
+      );
       if (pIdx != -1) {
         sorted[pIdx]['isUserPinned'] = true;
       }
@@ -12034,11 +12346,19 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             {'startTime': '20:00', 'endTime': '21:30'},
           ];
 
-          final slotIndex = i < standardSlots.length ? i : (standardSlots.length - 1);
-          final stdStartParts = standardSlots[slotIndex]['startTime']!.split(':');
+          final slotIndex = i < standardSlots.length
+              ? i
+              : (standardSlots.length - 1);
+          final stdStartParts = standardSlots[slotIndex]['startTime']!.split(
+            ':',
+          );
           final stdEndParts = standardSlots[slotIndex]['endTime']!.split(':');
-          final stdStartM = (int.tryParse(stdStartParts[0]) ?? 7) * 60 + (int.tryParse(stdStartParts[1]) ?? 0);
-          final stdEndM = (int.tryParse(stdEndParts[0]) ?? 8) * 60 + (int.tryParse(stdEndParts[1]) ?? 30);
+          final stdStartM =
+              (int.tryParse(stdStartParts[0]) ?? 7) * 60 +
+              (int.tryParse(stdStartParts[1]) ?? 0);
+          final stdEndM =
+              (int.tryParse(stdEndParts[0]) ?? 8) * 60 +
+              (int.tryParse(stdEndParts[1]) ?? 30);
           final stdDuration = (stdEndM - stdStartM).clamp(45, 120);
 
           int startM = stdStartM;
@@ -12052,8 +12372,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           int eH = (eTotal ~/ 60) % 24;
           int eM = eTotal % 60;
 
-          item['startTime'] = '${sH.toString().padLeft(2, '0')}:${sM.toString().padLeft(2, '0')}';
-          item['endTime'] = '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
+          item['startTime'] =
+              '${sH.toString().padLeft(2, '0')}:${sM.toString().padLeft(2, '0')}';
+          item['endTime'] =
+              '${eH.toString().padLeft(2, '0')}:${eM.toString().padLeft(2, '0')}';
 
           currentCursorMinutes = eTotal;
         }
@@ -12075,48 +12397,357 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     return _recalculateDayTimeline(items, forceResetUnpinned: true);
   }
 
+  Future<List<Map<String, dynamic>>> _collectDynamicWeatherSnapshots(
+    List<Map<String, dynamic>> dayItems,
+  ) async {
+    for (final item in dayItems) {
+      final place = item['place'];
+      if (place is Map) {
+        _getWeatherForPlace(
+          place,
+          item['startTime']?.toString(),
+          _getDateForDetail(item),
+          item['endTime']?.toString(),
+        );
+      }
+    }
+    for (int attempt = 0; attempt < 10; attempt++) {
+      final stillLoading = dayItems.any((item) {
+        final place = item['place'];
+        if (place is! Map) return false;
+        return _getWeatherForPlace(
+              place,
+              item['startTime']?.toString(),
+              _getDateForDetail(item),
+              item['endTime']?.toString(),
+            )['isLoading'] ==
+            true;
+      });
+      if (!stillLoading) break;
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    return dayItems.map((item) {
+      final place = item['place'] as Map;
+      final weather = _getWeatherForPlace(
+        place,
+        item['startTime']?.toString(),
+        _getDateForDetail(item),
+        item['endTime']?.toString(),
+      );
+      return <String, dynamic>{
+        'detailId': item['id'],
+        'startTime': item['startTime']?.toString() ?? '',
+        'rainProbability': weather['rainProb'] ?? 0,
+        'rainAmount': weather['rainAmount'] ?? 0,
+        'weatherCode': weather['weatherCode'],
+        'forecastLeadDays': weather['forecastLeadDays'],
+        'condition': weather['desc']?.toString() ?? '',
+        'isLoading': weather['isAvailable'] != true,
+      };
+    }).toList();
+  }
+
   Future<void> _optimizeDay(int dayIndex) async {
     if (!_checkCanEdit()) return;
     final dayNum = dayIndex + 1;
-    final dayItems = _details.where((d) => d['day'] == dayNum).toList();
+    if (_optimizingDayNumbers.contains(dayNum)) return;
+    final dayItems = _details
+        .where(
+          (d) =>
+              d['day'] == dayNum && d['placeId'] != null && d['place'] != null,
+        )
+        .toList();
     if (dayItems.isEmpty) return;
-
-    final optimized = _optimizeDayTimeSlots(dayItems);
-
-    setState(() {
-      for (final item in optimized) {
-        final idx = _details.indexWhere((d) => d['id'] == item['id']);
-        if (idx != -1) {
-          _details[idx]['startTime'] = item['startTime'];
-          _details[idx]['endTime'] = item['endTime'];
-          _details[idx]['sortOrder'] = item['sortOrder'];
+    setState(() => _optimizingDayNumbers.add(dayNum));
+    try {
+      final itineraryId = (_itineraryData['id'] as num).toInt();
+      final weatherSnapshots = await _collectDynamicWeatherSnapshots(dayItems);
+      final lockedIds = dayItems
+          .where(
+            (item) =>
+                _visitedDetailIds.contains(item['id']) ||
+                item['isUserPinned'] == true,
+          )
+          .map<int>((item) => (item['id'] as num).toInt())
+          .toList();
+      final proposal = await DatabaseService().optimizeDynamicItineraryDay(
+        itineraryId: itineraryId,
+        day: dayNum,
+        lockedDetailIds: lockedIds,
+        weatherSnapshots: weatherSnapshots,
+      );
+      if (!mounted) return;
+      final shouldApply = await _showDynamicOptimizationPreview(
+        dayNum,
+        proposal,
+      );
+      if (shouldApply == true) {
+        final rawItems = List<Map<String, dynamic>>.from(
+          proposal['items'] ?? [],
+        );
+        final applyItems = rawItems
+            .map(
+              (item) => <String, dynamic>{
+                'detailId': item['detailId'],
+                'placeId': item['placeId'],
+                'startTime': item['startTime'],
+                'endTime': item['endTime'],
+                'sortOrder': item['sortOrder'],
+                'requiresIndoor': item['requiresIndoor'] == true,
+              },
+            )
+            .toList();
+        _isUpdatingDatabase = true;
+        final success = await DatabaseService()
+            .applyDynamicItineraryOptimization(
+              itineraryId: itineraryId,
+              day: dayNum,
+              items: applyItems,
+            );
+        if (success && mounted) {
+          _dayRoadPolylines.remove(dayNum);
+          await _loadData(silent: true);
+          _updateRoadPolylines();
+          _showPremiumNotification(
+            title: 'Đã cập nhật lịch trình động',
+            message:
+                'Ngày $dayNum đã được cập nhật theo thời tiết và lộ trình mới.',
+            icon: Icons.auto_awesome_rounded,
+            color: Colors.green,
+          );
         }
       }
-    });
-
-    _showPremiumNotification(
-      title: 'Đã tối ưu hóa Ngày $dayNum',
-      message: 'Các địa điểm đã được phân bổ thời gian & thứ tự hợp lý.',
-      icon: Icons.auto_awesome_rounded,
-      color: AppTheme.primary,
-    );
-
-    _isUpdatingDatabase = true;
-    try {
-      final List<Future<bool>> futures = [];
-      for (int i = 0; i < optimized.length; i++) {
-        futures.add(
-          DatabaseService().updateItineraryDetail(optimized[i]['id'] as int, {
-            'startTime': optimized[i]['startTime'],
-            'endTime': optimized[i]['endTime'],
-            'sortOrder': optimized[i]['sortOrder'],
-          }),
+      if (mounted) await _offerManualReplacementForUnresolved(proposal);
+    } catch (error) {
+      if (mounted) {
+        _showPremiumNotification(
+          title: 'Không thể tối ưu lịch trình',
+          message: error.toString().replaceFirst('Exception: ', ''),
+          icon: Icons.error_outline_rounded,
+          color: Colors.orange,
         );
       }
-      await Future.wait(futures);
-      DatabaseService.refreshTrigger.value++;
     } finally {
       _isUpdatingDatabase = false;
+      if (mounted) setState(() => _optimizingDayNumbers.remove(dayNum));
+    }
+  }
+
+  Future<bool?> _showDynamicOptimizationPreview(
+    int dayNum,
+    Map<String, dynamic> proposal,
+  ) async {
+    final changes = List<Map<String, dynamic>>.from(proposal['changes'] ?? []);
+    final unresolved = List<Map<String, dynamic>>.from(
+      proposal['unresolved'] ?? [],
+    );
+    final metrics = Map<String, dynamic>.from(proposal['metrics'] ?? {});
+    final weather = Map<String, dynamic>.from(proposal['weather'] ?? {});
+    if (changes.isEmpty && unresolved.isEmpty) {
+      _showPremiumNotification(
+        title: 'Lịch trình đã phù hợp',
+        message: weather['available'] == true
+            ? 'Không phát hiện điểm cần đổi theo thời tiết hoặc lộ trình.'
+            : 'Chưa có thay đổi cần áp dụng. Dữ liệu thời tiết có thể chưa khả dụng.',
+        icon: Icons.check_circle_outline_rounded,
+        color: Colors.green,
+      );
+      return false;
+    }
+
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * 0.78,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Đề xuất tối ưu động · Ngày $dayNum',
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${weather['rainySlotCount'] ?? 0} khung giờ có nguy cơ mưa · '
+                  '${metrics['beforeDistanceKm'] ?? 0} km → ${metrics['afterDistanceKm'] ?? 0} km',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      ...changes.map((change) {
+                        final replaced = change['action'] == 'REPLACE';
+                        final oldPlace = Map<String, dynamic>.from(
+                          change['oldPlace'] ?? {},
+                        );
+                        final newPlace = Map<String, dynamic>.from(
+                          change['newPlace'] ?? {},
+                        );
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: replaced
+                                ? const Color(0xFFEFF6FF)
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: replaced
+                                  ? const Color(0xFFBFDBFE)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                replaced
+                                    ? '${oldPlace['name']} → ${newPlace['name']}'
+                                    : '${newPlace['name']}: ${change['oldStartTime']} → ${change['newStartTime']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                change['reason']?.toString() ?? '',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      ...unresolved.map(
+                        (entry) => Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF7ED),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFFED7AA)),
+                          ),
+                          child: Text(
+                            'Cần xử lý thủ công: ${entry['place']?['name']}\n${entry['reason']}',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF9A3412),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(sheetContext, false),
+                        child: const Text('Để sau'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: changes.isEmpty
+                            ? null
+                            : () => Navigator.pop(sheetContext, true),
+                        icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                        label: const Text('Áp dụng'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _offerManualReplacementForUnresolved(
+    Map<String, dynamic> proposal,
+  ) async {
+    final unresolved = List<Map<String, dynamic>>.from(
+      proposal['unresolved'] ?? [],
+    );
+    if (unresolved.isEmpty || !mounted) return;
+    final actionable = unresolved
+        .where((entry) => entry['requiresPrompt'] == true)
+        .toList();
+    if (actionable.isEmpty) return;
+    final first = actionable.first;
+    final detailId = (first['detailId'] as num?)?.toInt();
+    if (detailId == null) return;
+    final detail = _details.cast<Map<String, dynamic>?>().firstWhere(
+      (item) => item?['id'] == detailId,
+      orElse: () => null,
+    );
+    if (detail == null) return;
+    if (_visitedDetailIds.contains(detailId) ||
+        detail['isUserPinned'] == true) {
+      return;
+    }
+    final placeName = first['place']?['name']?.toString() ?? 'địa điểm này';
+    final wantsManual = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cần yêu cầu thay thế'),
+        content: Text(
+          'Không tìm được phương án tự động phù hợp cho $placeName. '
+          'Bạn có muốn nhập yêu cầu thay thế thủ công không?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Giữ nguyên'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Nhập yêu cầu'),
+          ),
+        ],
+      ),
+    );
+    if (wantsManual == true && mounted) {
+      final reason = first['reason']?.toString().toLowerCase() ?? '';
+      final environment = first['place']?['environmentType']
+          ?.toString()
+          .toUpperCase();
+      final requireIndoor =
+          first['requiresIndoor'] == true ||
+          environment == 'OUTDOOR' ||
+          reason.contains('mưa') ||
+          reason.contains('ngoài trời');
+      _showReplacementRequirementDialog(detail, requireIndoor: requireIndoor);
     }
   }
 
@@ -13439,7 +14070,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(14),
@@ -13512,7 +14146,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 decoration: BoxDecoration(
                   color: sectionColor.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: sectionColor.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: sectionColor.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -17732,6 +18368,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           date: _getDateForDetail(detail),
                                           startTime: detail['startTime']
                                               ?.toString(),
+                                          endTime: detail['endTime']
+                                              ?.toString(),
                                         ),
                                         if (detail['incidentReport'] !=
                                             null) ...[
@@ -17919,18 +18557,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           // 📝 Ghi chú
                                           Builder(
                                             builder: (context) {
-                                              final hasNote = _getEffectivePlaceNote(
-                                                detail,
-                                              ).isNotEmpty;
+                                              final hasNote =
+                                                  _getEffectivePlaceNote(
+                                                    detail,
+                                                  ).isNotEmpty;
                                               return _buildCardActionIcon(
                                                 icon: hasNote
                                                     ? Icons.description_rounded
-                                                    : Icons.description_outlined,
+                                                    : Icons
+                                                          .description_outlined,
                                                 active: hasNote,
                                                 badge: null,
                                                 disabled: isVisited,
                                                 onTap: () =>
-                                                    _showInlineNoteBottomSheet(detail),
+                                                    _showInlineNoteBottomSheet(
+                                                      detail,
+                                                    ),
                                               );
                                             },
                                           ),
@@ -17940,18 +18582,24 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             builder: (ctx) {
                                               final List tl =
                                                   detail['todoItems'] is List
-                                                  ? (detail['todoItems'] as List)
-                                                  : (detail['todoItems'] is String
+                                                  ? (detail['todoItems']
+                                                        as List)
+                                                  : (detail['todoItems']
+                                                            is String
                                                         ? (json.decode(
                                                                     detail['todoItems'],
                                                                   )
                                                                   as List? ??
                                                               [])
                                                         : []);
-                                              final bool hasItems = tl.isNotEmpty;
+                                              final bool hasItems =
+                                                  tl.isNotEmpty;
                                               final int done = hasItems
                                                   ? tl
-                                                        .where((x) => x['done'] == true)
+                                                        .where(
+                                                          (x) =>
+                                                              x['done'] == true,
+                                                        )
                                                         .length
                                                   : 0;
                                               return _buildCardActionIcon(
@@ -17971,16 +18619,23 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           const SizedBox(width: 4),
                                           // 💬 Phản hồi / Báo cáo sự cố
                                           _buildCardActionIcon(
-                                            icon: detail['incidentReport'] != null
+                                            icon:
+                                                detail['incidentReport'] != null
                                                 ? Icons.report_problem_rounded
-                                                : Icons.chat_bubble_outline_rounded,
+                                                : Icons
+                                                      .chat_bubble_outline_rounded,
                                             disabled: isVisited,
-                                            active: detail['incidentReport'] != null,
-                                            badge: detail['incidentReport'] != null
+                                            active:
+                                                detail['incidentReport'] !=
+                                                null,
+                                            badge:
+                                                detail['incidentReport'] != null
                                                 ? '!'
                                                 : null,
                                             onTap: () =>
-                                                _showPlaceIncidentReportSheet(detail),
+                                                _showPlaceIncidentReportSheet(
+                                                  detail,
+                                                ),
                                           ),
                                           const SizedBox(width: 4),
                                           // 💰 Chi phí
@@ -17988,7 +18643,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             builder: (ctx) {
                                               final expObj = detail['expense'];
                                               double amt = 0;
-                                              if (expObj is Map<String, dynamic>) {
+                                              if (expObj
+                                                  is Map<String, dynamic>) {
                                                 final v = expObj['amount'];
                                                 if (v is num)
                                                   amt = v.toDouble();
@@ -17997,15 +18653,20 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                               }
                                               return _buildCardActionIcon(
                                                 disabled: isVisited,
-                                                icon: Icons.attach_money_rounded,
+                                                icon:
+                                                    Icons.attach_money_rounded,
                                                 active: amt > 0,
                                                 badge: null,
-                                                onTap: () => _openPlaceExpenseSheet(
-                                                  detail,
-                                                  isItineraryDetail: true,
-                                                  dayIndex:
-                                                      (detail['day'] as int? ?? 1) - 1,
-                                                ),
+                                                onTap: () =>
+                                                    _openPlaceExpenseSheet(
+                                                      detail,
+                                                      isItineraryDetail: true,
+                                                      dayIndex:
+                                                          (detail['day']
+                                                                  as int? ??
+                                                              1) -
+                                                          1,
+                                                    ),
                                               );
                                             },
                                           ),
@@ -18021,7 +18682,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                                 PlaceDetailBottomSheet.show(
                                                   context,
                                                   place,
-                                                  currentItinerary: _itineraryData,
+                                                  currentItinerary:
+                                                      _itineraryData,
                                                   onTripUpdated: () =>
                                                       _loadData(silent: true),
                                                 );
@@ -18034,7 +18696,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                             icon: Icons.auto_awesome_rounded,
                                             active: true,
                                             badge: null,
-                                            customColor: const Color(0xFF8B5CF6),
+                                            customColor: const Color(
+                                              0xFF8B5CF6,
+                                            ),
                                             disabled: false,
                                             onTap: () {
                                               final placeName =
@@ -18675,8 +19339,12 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         ' · $totalDuration phút, ${totalDistance.toStringAsFixed(1).replaceAll('.', ',')} km';
                                   }
 
+                                  final isOptimizing = _optimizingDayNumbers
+                                      .contains(index + 1);
                                   return GestureDetector(
-                                    onTap: () => _optimizeDay(index),
+                                    onTap: isOptimizing
+                                        ? null
+                                        : () => _optimizeDay(index),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10,
@@ -18692,14 +19360,25 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(
-                                            Icons.auto_awesome_rounded,
-                                            color: Color(0xFF0284C7),
-                                            size: 14,
-                                          ),
+                                          isOptimizing
+                                              ? const SizedBox(
+                                                  width: 14,
+                                                  height: 14,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                )
+                                              : const Icon(
+                                                  Icons.auto_awesome_rounded,
+                                                  color: Color(0xFF0284C7),
+                                                  size: 14,
+                                                ),
                                           const SizedBox(width: 5),
                                           Text(
-                                            '✨ Tối ưu AI$subText',
+                                            isOptimizing
+                                                ? 'Đang phân tích thời tiết...'
+                                                : '✨ Tối ưu động$subText',
                                             style: const TextStyle(
                                               color: Color(0xFF0284C7),
                                               fontSize: 11,
