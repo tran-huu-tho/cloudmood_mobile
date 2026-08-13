@@ -51,7 +51,9 @@ class ApiClient {
   /// Chỉ cho phép các thao tác tạo/tối ưu lịch chạy trên backend đã có bộ luật
   /// thời tiết mới. Thiết bị Android thật dùng 127.0.0.1 qua adb reverse;
   /// emulator tiếp tục dùng 10.0.2.2.
-  static Future<void> requireDynamicAiBackend() async {
+  static Future<void> requireDynamicAiBackend({
+    bool requireAutoWeather = false,
+  }) async {
     for (final url in _candidateBackendUrls) {
       try {
         final response = await http
@@ -64,7 +66,10 @@ class ApiClient {
             ((decoded['apiVersion'] as num?)?.toInt() ?? 0) >= 2 &&
             features is Map &&
             features['generatedWeatherMatrix'] == true &&
-            features['replacementProposals'] == true) {
+            features['replacementProposals'] == true &&
+            (!requireAutoWeather ||
+                (features['backgroundAutoWeatherOptimization'] == true &&
+                    features['autoWeatherUndo'] == true))) {
           _activeBaseUrl = url;
           _lastCheckTime = DateTime.now();
           debugPrint(
@@ -77,7 +82,7 @@ class ApiClient {
       }
     }
     throw Exception(
-      'Backend đang chạy phiên bản cũ hoặc thiết bị chưa kết nối được backend local. '
+      'Backend đang chạy phiên bản cũ hoặc thiết bị chưa kết nối được backend local${requireAutoWeather ? ' có cập nhật thời tiết tự động' : ''}. '
       'Hãy khởi động backend mới; với Android thật cần bật adb reverse tcp:3000 tcp:3000.',
     );
   }

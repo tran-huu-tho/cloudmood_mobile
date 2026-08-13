@@ -440,10 +440,45 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final prefs = await SharedPreferences.getInstance();
     final itinId = _itineraryData['id'];
     final list = prefs.getStringList('visited_details_$itinId') ?? [];
+    final localVisited = list
+        .map((e) => int.tryParse(e) ?? 0)
+        .where((id) => id > 0)
+        .toSet();
+    final hasServerState = _details.any(
+      (detail) => detail.containsKey('isVisited'),
+    );
+    final serverVisited = _details
+        .where((detail) => detail['isVisited'] == true)
+        .map<int>((detail) => (detail['id'] as num).toInt())
+        .toSet();
+    final migrationKey = 'visited_state_migrated_$itinId';
+    final shouldMigrateLocalState =
+        hasServerState &&
+        prefs.getBool(migrationKey) != true &&
+        localVisited.isNotEmpty;
+    final visited = hasServerState
+        ? {...serverVisited, if (shouldMigrateLocalState) ...localVisited}
+        : localVisited;
+    if (shouldMigrateLocalState) {
+      final localOnlyIds = localVisited.difference(serverVisited);
+      await Future.wait(
+        localOnlyIds.map(
+          (id) =>
+              DatabaseService().updateItineraryDetail(id, {'isVisited': true}),
+        ),
+      );
+      await prefs.setBool(migrationKey, true);
+    } else if (hasServerState && prefs.getBool(migrationKey) != true) {
+      await prefs.setBool(migrationKey, true);
+    }
     if (mounted) {
       setState(() {
-        _visitedDetailIds = list.map((e) => int.tryParse(e) ?? 0).toSet();
+        _visitedDetailIds = visited;
       });
+      await prefs.setStringList(
+        'visited_details_$itinId',
+        visited.map((e) => e.toString()).toList(),
+      );
       _autoScrollToFirstUnvisitedDay();
     }
   }
@@ -467,14 +502,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   ) async {
     final prefs = await SharedPreferences.getInstance();
     final itinId = _itineraryData['id'];
+    final bool wasVisited = _visitedDetailIds.contains(detailId);
     setState(() {
-      if (_visitedDetailIds.contains(detailId)) {
-        _showPremiumNotification(
-          title: 'Địa điểm đã chốt',
-          message: 'Địa điểm đã hoàn thành không thể bỏ chọn!',
-          icon: Icons.check_circle_rounded,
-          color: const Color(0xFF10B981),
-        );
+      if (wasVisited) {
+        _visitedDetailIds.remove(detailId);
       } else {
         _visitedDetailIds.add(detailId);
       }
@@ -483,8 +514,42 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       'visited_details_$itinId',
       _visitedDetailIds.map((e) => e.toString()).toList(),
     );
+    final savedOnServer = await DatabaseService().updateItineraryDetail(
+      detailId,
+      {'isVisited': !wasVisited},
+    );
+    if (!savedOnServer) {
+      if (mounted) {
+        setState(() {
+          if (wasVisited) {
+            _visitedDetailIds.add(detailId);
+          } else {
+            _visitedDetailIds.remove(detailId);
+          }
+        });
+        await prefs.setStringList(
+          'visited_details_$itinId',
+          _visitedDetailIds.map((e) => e.toString()).toList(),
+        );
+        _showPremiumNotification(
+          title: 'Không thể lưu trạng thái',
+          message: 'Vui lòng kiểm tra kết nối và thử lại.',
+          icon: Icons.error_outline_rounded,
+          color: Colors.orange,
+        );
+      }
+      return;
+    }
+    detail['isVisited'] = !wasVisited;
 
-    if (_visitedDetailIds.contains(detailId)) {
+    if (wasVisited) {
+      _showPremiumNotification(
+        title: 'Đã hoàn tác ghé thăm',
+        message: 'Địa điểm đã được chuyển lại thành Chưa ghé.',
+        icon: Icons.undo_rounded,
+        color: const Color(0xFF64748B),
+      );
+    } else if (_visitedDetailIds.contains(detailId)) {
       final placeName = detail['place']?['name'] ?? 'Địa điểm';
       int currentIdx = _details.indexWhere((d) => d['id'] == detailId);
       Map<String, dynamic>? nextDetail;
@@ -1226,6 +1291,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   bool _isReordering = false;
   bool _isUpdatingDatabase = false;
   final Set<int> _optimizingDayNumbers = <int>{};
+  bool _autoWeatherEnabled = false;
+  bool _isLoadingAutoWeatherSettings = true;
+  bool _isUpdatingAutoWeatherSettings = false;
+  int _autoWeatherRainThreshold = 70;
   final Map<String, String> _segmentTransportModes = {};
 
   @override
@@ -1380,8 +1449,14 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
     // Skip full screen blocking loader if initial details or places are present
     _isLoading = _details.isEmpty && _savedPlaces.isEmpty;
-    _loadData(silent: _details.isNotEmpty || _savedPlaces.isNotEmpty);
-    _loadVisitedDetails();
+    // Đợi dữ liệu server về rồi mới hợp nhất trạng thái "đã ghé" cũ trên máy,
+    // tránh hai Future chạy song song và ghi đè kết quả migration của nhau.
+    _loadData(
+      silent: _details.isNotEmpty || _savedPlaces.isNotEmpty,
+    ).whenComplete(_loadVisitedDetails);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAutoWeatherSettings(showLatestChange: true);
+    });
 
     // Kết nối Socket Real-time cho Chuyến đi
     final itinId = _itineraryData['id'] is int
@@ -1438,6 +1513,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     final currentItinId = _itineraryData['id']?.toString();
     final updatedByUserId = data['updatedByUserId']?.toString();
     final currentUserId = AuthService().currentUser.value?.id?.toString();
+    final actionType = data['actionType']?.toString() ?? '';
 
     if (eventItinId == currentItinId &&
         (updatedByUserId == null || updatedByUserId != currentUserId) &&
@@ -1445,12 +1521,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       // Debounce: trì hoãn reload 1.5s để gom nhiều event liên tiếp
       // và tránh flicker khi optimistic update đang áp dụng
       _socketReloadTimer?.cancel();
-      _socketReloadTimer = Timer(const Duration(milliseconds: 1500), () {
+      _socketReloadTimer = Timer(const Duration(milliseconds: 1500), () async {
         if (mounted && !_isUpdatingDatabase) {
           debugPrint(
             '⚡ Real-time update từ máy chủ: Đang cập nhật dữ liệu ngầm...',
           );
-          _loadData(silent: true);
+          await _loadData(silent: true);
+          if (actionType.startsWith('AUTO_WEATHER')) {
+            await _loadAutoWeatherSettings(showLatestChange: true);
+          }
         }
       });
     }
@@ -1742,6 +1821,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     required IconData icon,
     required Color color,
     String? title,
+    String? actionLabel,
+    VoidCallback? onAction,
+    Duration displayDuration = const Duration(seconds: 3),
   }) {
     if (!mounted) return;
 
@@ -1827,6 +1909,30 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         ],
                       ),
                     ),
+                    if (actionLabel != null && onAction != null) ...[
+                      const SizedBox(width: 4),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 7),
+                          minimumSize: const Size(0, 32),
+                        ),
+                        onPressed: () {
+                          _currentNotification?.remove();
+                          _currentNotification = null;
+                          onAction();
+                        },
+                        child: Text(
+                          actionLabel,
+                          maxLines: 1,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: () {
@@ -1852,7 +1958,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     overlay.insert(entry);
 
     // Auto-remove after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(displayDuration, () {
       if (entry.mounted && _currentNotification == entry) {
         entry.remove();
         if (_currentNotification == entry) {
@@ -2204,6 +2310,16 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       });
       _details = cleanDetails;
       _savedPlaces = cleanSaved;
+      if (cleanDetails.any((detail) => detail.containsKey('isVisited'))) {
+        _visitedDetailIds = cleanDetails
+            .where((detail) => detail['isVisited'] == true)
+            .map<int>((detail) => (detail['id'] as num).toInt())
+            .toSet();
+        await prefs.setStringList(
+          'visited_details_$itineraryId',
+          _visitedDetailIds.map((e) => e.toString()).toList(),
+        );
+      }
     }
 
     // Fetch places near destination for Explore and recommendations (only if not loaded)
@@ -5409,17 +5525,57 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           indicatorColor: AppTheme.primary,
           indicatorWeight: 3,
           indicatorSize: TabBarIndicatorSize.tab,
+          labelPadding: EdgeInsets.zero,
           labelStyle: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 13,
           ),
           tabs: _itineraryData['isGuide'] == true
-              ? const [Tab(text: 'Tổng quan'), Tab(text: 'Khám phá')]
+              ? const [
+                  Tab(
+                    child: Text(
+                      'Tổng quan',
+                      textScaler: TextScaler.noScaling,
+                      maxLines: 1,
+                    ),
+                  ),
+                  Tab(
+                    child: Text(
+                      'Khám phá',
+                      textScaler: TextScaler.noScaling,
+                      maxLines: 1,
+                    ),
+                  ),
+                ]
               : const [
-                  Tab(text: 'Tổng quan'),
-                  Tab(text: 'Hành trình'),
-                  Tab(text: 'Chi phí'),
-                  Tab(text: 'Khám phá'),
+                  Tab(
+                    child: Text(
+                      'Tổng quan',
+                      textScaler: TextScaler.noScaling,
+                      maxLines: 1,
+                    ),
+                  ),
+                  Tab(
+                    child: Text(
+                      'Hành trình',
+                      textScaler: TextScaler.noScaling,
+                      maxLines: 1,
+                    ),
+                  ),
+                  Tab(
+                    child: Text(
+                      'Chi phí',
+                      textScaler: TextScaler.noScaling,
+                      maxLines: 1,
+                    ),
+                  ),
+                  Tab(
+                    child: Text(
+                      'Khám phá',
+                      textScaler: TextScaler.noScaling,
+                      maxLines: 1,
+                    ),
+                  ),
                 ],
         ),
       ),
@@ -6926,20 +7082,57 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                 indicatorColor: AppTheme.primary,
                                 indicatorWeight: 3,
                                 indicatorSize: TabBarIndicatorSize.tab,
+                                labelPadding: EdgeInsets.zero,
                                 labelStyle: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
                                 tabs: _itineraryData['isGuide'] == true
                                     ? const [
-                                        Tab(text: 'Tổng quan'),
-                                        Tab(text: 'Khám phá'),
+                                        Tab(
+                                          child: Text(
+                                            'Tổng quan',
+                                            textScaler: TextScaler.noScaling,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                        Tab(
+                                          child: Text(
+                                            'Khám phá',
+                                            textScaler: TextScaler.noScaling,
+                                            maxLines: 1,
+                                          ),
+                                        ),
                                       ]
                                     : const [
-                                        Tab(text: 'Tổng quan'),
-                                        Tab(text: 'Hành trình'),
-                                        Tab(text: 'Chi phí'),
-                                        Tab(text: 'Khám phá'),
+                                        Tab(
+                                          child: Text(
+                                            'Tổng quan',
+                                            textScaler: TextScaler.noScaling,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                        Tab(
+                                          child: Text(
+                                            'Hành trình',
+                                            textScaler: TextScaler.noScaling,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                        Tab(
+                                          child: Text(
+                                            'Chi phí',
+                                            textScaler: TextScaler.noScaling,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                        Tab(
+                                          child: Text(
+                                            'Khám phá',
+                                            textScaler: TextScaler.noScaling,
+                                            maxLines: 1,
+                                          ),
+                                        ),
                                       ],
                               ),
                             ),
@@ -9903,6 +10096,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                     'Trời có khả năng mưa giông. Ưu tiên di chuyển các điểm tham quan trong nhà!';
               }
 
+              // Nếu mô hình trả mã nhiều mây nhưng đồng thời dự báo lượng mưa
+              // đo được đáng kể, ưu tiên mô tả mưa để chip và cảnh báo không
+              // hiển thị hai kết luận trái ngược nhau.
+              if (code >= 0 && code <= 3 && rainAmount >= 0.5) {
+                desc = 'Có mưa tại khung giờ';
+                icon = Icons.grain_rounded;
+                color = const Color(0xFF2563EB);
+                bg = const Color(0xFFDBEAFE);
+                advice =
+                    'Mô hình dự báo có lượng mưa đáng kể tại khung giờ này. Nên ưu tiên địa điểm trong nhà.';
+              }
+
               if (mounted) {
                 setState(() {
                   _placeWeatherCache[cacheKey] = <String, dynamic>{
@@ -9969,6 +10174,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     String? startTime,
     DateTime? date,
     String? endTime,
+    bool fullWidth = false,
   ]) {
     if (place.isEmpty) return const SizedBox.shrink();
     final weather = _getWeatherForPlace(place, startTime, date, endTime);
@@ -9979,7 +10185,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           ? null
           : () => _showPlaceWeatherDetailsSheet(place, weather),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 145),
+        width: fullWidth ? double.infinity : null,
+        height: 30,
+        constraints: fullWidth ? null : const BoxConstraints(maxWidth: 145),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: weather['bg'] as Color,
@@ -10004,19 +10212,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 color: weather['color'] as Color,
                 size: 13,
               ),
-            const SizedBox(width: 4),
-            Flexible(
+            const SizedBox(width: 5),
+            Expanded(
               child: Text(
                 isLoading
                     ? 'Đang tải...'
                     : '${weather['temp']}°C · ${weather['desc']}',
+                textScaler: TextScaler.noScaling,
+                maxLines: 1,
+                softWrap: false,
                 style: TextStyle(
                   color: weather['color'] as Color,
                   fontWeight: FontWeight.bold,
-                  fontSize: 10,
+                  fontSize: 11,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                overflow: TextOverflow.clip,
               ),
             ),
           ],
@@ -11176,7 +11386,10 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     return 'UNKNOWN';
   }
 
-  Widget _buildRainSafetyChip(String environmentType) {
+  Widget _buildRainSafetyChip(
+    String environmentType, {
+    bool fullWidth = false,
+  }) {
     final bool isIndoor = environmentType == 'INDOOR';
     final bool isMixed = environmentType == 'MIXED';
     final color = isIndoor
@@ -11204,9 +11417,13 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         : 'Cảnh báo mưa';
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 138),
+      constraints: fullWidth
+          ? const BoxConstraints()
+          : const BoxConstraints(maxWidth: 138),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        width: fullWidth ? double.infinity : null,
+        height: 30,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: background,
           borderRadius: BorderRadius.circular(8),
@@ -11215,15 +11432,17 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 12, color: color),
-            const SizedBox(width: 3),
-            Flexible(
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 5),
+            Expanded(
               child: Text(
                 label,
+                textScaler: TextScaler.noScaling,
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+                overflow: TextOverflow.clip,
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
                   color: color,
                   fontWeight: FontWeight.bold,
                 ),
@@ -11248,21 +11467,36 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         (weather['forecastLeadDays'] as num?)?.toInt() ?? 0;
     final bool hasThunderstormCode =
         weatherCode != null && weatherCode >= 95 && weatherCode <= 99;
+    final bool hasRainWeatherCode =
+        weatherCode != null &&
+        ((weatherCode >= 51 && weatherCode <= 67) ||
+            (weatherCode >= 80 && weatherCode <= 82) ||
+            hasThunderstormCode);
+
+    // Xác suất mưa cao nhưng mã thời tiết vẫn là quang/mây và lượng mưa gần
+    // bằng 0 chưa đủ để kết luận địa điểm cần tránh mưa.
+    if (!hasRainWeatherCode && rainAmount < 0.5) return false;
 
     // Chỉ bật cảnh báo đỏ khi rủi ro đủ lớn. Mã mưa phùn/rào đơn lẻ với
     // xác suất và lượng mưa thấp vẫn được hiển thị ở chip dự báo nhưng không
     // bị xem là xung đột bắt buộc phải đổi địa điểm.
     if (forecastLeadDays >= 8) {
-      return rainProbability >= 90 ||
+      return (hasRainWeatherCode &&
+              rainProbability >= 90 &&
+              rainAmount >= 0.2) ||
           (rainProbability >= 75 && rainAmount >= 1) ||
           (hasThunderstormCode && rainProbability >= 70);
     }
     if (forecastLeadDays >= 4) {
-      return rainProbability >= 80 ||
+      return (hasRainWeatherCode &&
+              rainProbability >= 80 &&
+              rainAmount >= 0.1) ||
           (rainProbability >= 65 && rainAmount >= 0.5) ||
           (hasThunderstormCode && rainProbability >= 50);
     }
-    return hasThunderstormCode || rainAmount >= 0.5 || rainProbability >= 70;
+    return hasThunderstormCode ||
+        rainAmount >= 0.5 ||
+        (hasRainWeatherCode && rainProbability >= 70 && rainAmount >= 0.1);
   }
 
   Widget _buildPlaceTags(
@@ -11271,42 +11505,161 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     DateTime? date,
     String? endTime,
   }) {
-    List<dynamic> tags = [];
-
-    if (place['category'] != null && place['category']['name'] != null) {
-      tags = [place['category']['name']];
-    } else {
-      tags = ['Điểm tham quan'];
-    }
+    final dynamic categoryObject = place['category'];
+    final String categoryName = categoryObject is Map
+        ? (categoryObject['name'] ?? 'Điểm tham quan').toString()
+        : (categoryObject ?? 'Điểm tham quan').toString();
+    final dynamic rawIconCode = categoryObject is Map
+        ? categoryObject['iconCode']
+        : null;
+    final int? categoryIconCode = rawIconCode is num
+        ? rawIconCode.toInt()
+        : int.tryParse(rawIconCode?.toString() ?? '');
+    final IconData categoryIcon = _getCategoryIconData(
+      categoryName,
+      iconCode: categoryIconCode,
+    );
 
     final weather = _getWeatherForPlace(place, startTime, date, endTime);
     final bool isRainy = _weatherRequiresIndoor(weather);
     final String environmentType = _getPlaceEnvironmentType(place);
 
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        ...tags.map(
-          (cat) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(6),
-            ),
+    final categoryChip = Container(
+      width: double.infinity,
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(categoryIcon, size: 13, color: const Color(0xFF64748B)),
+          const SizedBox(width: 5),
+          Expanded(
             child: Text(
-              cat.toString(),
+              categoryName,
+              textScaler: TextScaler.noScaling,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.clip,
               style: const TextStyle(
-                fontSize: 10,
+                fontSize: 11,
                 color: Color(0xFF475569),
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Hàng 2: thời tiết chiếm trọn chiều ngang của hai ô.
+        _buildWeatherChip(place, startTime, date, endTime, true),
+        const SizedBox(height: 6),
+        // Danh mục được chuyển xuống dưới và dùng iconCode từ CSDL.
+        categoryChip,
+        if (isRainy) ...[
+          const SizedBox(height: 6),
+          _buildRainSafetyChip(environmentType, fullWidth: true),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildScheduleStatusRow({
+    required Map<String, dynamic> detail,
+    required int detailId,
+    required bool isVisited,
+    required String? timeLabel,
+    required Color customColor,
+  }) {
+    Widget tile({
+      required IconData icon,
+      required String label,
+      required Color foreground,
+      required Color background,
+      required Color border,
+      int flex = 1,
+      VoidCallback? onTap,
+    }) {
+      return Expanded(
+        flex: flex,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              height: 30,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: border),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, size: 11, color: foreground),
+                  const SizedBox(width: 3),
+                  Expanded(
+                    child: Text(
+                      label,
+                      textScaler: TextScaler.noScaling,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.clip,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: foreground,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-        _buildWeatherChip(place, startTime, date, endTime),
-        if (isRainy) _buildRainSafetyChip(environmentType),
+      );
+    }
+
+    final hasTime = timeLabel != null && timeLabel.isNotEmpty;
+    final displayTimeLabel = hasTime
+        ? timeLabel.replaceAll(RegExp(r'\s+-\s+'), '–')
+        : 'Thêm thời gian';
+    return Row(
+      children: [
+        tile(
+          icon: Icons.schedule_rounded,
+          label: displayTimeLabel,
+          flex: 6,
+          foreground: hasTime ? customColor : const Color(0xFFD97706),
+          background: hasTime
+              ? customColor.withAlpha(18)
+              : const Color(0xFFFFFBEB),
+          border: hasTime ? customColor.withAlpha(70) : const Color(0xFFFCD34D),
+          onTap: isVisited ? null : () => _selectTimeForDetail(detail),
+        ),
+        const SizedBox(width: 6),
+        tile(
+          icon: isVisited
+              ? Icons.check_circle_rounded
+              : Icons.radio_button_unchecked_rounded,
+          label: isVisited ? 'Đã ghé' : 'Chưa ghé',
+          flex: 5,
+          foreground: isVisited
+              ? const Color(0xFF059669)
+              : const Color(0xFF64748B),
+          background: isVisited
+              ? const Color(0xFFECFDF5)
+              : const Color(0xFFF8FAFC),
+          border: isVisited ? const Color(0xFF6EE7B7) : const Color(0xFFE2E8F0),
+          onTap: () => _toggleVisitedDetail(detailId, detail),
+        ),
       ],
     );
   }
@@ -11472,6 +11825,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             'startTime': item['startTime'],
             'endTime': item['endTime'],
             'sortOrder': item['sortOrder'],
+            if ((item['id'] ?? '').toString() == detailIdStr)
+              'isUserPinned': true,
           }),
         );
       }
@@ -12447,6 +12802,330 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     }).toList();
   }
 
+  Future<void> _loadAutoWeatherSettings({bool showLatestChange = false}) async {
+    if (_itineraryData['isGuide'] == true) {
+      if (mounted) setState(() => _isLoadingAutoWeatherSettings = false);
+      return;
+    }
+    try {
+      final itineraryId = (_itineraryData['id'] as num).toInt();
+      final settings = await DatabaseService().getAutoWeatherSettings(
+        itineraryId: itineraryId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _autoWeatherEnabled = settings['enabled'] == true;
+        _autoWeatherRainThreshold =
+            (settings['rainThreshold'] as num?)?.toInt() ?? 70;
+        _isLoadingAutoWeatherSettings = false;
+      });
+      if (showLatestChange && settings['latestHistory'] is Map) {
+        await _announceAutoWeatherHistory(
+          Map<String, dynamic>.from(settings['latestHistory'] as Map),
+        );
+      }
+    } catch (error) {
+      debugPrint('Không thể tải cấu hình tự động thời tiết: $error');
+      if (mounted) setState(() => _isLoadingAutoWeatherSettings = false);
+    }
+  }
+
+  Future<void> _announceAutoWeatherHistory(Map<String, dynamic> history) async {
+    final historyId = (history['id'] as num?)?.toInt();
+    if (historyId == null || !mounted) return;
+    final itineraryId = (_itineraryData['id'] as num).toInt();
+    final prefs = await SharedPreferences.getInstance();
+    final seenKey = 'seen_auto_weather_history_$itineraryId';
+    if (prefs.getInt(seenKey) == historyId) return;
+    await prefs.setInt(seenKey, historyId);
+
+    final summary = history['summary'] is Map
+        ? Map<String, dynamic>.from(history['summary'] as Map)
+        : <String, dynamic>{};
+    final day = (history['day'] as num?)?.toInt() ?? 1;
+    final changes = summary['changes'] is List
+        ? List<dynamic>.from(summary['changes'] as List)
+        : <dynamic>[];
+    final unresolved = summary['unresolved'] is List
+        ? List<dynamic>.from(summary['unresolved'] as List)
+        : <dynamic>[];
+    final status = history['status']?.toString() ?? '';
+
+    if (status == 'APPLIED') {
+      _showPremiumNotification(
+        title: 'Đã tự động cập nhật ngày $day',
+        message: unresolved.isEmpty
+            ? 'Đã điều chỉnh ${changes.length} địa điểm hoặc khung giờ do thời tiết xấu.'
+            : 'Đã điều chỉnh ${changes.length} mục; còn ${unresolved.length} địa điểm cần xử lý thủ công.',
+        icon: Icons.thunderstorm_rounded,
+        color: const Color(0xFF2563EB),
+        actionLabel: unresolved.isEmpty ? 'Hoàn tác' : 'Xem',
+        onAction: unresolved.isEmpty
+            ? () => _undoAutoWeatherOptimization(historyId)
+            : () => _showAutoWeatherAppliedDialog(
+                historyId: historyId,
+                day: day,
+                changeCount: changes.length,
+                unresolved: unresolved,
+              ),
+        displayDuration: const Duration(seconds: 8),
+      );
+      return;
+    }
+
+    if (status == 'NEEDS_ATTENTION' && unresolved.isNotEmpty) {
+      final entry = _firstAutoWeatherUnresolved(unresolved);
+      final detailId = (entry['detailId'] as num?)?.toInt();
+      _showPremiumNotification(
+        title: 'Cần xử lý địa điểm ngày $day',
+        message:
+            entry['reason']?.toString() ??
+            'Không tìm được địa điểm trong nhà phù hợp để tự động thay thế.',
+        icon: Icons.warning_amber_rounded,
+        color: const Color(0xFFD97706),
+        actionLabel: detailId == null ? null : 'Xử lý',
+        onAction: detailId == null
+            ? null
+            : () => _openAutoWeatherUnresolved(entry),
+        displayDuration: const Duration(seconds: 8),
+      );
+    }
+  }
+
+  Map<String, dynamic> _firstAutoWeatherUnresolved(List<dynamic> unresolved) {
+    if (unresolved.isEmpty || unresolved.first is! Map) {
+      return <String, dynamic>{};
+    }
+    return Map<String, dynamic>.from(unresolved.first as Map);
+  }
+
+  void _openAutoWeatherUnresolved(Map<String, dynamic> entry) {
+    final detailId = (entry['detailId'] as num?)?.toInt();
+    if (detailId == null) return;
+    Map<String, dynamic>? detail;
+    for (final item in _details) {
+      if ((item['id'] as num?)?.toInt() == detailId) {
+        detail = item;
+        break;
+      }
+    }
+    if (detail != null) {
+      _showReplacementRequirementDialog(detail, requireIndoor: true);
+    }
+  }
+
+  Future<void> _showAutoWeatherAppliedDialog({
+    required int historyId,
+    required int day,
+    required int changeCount,
+    required List<dynamic> unresolved,
+  }) async {
+    if (!mounted) return;
+    final entry = _firstAutoWeatherUnresolved(unresolved);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Kết quả tự động · Ngày $day'),
+        content: Text(
+          'Đã điều chỉnh $changeCount mục. Còn ${unresolved.length} địa điểm '
+          'không có phương án trong nhà phù hợp và cần bạn nhập yêu cầu thay thế.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _undoAutoWeatherOptimization(historyId);
+            },
+            child: const Text('Hoàn tác'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _openAutoWeatherUnresolved(entry);
+            },
+            child: const Text('Xử lý địa điểm'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleAutoWeather(bool enabled) async {
+    if (!_checkCanEdit() || _isUpdatingAutoWeatherSettings) return;
+    final previous = _autoWeatherEnabled;
+    setState(() {
+      _autoWeatherEnabled = enabled;
+      _isUpdatingAutoWeatherSettings = true;
+    });
+    try {
+      final itineraryId = (_itineraryData['id'] as num).toInt();
+      final settings = await DatabaseService().updateAutoWeatherSettings(
+        itineraryId: itineraryId,
+        enabled: enabled,
+        rainThreshold: _autoWeatherRainThreshold,
+      );
+      if (!mounted) return;
+      setState(() {
+        _autoWeatherEnabled = settings['enabled'] == true;
+        _autoWeatherRainThreshold =
+            (settings['rainThreshold'] as num?)?.toInt() ?? 70;
+      });
+      _showPremiumNotification(
+        title: enabled
+            ? 'Đã bật tự động ứng phó thời tiết'
+            : 'Đã tắt tự động ứng phó thời tiết',
+        message: enabled
+            ? 'Máy chủ sẽ quét mỗi 15 phút và tự thay điểm phù hợp trong 72 giờ tới.'
+            : 'Lịch trình chỉ được tối ưu khi bạn bấm Tối ưu ngay.',
+        icon: enabled ? Icons.shield_rounded : Icons.pause_circle_outline,
+        color: enabled ? const Color(0xFF059669) : const Color(0xFF64748B),
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() => _autoWeatherEnabled = previous);
+        _showPremiumNotification(
+          title: 'Không thể đổi chế độ tự động',
+          message: error.toString().replaceFirst('Exception: ', ''),
+          icon: Icons.error_outline_rounded,
+          color: Colors.orange,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdatingAutoWeatherSettings = false);
+    }
+  }
+
+  Future<void> _undoAutoWeatherOptimization(int historyId) async {
+    if (!_checkCanEdit() || _isUpdatingDatabase) return;
+    _isUpdatingDatabase = true;
+    try {
+      final itineraryId = (_itineraryData['id'] as num).toInt();
+      final success = await DatabaseService().undoAutoWeatherOptimization(
+        itineraryId: itineraryId,
+        historyId: historyId,
+      );
+      if (success && mounted) {
+        await _loadData(silent: true);
+        _updateRoadPolylines();
+        _showPremiumNotification(
+          title: 'Đã hoàn tác cập nhật tự động',
+          message: 'Địa điểm và thời gian đã trở về trạng thái trước đó.',
+          icon: Icons.undo_rounded,
+          color: const Color(0xFF059669),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        _showPremiumNotification(
+          title: 'Không thể hoàn tác',
+          message: error.toString().replaceFirst('Exception: ', ''),
+          icon: Icons.error_outline_rounded,
+          color: Colors.orange,
+        );
+      }
+    } finally {
+      _isUpdatingDatabase = false;
+    }
+  }
+
+  Widget _buildAutoWeatherControl() {
+    if (_itineraryData['isGuide'] == true) return const SizedBox.shrink();
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 5, 16, 6),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(9, 5, 7, 5),
+        decoration: BoxDecoration(
+          color: _autoWeatherEnabled
+              ? const Color(0xFFECFDF5)
+              : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _autoWeatherEnabled
+                ? const Color(0xFF6EE7B7)
+                : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: _autoWeatherEnabled
+                    ? const Color(0xFFD1FAE5)
+                    : const Color(0xFFEFF6FF),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.thunderstorm_rounded,
+                size: 15,
+                color: _autoWeatherEnabled
+                    ? const Color(0xFF059669)
+                    : const Color(0xFF2563EB),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Tự động theo thời tiết',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _autoWeatherEnabled
+                    ? const Color(0xFFD1FAE5)
+                    : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                _autoWeatherEnabled ? 'Bật' : 'Tắt',
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  color: _autoWeatherEnabled
+                      ? const Color(0xFF047857)
+                      : const Color(0xFF64748B),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            if (_isLoadingAutoWeatherSettings || _isUpdatingAutoWeatherSettings)
+              const SizedBox(
+                width: 38,
+                height: 26,
+                child: Padding(
+                  padding: EdgeInsets.all(5),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            else
+              SizedBox(
+                width: 40,
+                height: 26,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: Switch.adaptive(
+                    value: _autoWeatherEnabled,
+                    onChanged: _isViewer ? null : _toggleAutoWeather,
+                    activeThumbColor: const Color(0xFF059669),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _optimizeDay(int dayIndex) async {
     if (!_checkCanEdit()) return;
     final dayNum = dayIndex + 1;
@@ -12509,7 +13188,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           await _loadData(silent: true);
           _updateRoadPolylines();
           _showPremiumNotification(
-            title: 'Đã cập nhật lịch trình động',
+            title: 'Đã áp dụng tối ưu ngay',
             message:
                 'Ngày $dayNum đã được cập nhật theo thời tiết và lộ trình mới.',
             icon: Icons.auto_awesome_rounded,
@@ -12582,7 +13261,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Đề xuất tối ưu động · Ngày $dayNum',
+                  'Đề xuất tối ưu ngay · Ngày $dayNum',
                   style: const TextStyle(
                     fontSize: 19,
                     fontWeight: FontWeight.w800,
@@ -18114,69 +18793,8 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // LEFT: drag handle + number badge + text info
-                                  // Drag handle (disabled if isVisited)
-                                  if (isVisited)
-                                    const Padding(
-                                      padding: EdgeInsets.only(
-                                        top: 2,
-                                        right: 6,
-                                      ),
-                                      child: Icon(
-                                        Icons.drag_indicator_rounded,
-                                        color: Colors.transparent,
-                                        size: 13,
-                                      ),
-                                    )
-                                  else
-                                    ReorderableDragStartListener(
-                                      index: idx,
-                                      child: const Padding(
-                                        padding: EdgeInsets.only(
-                                          top: 2,
-                                          right: 6,
-                                        ),
-                                        child: Icon(
-                                          Icons.drag_indicator_rounded,
-                                          color: Color(0xFFCBD5E1),
-                                          size: 18,
-                                        ),
-                                      ),
-                                    ),
-                                  // Number badge
-                                  Container(
-                                    width: 22,
-                                    height: 22,
-                                    margin: const EdgeInsets.only(
-                                      right: 6,
-                                      top: 1,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isVisited
-                                          ? const Color(0xFF10B981)
-                                          : customColor,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      (() {
-                                        int n = 0;
-                                        for (int i = 0; i <= idx; i++) {
-                                          if (sortedDayDetails[i]['place'] !=
-                                              null) {
-                                            n++;
-                                          }
-                                        }
-                                        return '$n';
-                                      })(),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                  // Name + time + tags
+                                  // Tên không lặp số thứ tự; số đã nằm trên
+                                  // timeline bên trái. Nhấn giữ thẻ để kéo.
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -18186,7 +18804,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                           name.isNotEmpty ? name : 'Địa điểm',
                                           style: TextStyle(
                                             fontWeight: FontWeight.w700,
-                                            fontSize: 15,
+                                            fontSize: 14,
                                             color: isVisited
                                                 ? const Color(0xFF64748B)
                                                 : const Color(0xFF0F172A),
@@ -18197,169 +18815,18 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                               0xFF94A3B8,
                                             ),
                                             letterSpacing: -0.2,
-                                            height: 1.25,
+                                            height: 1.2,
                                           ),
-                                          maxLines: 2,
+                                          maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         const SizedBox(height: 6),
-                                        Wrap(
-                                          crossAxisAlignment:
-                                              WrapCrossAlignment.center,
-                                          spacing: 6,
-                                          runSpacing: 4,
-                                          children: [
-                                            // Time pill
-                                            GestureDetector(
-                                              onTap: isVisited
-                                                  ? null
-                                                  : () => _selectTimeForDetail(
-                                                      detail,
-                                                    ),
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      (extraInfo != null &&
-                                                          extraInfo.isNotEmpty)
-                                                      ? customColor.withAlpha(
-                                                          20,
-                                                        )
-                                                      : const Color(0xFFFEF3C7),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color:
-                                                        (extraInfo != null &&
-                                                            extraInfo
-                                                                .isNotEmpty)
-                                                        ? customColor.withAlpha(
-                                                            70,
-                                                          )
-                                                        : const Color(
-                                                            0xFFFBBF24,
-                                                          ).withAlpha(120),
-                                                  ),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.schedule_rounded,
-                                                      size: 12,
-                                                      color:
-                                                          (extraInfo != null &&
-                                                              extraInfo
-                                                                  .isNotEmpty)
-                                                          ? customColor
-                                                          : const Color(
-                                                              0xFFD97706,
-                                                            ),
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      (extraInfo != null &&
-                                                              extraInfo
-                                                                  .isNotEmpty)
-                                                          ? extraInfo
-                                                          : 'Thêm thời gian',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color:
-                                                            (extraInfo !=
-                                                                    null &&
-                                                                extraInfo
-                                                                    .isNotEmpty)
-                                                            ? customColor
-                                                            : const Color(
-                                                                0xFFD97706,
-                                                              ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                            // Visited badge
-                                            InkWell(
-                                              onTap: () => _toggleVisitedDetail(
-                                                id,
-                                                detail,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 7,
-                                                      vertical: 3,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: isVisited
-                                                      ? const Color(
-                                                          0xFF10B981,
-                                                        ).withAlpha(25)
-                                                      : Colors.grey.withAlpha(
-                                                          18,
-                                                        ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  border: Border.all(
-                                                    color: isVisited
-                                                        ? const Color(
-                                                            0xFF10B981,
-                                                          )
-                                                        : Colors.grey.withAlpha(
-                                                            60,
-                                                          ),
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                      isVisited
-                                                          ? Icons
-                                                                .check_circle_rounded
-                                                          : Icons
-                                                                .radio_button_unchecked_rounded,
-                                                      size: 13,
-                                                      color: isVisited
-                                                          ? const Color(
-                                                              0xFF059669,
-                                                            )
-                                                          : Colors.grey[600],
-                                                    ),
-                                                    const SizedBox(width: 3),
-                                                    Text(
-                                                      isVisited
-                                                          ? 'Đã ghé'
-                                                          : 'Chưa ghé',
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: isVisited
-                                                            ? const Color(
-                                                                0xFF059669,
-                                                              )
-                                                            : Colors.grey[600],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
+                                        _buildScheduleStatusRow(
+                                          detail: detail,
+                                          detailId: id,
+                                          isVisited: isVisited,
+                                          timeLabel: extraInfo,
+                                          customColor: customColor,
                                         ),
                                         const SizedBox(height: 7),
                                         // Tags row (category + weather)
@@ -18888,11 +19355,11 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
               // Numbered Circle / Check Marker (for Place Timeline marker)
               if (detail['place'] != null)
                 Positioned(
-                  top: 18,
-                  left: 4,
+                  top: 16,
+                  left: 2,
                   child: Container(
-                    width: 24,
-                    height: 24,
+                    width: 28,
+                    height: 28,
                     decoration: BoxDecoration(
                       color: isVisited ? const Color(0xFF10B981) : customColor,
                       shape: BoxShape.circle,
@@ -18903,7 +19370,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                         ? const Icon(
                             Icons.check_rounded,
                             color: Colors.white,
-                            size: 13,
+                            size: 15,
                           )
                         : Text(
                             (() {
@@ -18918,7 +19385,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
-                              fontSize: 10,
+                              fontSize: 12,
                             ),
                           ),
                   ),
@@ -18949,7 +19416,15 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           ),
         );
 
-        return Container(key: ValueKey('item_$id'), child: contentWidget);
+        return Container(
+          key: ValueKey('item_$id'),
+          child: isVisited
+              ? contentWidget
+              : ReorderableDelayedDragStartListener(
+                  index: idx,
+                  child: contentWidget,
+                ),
+        );
       }),
     );
   }
@@ -19110,6 +19585,7 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     return Column(
       children: [
         horizontalBar,
+        _buildAutoWeatherControl(),
         Expanded(
           child: Listener(
             onPointerDown: (event) {
@@ -19341,51 +19817,89 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
 
                                   final isOptimizing = _optimizingDayNumbers
                                       .contains(index + 1);
-                                  return GestureDetector(
-                                    onTap: isOptimizing
-                                        ? null
-                                        : () => _optimizeDay(index),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEFF6FF),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: const Color(0xFFBFDBFE),
+                                  return Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: isOptimizing
+                                          ? null
+                                          : () => _optimizeDay(index),
+                                      borderRadius: BorderRadius.circular(13),
+                                      child: Ink(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 13,
+                                          vertical: 10,
                                         ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          isOptimizing
-                                              ? const SizedBox(
-                                                  width: 14,
-                                                  height: 14,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                      ),
-                                                )
-                                              : const Icon(
-                                                  Icons.auto_awesome_rounded,
-                                                  color: Color(0xFF0284C7),
-                                                  size: 14,
-                                                ),
-                                          const SizedBox(width: 5),
-                                          Text(
-                                            isOptimizing
-                                                ? 'Đang phân tích thời tiết...'
-                                                : '✨ Tối ưu động$subText',
-                                            style: const TextStyle(
-                                              color: Color(0xFF0284C7),
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                        decoration: BoxDecoration(
+                                          color: isOptimizing
+                                              ? const Color(0xFF64748B)
+                                              : const Color(0xFF2563EB),
+                                          borderRadius: BorderRadius.circular(
+                                            13,
                                           ),
-                                        ],
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(
+                                                0xFF2563EB,
+                                              ).withAlpha(42),
+                                              blurRadius: 12,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            isOptimizing
+                                                ? const SizedBox(
+                                                    width: 17,
+                                                    height: 17,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          color: Colors.white,
+                                                        ),
+                                                  )
+                                                : const Icon(
+                                                    Icons.auto_awesome_rounded,
+                                                    color: Colors.white,
+                                                    size: 18,
+                                                  ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                isOptimizing
+                                                    ? 'Đang tối ưu lịch trình...'
+                                                    : 'Tối ưu ngay',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ),
+                                            if (!isOptimizing &&
+                                                subText.isNotEmpty)
+                                              Flexible(
+                                                child: Text(
+                                                  subText.replaceFirst(
+                                                    ' · ',
+                                                    '',
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                    color: Color(0xFFDBEAFE),
+                                                    fontSize: 10.5,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   );

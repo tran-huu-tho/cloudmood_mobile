@@ -373,6 +373,77 @@ class DatabaseService {
     }
   }
 
+  Future<Map<String, dynamic>> getAutoWeatherSettings({
+    required int itineraryId,
+  }) async {
+    await ApiClient.requireDynamicAiBackend(requireAutoWeather: true);
+    final response = await ApiClient.get(
+      '/mobile/ai/auto-weather-settings/$itineraryId',
+    );
+    final decoded = jsonDecode(response.body);
+    if (response.statusCode == 200 &&
+        decoded is Map &&
+        decoded['success'] == true &&
+        decoded['data'] != null) {
+      return Map<String, dynamic>.from(decoded['data']);
+    }
+    final message = decoded is Map
+        ? (decoded['message'] ?? 'Không thể tải cấu hình tự động thời tiết.')
+        : 'Không thể tải cấu hình tự động thời tiết.';
+    throw Exception(message.toString());
+  }
+
+  Future<Map<String, dynamic>> updateAutoWeatherSettings({
+    required int itineraryId,
+    required bool enabled,
+    int rainThreshold = 70,
+  }) async {
+    await ApiClient.requireDynamicAiBackend(requireAutoWeather: true);
+    final response = await ApiClient.post(
+      '/mobile/ai/auto-weather-settings',
+      body: {
+        'itineraryId': itineraryId,
+        'enabled': enabled,
+        'rainThreshold': rainThreshold,
+      },
+      allowRemoteFallback: false,
+    );
+    final decoded = jsonDecode(response.body);
+    if ((response.statusCode == 200 || response.statusCode == 201) &&
+        decoded is Map &&
+        decoded['success'] == true &&
+        decoded['data'] != null) {
+      return Map<String, dynamic>.from(decoded['data']);
+    }
+    final message = decoded is Map
+        ? (decoded['message'] ?? 'Không thể cập nhật chế độ tự động.')
+        : 'Không thể cập nhật chế độ tự động.';
+    throw Exception(message.toString());
+  }
+
+  Future<bool> undoAutoWeatherOptimization({
+    required int itineraryId,
+    required int historyId,
+  }) async {
+    await ApiClient.requireDynamicAiBackend(requireAutoWeather: true);
+    final response = await ApiClient.post(
+      '/mobile/ai/undo-auto-weather',
+      body: {'itineraryId': itineraryId, 'historyId': historyId},
+      allowRemoteFallback: false,
+    );
+    final decoded = jsonDecode(response.body);
+    if ((response.statusCode == 200 || response.statusCode == 201) &&
+        decoded is Map &&
+        decoded['success'] == true) {
+      refreshTrigger.value++;
+      return true;
+    }
+    final message = decoded is Map
+        ? (decoded['message'] ?? 'Không thể hoàn tác lần tự động cập nhật.')
+        : 'Không thể hoàn tác lần tự động cập nhật.';
+    throw Exception(message.toString());
+  }
+
   /// Lấy tối đa ba địa điểm thật từ CSDL đã vượt qua Rule Engine.
   Future<Map<String, dynamic>> proposePlaceReplacements({
     required int itineraryId,
