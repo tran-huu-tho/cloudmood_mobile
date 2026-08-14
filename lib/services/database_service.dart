@@ -263,8 +263,12 @@ class DatabaseService {
     required String pace,
     required String companion,
     required String budget,
+    required int budgetTotal,
+    required int travelerCount,
+    required int dailyBudgetPerPerson,
     required List<String> categories,
     required DateTime startDate,
+    List<String> preferenceTags = const [],
     String? customRequest,
   }) async {
     await ApiClient.requireDynamicAiBackend();
@@ -274,8 +278,12 @@ class DatabaseService {
       'pace': pace,
       'companion': companion,
       'budget': budget,
+      'budgetTotal': budgetTotal,
+      'travelerCount': travelerCount,
+      'dailyBudgetPerPerson': dailyBudgetPerPerson,
       'categories': categories,
       'startDate': startDate.toIso8601String(),
+      'preferenceTags': preferenceTags,
       if (customRequest != null && customRequest.trim().isNotEmpty)
         'customRequest': customRequest.trim(),
     };

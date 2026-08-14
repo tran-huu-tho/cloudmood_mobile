@@ -35,13 +35,12 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
   String _selectedMood = "🏖️ Thư giãn";
   Map<String, dynamic>? _weatherData;
   bool _isLoadingWeather = true;
-  String _weatherQuote = "";
+  String? _weatherError;
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
   static Map<String, dynamic>? _cachedWeatherData;
-  static String _cachedWeatherQuote = "";
   static DateTime? _lastWeatherFetchTime;
   Timer? _weatherTimer;
 
@@ -69,7 +68,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       if (mounted) {
         setState(() {
           _weatherData = _cachedWeatherData;
-          _weatherQuote = _cachedWeatherQuote;
+          _weatherError = null;
           _isLoadingWeather = false;
         });
       }
@@ -80,6 +79,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       if (mounted) {
         setState(() {
           _isLoadingWeather = true;
+          _weatherError = null;
         });
       }
     }
@@ -117,28 +117,46 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
               'lat': position.latitude.toString(),
               'lon': position.longitude.toString(),
             }
-          : {'cityName': 'Da Nang'};
+          : {'cityName': 'Can Tho'};
 
       final response = await ApiClient.get(
         '/weather/current',
         query: queryParams,
+        timeout: const Duration(seconds: 12),
       );
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final quote = _getQuoteForCondition(data['condition'] ?? '');
-        _cachedWeatherData = data;
-        _cachedWeatherQuote = quote;
+        final rawData = Map<String, dynamic>.from(jsonDecode(response.body));
+        final initialData = {
+          ...rawData,
+          'rainDataSource': 'Đang cập nhật Open-Meteo',
+        };
+        _cachedWeatherData = initialData;
         _lastWeatherFetchTime = DateTime.now();
 
         if (mounted) {
           setState(() {
+            _weatherData = initialData;
+            _weatherError = null;
+            _isLoadingWeather = false;
+          });
+        }
+
+        final data = await _attachHourlyRainForecast(initialData);
+        _cachedWeatherData = data;
+        _lastWeatherFetchTime = DateTime.now();
+        if (mounted) {
+          setState(() {
             _weatherData = data;
-            _weatherQuote = quote;
           });
         }
       }
     } catch (e) {
       debugPrint('Error fetching weather: $e');
+      if (mounted && _weatherData == null) {
+        setState(() {
+          _weatherError = 'Không thể cập nhật thời tiết';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -148,41 +166,96 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
     }
   }
 
-  String _getQuoteForCondition(String condition) {
-    final cond = condition.toLowerCase();
-    if (cond.contains('rain') ||
-        cond.contains('drizzle') ||
-        cond.contains('thunderstorm')) {
-      final quotes = [
-        "Những ngày mưa là cái cớ hoàn hảo để trốn vào góc quán quen, thưởng thức ly latte ấm và lắng nghe giai điệu Acoustic dịu dàng.",
-        "Mưa không làm ta buồn, mưa chỉ làm ta muốn ghé một quán trà nhỏ, ngắm dòng người qua và nghĩ về những hành trình đã qua.",
-        "Có những ngày mưa rơi mang theo hương vị của sự bình yên. Một ngày tuyệt vời để tìm cho mình một góc trú chân ấm cúng.",
-        "Tiếng mưa tí tách bên hiên nhà là nhạc nền hoàn hảo cho một ngày lười biếng, tận hưởng tách cacao nóng thơm lừng.",
-      ];
-      return (quotes..shuffle()).first;
-    } else if (cond.contains('cloud')) {
-      final quotes = [
-        "Tiết trời dịu mát như chiều lòng người, thích hợp cho một buổi dạo bộ thong dung qua những con hẻm nhỏ bình yên.",
-        "Hôm nay trời không nắng gắt, mây nhẹ che đầu, là thời điểm lý tưởng nhất để cùng nhóm bạn thân lên lịch đi trốn.",
-        "Bầu trời mang sắc xám nhẹ nhàng, thổi làn gió mát lành gọi mời bước chân ta bước ra ngoài khám phá.",
-        "Thời tiết râm mát thế này, một tách trà chiều bên hiên nhà là đủ cho một ngày cuối tuần thảnh thơi.",
-      ];
-      return (quotes..shuffle()).first;
-    } else if (cond.contains('clear') || cond.contains('sunny')) {
-      final quotes = [
-        "Nắng vàng lấp lánh như đang viết nên bài thơ của mùa hè. Hãy xách ba lô lên và đi để không bỏ lỡ ngày xanh!",
-        "Bầu trời hôm nay thật trong lành, những tia nắng ấm áp chính là chiếc vé mời gọi ta đến với những vùng đất mới.",
-        "Nắng chiếu lung linh qua từng tán lá, một ngày ngập tràn năng lượng thích hợp cho những chuyến đi dã ngoại ngoài trời.",
-        "Cuộc đời là những chuyến đi, và nắng hôm nay chính là người bạn đồng hành tuyệt vời nhất của bạn.",
-      ];
-      return (quotes..shuffle()).first;
-    } else {
-      final quotes = [
-        "Dù ngoài trời nắng hay mưa, chỉ cần lòng bạn bình yên thì ngày nào cũng là một ngày đẹp để đi.",
-        "Mỗi ngày mới là một chương sách mới. Hãy để thời tiết viết nên những kỷ niệm đáng nhớ trong hành trình của bạn.",
-        "Thời tiết đẹp nhất là khi lòng ta sẵn sàng đón nhận những trải nghiệm mới. Khám phá ngay nhé!",
-      ];
-      return (quotes..shuffle()).first;
+  Future<Map<String, dynamic>> _attachHourlyRainForecast(
+    Map<String, dynamic> currentData,
+  ) async {
+    final latitude = (currentData['latitude'] as num?)?.toDouble();
+    final longitude = (currentData['longitude'] as num?)?.toDouble();
+    if (latitude == null ||
+        longitude == null ||
+        !latitude.isFinite ||
+        !longitude.isFinite) {
+      return {
+        ...currentData,
+        'rainDataSource': 'Ước tính từ điều kiện hiện tại',
+      };
+    }
+
+    try {
+      final response = await ApiClient.get(
+        '/weather/hourly',
+        query: {'lat': latitude.toString(), 'lon': longitude.toString()},
+        timeout: const Duration(seconds: 10),
+      );
+      if (response.statusCode != 200) {
+        return {
+          ...currentData,
+          'rainDataSource': 'Ước tính từ điều kiện hiện tại',
+        };
+      }
+
+      final payload = Map<String, dynamic>.from(jsonDecode(response.body));
+      final hourly = payload['hourly'] is Map
+          ? Map<String, dynamic>.from(payload['hourly'])
+          : <String, dynamic>{};
+      final times = List<dynamic>.from(hourly['time'] ?? const []);
+      final probabilities = List<dynamic>.from(
+        hourly['precipitation_probability'] ?? const [],
+      );
+      final precipitation = List<dynamic>.from(
+        hourly['precipitation'] ?? const [],
+      );
+      if (times.isEmpty) {
+        return {
+          ...currentData,
+          'rainDataSource': 'Ước tính từ điều kiện hiện tại',
+        };
+      }
+
+      final now = DateTime.now();
+      var nearestIndex = 0;
+      var nearestDifference = const Duration(days: 365);
+      for (var index = 0; index < times.length; index++) {
+        final forecastTime = DateTime.tryParse(times[index].toString());
+        if (forecastTime == null) continue;
+        final difference = forecastTime.difference(now).abs();
+        if (difference < nearestDifference) {
+          nearestDifference = difference;
+          nearestIndex = index;
+        }
+      }
+
+      final rainProbability = nearestIndex < probabilities.length
+          ? (probabilities[nearestIndex] as num?)?.round()
+          : null;
+      final rainAmount = nearestIndex < precipitation.length
+          ? (precipitation[nearestIndex] as num?)?.toDouble()
+          : null;
+      final suggestions = currentData['suggestions'] is Map
+          ? Map<String, dynamic>.from(currentData['suggestions'])
+          : <String, dynamic>{};
+      if (rainProbability != null) {
+        suggestions['rainProbability'] = rainProbability.clamp(0, 100);
+      }
+      if (rainAmount != null) {
+        suggestions['estimatedRainfall'] = rainAmount;
+      }
+
+      return {
+        ...currentData,
+        'suggestions': suggestions,
+        if (rainAmount != null) 'rainfall': rainAmount,
+        'rainDataSource': 'Open-Meteo theo giờ',
+        'forecastTime': times[nearestIndex].toString(),
+      };
+    } catch (error) {
+      debugPrint(
+        'Không thể bổ sung dự báo mưa Open-Meteo: ' + error.toString(),
+      );
+      return {
+        ...currentData,
+        'rainDataSource': 'Ước tính từ điều kiện hiện tại',
+      };
     }
   }
 
@@ -190,15 +263,23 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
     final raw = rawDesc.toLowerCase();
     final cond = condition.toLowerCase();
 
-    if (raw.contains('mây đen') || raw.contains('overcast') || raw.contains('broken clouds')) {
+    if (raw.contains('mây đen') ||
+        raw.contains('overcast') ||
+        raw.contains('broken clouds')) {
       return 'Nhiều mây âm u';
-    } else if (raw.contains('scattered') || raw.contains('few clouds') || raw.contains('mây rải rác')) {
+    } else if (raw.contains('scattered') ||
+        raw.contains('few clouds') ||
+        raw.contains('mây rải rác')) {
       return 'Mây rải rác nhẹ';
     } else if (raw.contains('cloud') || cond.contains('cloud')) {
       return 'Trời nhiều mây';
-    } else if (raw.contains('clear') || raw.contains('sunny') || cond.contains('clear')) {
+    } else if (raw.contains('clear') ||
+        raw.contains('sunny') ||
+        cond.contains('clear')) {
       return 'Trời nắng quang đãng';
-    } else if (raw.contains('light rain') || raw.contains('mưa nhẹ') || raw.contains('mưa rào rải rác')) {
+    } else if (raw.contains('light rain') ||
+        raw.contains('mưa nhẹ') ||
+        raw.contains('mưa rào rải rác')) {
       return 'Mưa rào nhẹ';
     } else if (raw.contains('thunderstorm') || cond.contains('thunderstorm')) {
       return 'Mưa giông';
@@ -219,10 +300,10 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 5),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withOpacity(0.15)),
         boxShadow: [
           BoxShadow(
@@ -236,27 +317,27 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: color.withOpacity(0.12),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 14, color: color),
+            child: Icon(icon, size: 12, color: color),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           Text(
             label,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 9.5,
               color: Colors.grey[600],
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 1),
           Text(
             value,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 11.5,
               fontWeight: FontWeight.w800,
               color: AppTheme.darkText,
             ),
@@ -271,10 +352,10 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Container(
-          height: 140,
+          height: 110,
           decoration: BoxDecoration(
             color: AppTheme.surfaceVariant,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: const Center(
             child: CircularProgressIndicator(
@@ -287,13 +368,58 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
     }
 
     if (_weatherData == null) {
-      return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Container(
+          height: 54,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.cloud_off_rounded,
+                size: 20,
+                color: Color(0xFF64748B),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  _weatherError ?? 'Chưa có dữ liệu thời tiết',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF475569),
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _fetchWeatherAndQuote(force: true),
+                icon: const Icon(Icons.refresh_rounded, size: 15),
+                label: const Text('Thử lại'),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  textStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final temp = _weatherData!['temp'] != null
         ? (_weatherData!['temp'] as num).round()
         : 25;
-    final cityName = _weatherData!['cityName'] ?? 'Đà Nẵng';
+    final cityName = _weatherData!['cityName'] ?? 'Cần Thơ';
     final rawDesc = _weatherData!['description'] ?? '';
     final condition = _weatherData!['condition'] ?? '';
     final desc = _getFriendlyWeatherDesc(rawDesc, condition);
@@ -304,8 +430,11 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
     final humidity = _weatherData!['humidity'] ?? 0;
     final suggestions = _weatherData!['suggestions'] ?? {};
     final rainProb = suggestions['rainProbability'] ?? 0;
-    final num rainfallNum = (suggestions['estimatedRainfall'] ?? _weatherData!['rainfall'] ?? 0);
+    final num rainfallNum =
+        (_weatherData!['rainfall'] ?? suggestions['estimatedRainfall'] ?? 0);
     final double rainfall = rainfallNum.toDouble();
+    final rainDataSource =
+        _weatherData!['rainDataSource'] ?? 'Dữ liệu thời tiết hiện tại';
 
     final String formattedTime = _lastWeatherFetchTime != null
         ? "${_lastWeatherFetchTime!.hour.toString().padLeft(2, '0')}:${_lastWeatherFetchTime!.minute.toString().padLeft(2, '0')}"
@@ -318,16 +447,10 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFEFF6FF),
-              Color(0xFFF8FAFC),
-            ],
+            colors: [Color(0xFFEFF6FF), Color(0xFFF8FAFC)],
           ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: const Color(0xFFDBEAFE),
-            width: 1.2,
-          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFDBEAFE), width: 1.2),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF3B82F6).withOpacity(0.06),
@@ -364,7 +487,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(18.0),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -376,14 +499,14 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                         children: [
                           const Icon(
                             Icons.location_on_rounded,
-                            size: 16,
+                            size: 15,
                             color: Color(0xFF2563EB),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             cityName,
                             style: const TextStyle(
-                              fontSize: 16.5,
+                              fontSize: 14.5,
                               fontWeight: FontWeight.w800,
                               color: Color(0xFF0F172A),
                               letterSpacing: -0.2,
@@ -394,7 +517,10 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                       GestureDetector(
                         onTap: () => _fetchWeatherAndQuote(force: true),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
@@ -413,7 +539,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                               Text(
                                 formattedTime,
                                 style: const TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xFF2563EB),
                                 ),
@@ -421,7 +547,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                               const SizedBox(width: 4),
                               const Icon(
                                 Icons.refresh_rounded,
-                                size: 13,
+                                size: 12,
                                 color: Color(0xFF2563EB),
                               ),
                             ],
@@ -430,7 +556,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 7),
 
                   // Main Temperature & Weather Image Row
                   Row(
@@ -446,7 +572,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                               Text(
                                 '$temp°',
                                 style: const TextStyle(
-                                  fontSize: 42,
+                                  fontSize: 34,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF0F172A),
                                   letterSpacing: -1.5,
@@ -458,7 +584,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                                 child: Text(
                                   'C',
                                   style: TextStyle(
-                                    fontSize: 22,
+                                    fontSize: 17,
                                     fontWeight: FontWeight.w800,
                                     color: Color(0xFF0F172A),
                                   ),
@@ -466,9 +592,12 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFF2563EB).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(10),
@@ -476,7 +605,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                             child: Text(
                               desc,
                               style: const TextStyle(
-                                fontSize: 12.5,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF2563EB),
                               ),
@@ -486,18 +615,18 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                       ),
                       Image.network(
                         iconUrl,
-                        width: 72,
-                        height: 72,
+                        width: 50,
+                        height: 50,
                         fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) => const Icon(
                           Icons.wb_sunny_rounded,
                           color: Color(0xFFF59E0B),
-                          size: 52,
+                          size: 40,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
 
                   // 3 Stat Badges
                   Row(
@@ -523,7 +652,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                       Expanded(
                         child: _buildStatBadge(
                           icon: Icons.umbrella_rounded,
-                          label: 'Lượng mưa',
+                          label: 'Mưa dự kiến',
                           value: '${rainfall.toStringAsFixed(1)}mm',
                           color: const Color(0xFF7C3AED),
                         ),
@@ -531,70 +660,46 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                     ],
                   ),
 
-                  if (_weatherQuote.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: const Color(0xFFDBEAFE),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 3,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3B82F6),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _weatherQuote,
-                              style: const TextStyle(
-                                fontStyle: FontStyle.italic,
-                                fontSize: 12.5,
-                                color: Color(0xFF334155),
-                                height: 1.45,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   // Action Footer: "Xem dự báo giờ & 5 ngày"
                   InkWell(
                     onTap: () => _showDetailedWeatherSheet(context, cityName),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 6,
+                        horizontal: 9,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF2563EB).withOpacity(0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Row(
                         children: [
-                          Icon(Icons.calendar_month_rounded, size: 15, color: Color(0xFF2563EB)),
-                          SizedBox(width: 6),
-                          Text(
-                            'Xem dự báo theo giờ & 5 ngày tới',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF2563EB),
+                          const Icon(
+                            Icons.calendar_month_rounded,
+                            size: 14,
+                            color: Color(0xFF2563EB),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              rainDataSource + ' · Dự báo giờ & 5 ngày',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF2563EB),
+                              ),
                             ),
                           ),
-                          SizedBox(width: 4),
-                          Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 3),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 15,
+                            color: Color(0xFF2563EB),
+                          ),
                         ],
                       ),
                     ),
@@ -609,12 +714,19 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
   }
 
   void _showDetailedWeatherSheet(BuildContext context, String city) {
+    final latitude = (_weatherData?['latitude'] as num?)?.toDouble();
+    final longitude = (_weatherData?['longitude'] as num?)?.toDouble();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return _DetailedWeatherModal(cityName: city);
+        return _DetailedWeatherModal(
+          cityName: city,
+          latitude: latitude,
+          longitude: longitude,
+        );
       },
     );
   }
@@ -644,11 +756,11 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
               children: [
                 // 1. Hero Search Header
                 SearchHeaderWidget(onSearchTap: widget.onExplorePlacesTap),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
 
                 // Weather Widget
                 _buildWeatherWidget(),
-                const SizedBox(height: 24),
+                const SizedBox(height: 14),
 
                 // Featured Places Section
                 FeaturedPlacesSection(
@@ -656,13 +768,13 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
                       ? () => widget.onExplorePlacesTap!('')
                       : null,
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 14),
 
                 // 3. Featured Guides
                 FeaturedGuidesSection(onSeeMore: widget.onExploreGuidesTap),
 
                 // Bottom padding for floating nav
-                const SizedBox(height: 110),
+                const SizedBox(height: 86),
               ],
             ),
           ),
@@ -826,7 +938,10 @@ class _SearchHeaderWidgetState extends State<SearchHeaderWidget> {
                     },
                     decoration: InputDecoration(
                       hintText: 'Tìm điểm đến, cẩm nang du lịch...',
-                      hintStyle: TextStyle(color: AppTheme.hintText, fontSize: 14),
+                      hintStyle: TextStyle(
+                        color: AppTheme.hintText,
+                        fontSize: 14,
+                      ),
                       filled: false,
                       fillColor: Colors.transparent,
                       border: InputBorder.none,
@@ -1041,7 +1156,7 @@ class FeaturedGuidesSection extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting &&
             posts.isEmpty) {
           return const SizedBox(
-            height: 320,
+            height: 118,
             child: Center(
               child: CircularProgressIndicator(
                 color: AppTheme.primary,
@@ -1096,9 +1211,9 @@ class FeaturedGuidesSection extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 7),
             SizedBox(
-              height: 320,
+              height: 118,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -1108,12 +1223,6 @@ class FeaturedGuidesSection extends StatelessWidget {
                   final post = posts[index];
                   final String title = (post['title'] ?? 'Cẩm nang du lịch')
                       .toString();
-                  final String desc =
-                      (post['description'] ??
-                              post['content'] ??
-                              post['summary'] ??
-                              '')
-                          .toString();
                   final String image =
                       (post['coverImage'] ??
                               post['image'] ??
@@ -1130,6 +1239,13 @@ class FeaturedGuidesSection extends StatelessWidget {
                       (post['author']?['fullName'] ?? 'Cloudmood Guide')
                           .toString();
                   final String? avatar = post['author']?['avatar']?.toString();
+                  final bool hasCustomAvatar =
+                      avatar != null &&
+                      avatar.trim().isNotEmpty &&
+                      !avatar.toLowerCase().contains('default-avatar');
+                  final String authorInitial = authorName.trim().isNotEmpty
+                      ? authorName.trim()[0].toUpperCase()
+                      : 'C';
                   final int likesCount = (post['likes'] is List)
                       ? (post['likes'] as List).length
                       : 0;
@@ -1163,11 +1279,11 @@ class FeaturedGuidesSection extends StatelessWidget {
                       );
                     },
                     child: Container(
-                      width: 265,
-                      margin: const EdgeInsets.only(right: 16.0),
+                      width: 180,
+                      margin: const EdgeInsets.only(right: 10.0),
                       decoration: BoxDecoration(
                         color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
                             color: AppTheme.primary.withAlpha(15),
@@ -1185,21 +1301,21 @@ class FeaturedGuidesSection extends StatelessWidget {
                             children: [
                               ClipRRect(
                                 borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(22),
+                                  top: Radius.circular(16),
                                 ),
                                 child: Image.network(
                                   image,
-                                  height: 155,
-                                  width: 265,
+                                  height: 64,
+                                  width: 180,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Container(
-                                      height: 155,
+                                      height: 64,
                                       color: AppTheme.surfaceVariant,
                                       child: Icon(
                                         Icons.image_rounded,
                                         color: AppTheme.hintText,
-                                        size: 40,
+                                        size: 24,
                                       ),
                                     );
                                   },
@@ -1210,7 +1326,7 @@ class FeaturedGuidesSection extends StatelessWidget {
                                 bottom: 0,
                                 left: 0,
                                 right: 0,
-                                height: 60,
+                                height: 35,
                                 child: Container(
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
@@ -1226,22 +1342,22 @@ class FeaturedGuidesSection extends StatelessWidget {
                               ),
                               // Category badge
                               Positioned(
-                                top: 12,
-                                left: 12,
+                                top: 6,
+                                left: 6,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
+                                    horizontal: 7,
+                                    vertical: 3,
                                   ),
                                   decoration: BoxDecoration(
                                     gradient: AppTheme.primaryGradient,
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
                                     category,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 10,
+                                      fontSize: 8.5,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -1249,30 +1365,30 @@ class FeaturedGuidesSection extends StatelessWidget {
                               ),
                               // Likes badge
                               Positioned(
-                                top: 12,
-                                right: 12,
+                                top: 6,
+                                right: 6,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 5,
+                                    horizontal: 6,
+                                    vertical: 3,
                                   ),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withAlpha(130),
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Row(
                                     children: [
                                       const Icon(
                                         Icons.favorite_rounded,
                                         color: Colors.redAccent,
-                                        size: 12,
+                                        size: 10,
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
                                         '$likesCount',
                                         style: const TextStyle(
                                           color: Colors.white,
-                                          fontSize: 10,
+                                          fontSize: 8.5,
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
@@ -1284,59 +1400,56 @@ class FeaturedGuidesSection extends StatelessWidget {
                           ),
                           // Content
                           Padding(
-                            padding: const EdgeInsets.all(14.0),
+                            padding: const EdgeInsets.all(6.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   title,
-                                  maxLines: 2,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.darkText,
                                     height: 1.3,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  desc,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.subtitleText,
-                                    height: 1.4,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 3),
                                 Row(
                                   children: [
-                                    CircleAvatar(
-                                      radius: 12,
-                                      backgroundColor:
-                                          AppTheme.primaryContainer,
-                                      backgroundImage:
-                                          (avatar != null && avatar.isNotEmpty)
-                                          ? NetworkImage(avatar)
-                                          : null,
-                                      child: (avatar == null || avatar.isEmpty)
-                                          ? const Icon(
-                                              Icons.person,
-                                              size: 14,
-                                              color: AppTheme.primary,
+                                    Container(
+                                      width: 18,
+                                      height: 18,
+                                      alignment: Alignment.center,
+                                      clipBehavior: Clip.antiAlias,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primaryContainer,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: hasCustomAvatar
+                                          ? AvatarImage(
+                                              avatarUrl: avatar,
+                                              size: 18,
                                             )
-                                          : null,
+                                          : Text(
+                                              authorInitial,
+                                              style: const TextStyle(
+                                                color: AppTheme.primary,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                height: 1,
+                                              ),
+                                            ),
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 5),
                                     Expanded(
                                       child: Text(
                                         '$authorName · $viewsCount xem',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 9.5,
                                           color: AppTheme.subtitleText,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -1993,7 +2106,7 @@ class FeaturedPlacesSection extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting &&
             places.isEmpty) {
           return const SizedBox(
-            height: 320,
+            height: 118,
             child: Center(
               child: CircularProgressIndicator(
                 color: AppTheme.primary,
@@ -2045,9 +2158,9 @@ class FeaturedPlacesSection extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 7),
             SizedBox(
-              height: 320,
+              height: 118,
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 scrollDirection: Axis.horizontal,
@@ -2063,20 +2176,16 @@ class FeaturedPlacesSection extends StatelessWidget {
                   final category = place['category']?['name'] ?? 'Địa điểm';
                   final rating = place['rating'] ?? 4.5;
                   final address = place['address'] ?? '';
-                  final desc =
-                      place['description'] ??
-                      'Khám phá địa điểm du lịch tuyệt vời này cùng Cloudmood.';
-
                   return GestureDetector(
                     onTap: () {
                       PlaceDetailBottomSheet.show(context, place);
                     },
                     child: Container(
-                      width: 265,
-                      margin: const EdgeInsets.only(right: 16.0, bottom: 6),
+                      width: 170,
+                      margin: const EdgeInsets.only(right: 10.0, bottom: 3),
                       decoration: BoxDecoration(
                         color: AppTheme.surface,
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
                             color: AppTheme.primary.withAlpha(15),
@@ -2093,65 +2202,65 @@ class FeaturedPlacesSection extends StatelessWidget {
                             children: [
                               ClipRRect(
                                 borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(22),
+                                  top: Radius.circular(16),
                                 ),
                                 child: Image.network(
                                   image,
-                                  height: 155,
-                                  width: 265,
+                                  height: 64,
+                                  width: 170,
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => Container(
-                                    height: 155,
-                                    width: 265,
+                                    height: 64,
+                                    width: 170,
                                     color: AppTheme.surfaceVariant,
                                     child: Icon(
                                       Icons.image_not_supported_rounded,
                                       color: AppTheme.subtitleText,
-                                      size: 36,
+                                      size: 24,
                                     ),
                                   ),
                                 ),
                               ),
                               Positioned(
-                                top: 12,
-                                left: 12,
+                                top: 6,
+                                left: 6,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
+                                    horizontal: 7,
+                                    vertical: 3,
                                   ),
                                   decoration: BoxDecoration(
                                     gradient: AppTheme.primaryGradient,
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
                                     category,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 10,
+                                      fontSize: 8.5,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
                               ),
                               Positioned(
-                                top: 12,
-                                right: 12,
+                                top: 6,
+                                right: 6,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 5,
+                                    horizontal: 6,
+                                    vertical: 3,
                                   ),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withAlpha(130),
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Row(
                                     children: [
                                       const Icon(
                                         Icons.star_rounded,
                                         color: Colors.amber,
-                                        size: 12,
+                                        size: 10,
                                       ),
                                       const SizedBox(width: 3),
                                       Text(
@@ -2160,7 +2269,7 @@ class FeaturedPlacesSection extends StatelessWidget {
                                             : '4.5',
                                         style: const TextStyle(
                                           color: Colors.white,
-                                          fontSize: 10,
+                                          fontSize: 8.5,
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
@@ -2171,48 +2280,37 @@ class FeaturedPlacesSection extends StatelessWidget {
                             ],
                           ),
                           Padding(
-                            padding: const EdgeInsets.all(14.0),
+                            padding: const EdgeInsets.all(6.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   name,
-                                  maxLines: 2,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: AppTheme.darkText,
                                     height: 1.3,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  desc,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppTheme.subtitleText,
-                                    height: 1.4,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 3),
                                 Row(
                                   children: [
                                     Icon(
                                       Icons.location_on_rounded,
-                                      size: 14,
+                                      size: 11,
                                       color: AppTheme.primary,
                                     ),
-                                    const SizedBox(width: 6),
+                                    const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
                                         address,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          fontSize: 11,
+                                          fontSize: 9.5,
                                           color: AppTheme.subtitleText,
                                           fontWeight: FontWeight.w500,
                                         ),
@@ -2239,7 +2337,13 @@ class FeaturedPlacesSection extends StatelessWidget {
 
 class _DetailedWeatherModal extends StatefulWidget {
   final String cityName;
-  const _DetailedWeatherModal({required this.cityName});
+  final double? latitude;
+  final double? longitude;
+  const _DetailedWeatherModal({
+    required this.cityName,
+    this.latitude,
+    this.longitude,
+  });
 
   @override
   State<_DetailedWeatherModal> createState() => _DetailedWeatherModalState();
@@ -2249,6 +2353,26 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
   bool _isLoading = true;
   String? _errorMessage;
   Map<String, dynamic>? _forecastData;
+  int _selectedHourlyIndex = 0;
+  int? _expandedDayIndex;
+
+  List<Map<String, dynamic>> get _hourlyForecasts {
+    final items = _forecastData?['hourly'];
+    if (items is! List) return <Map<String, dynamic>>[];
+    return items
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  List<Map<String, dynamic>> get _dailyForecasts {
+    final items = _forecastData?['daily'];
+    if (items is! List) return <Map<String, dynamic>>[];
+    return items
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
 
   @override
   void initState() {
@@ -2265,7 +2389,11 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
     try {
       final response = await ApiClient.get(
         '/weather/forecast',
-        query: {'cityName': widget.cityName},
+        query: {
+          'cityName': widget.cityName,
+          if (widget.latitude != null) 'lat': widget.latitude.toString(),
+          if (widget.longitude != null) 'lon': widget.longitude.toString(),
+        },
       );
 
       if (response.statusCode == 200) {
@@ -2273,6 +2401,8 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
         if (mounted) {
           setState(() {
             _forecastData = data;
+            _selectedHourlyIndex = 0;
+            _expandedDayIndex = null;
             _isLoading = false;
           });
         }
@@ -2372,7 +2502,11 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
                       color: Colors.grey.shade100,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF475569)),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 20,
+                      color: Color(0xFF475569),
+                    ),
                   ),
                 ),
               ],
@@ -2388,77 +2522,108 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
                     child: CircularProgressIndicator(color: AppTheme.primary),
                   )
                 : _errorMessage != null
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_rounded,
+                          size: 48,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _fetchForecast,
+                          child: const Text('Thử lại'),
+                        ),
+                      ],
+                    ),
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Current overview banner inside modal
+                        _buildCurrentBanner(_forecastData!['current']),
+                        const SizedBox(height: 24),
+
+                        // SECTION 1: Hourly Forecast (Dự báo theo giờ)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Icon(Icons.cloud_off_rounded, size: 48, color: Colors.grey),
-                            const SizedBox(height: 12),
-                            Text(_errorMessage!, style: const TextStyle(color: Colors.grey)),
-                            const SizedBox(height: 12),
-                            ElevatedButton(
-                              onPressed: _fetchForecast,
-                              child: const Text('Thử lại'),
+                            const Text(
+                              'DỰ BÁO THEO GIỜ',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF64748B),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDBEAFE),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Chạm xem · 3 giờ',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF2563EB),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Current overview banner inside modal
-                            _buildCurrentBanner(_forecastData!['current']),
-                            const SizedBox(height: 24),
-
-                            // SECTION 1: Hourly Forecast (Dự báo theo giờ)
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'DỰ BÁO THEO GIỜ',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF64748B),
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFDBEAFE),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text(
-                                    'Mỗi 3 giờ',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF2563EB),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              height: 130,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                physics: const BouncingScrollPhysics(),
-                                itemCount: (_forecastData!['hourly'] as List? ?? []).length,
-                                separatorBuilder: (_, __) => const SizedBox(width: 10),
-                                itemBuilder: (context, index) {
-                                  final item = _forecastData!['hourly'][index];
-                                  return _buildHourlyCard(item, index == 0);
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 130,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: _hourlyForecasts.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 10),
+                            itemBuilder: (context, index) {
+                              final item = _hourlyForecasts[index];
+                              return _buildHourlyCard(
+                                item,
+                                index == _selectedHourlyIndex,
+                                () {
+                                  setState(() {
+                                    _selectedHourlyIndex = index;
+                                  });
                                 },
-                              ),
-                            ),
-                            const SizedBox(height: 28),
+                              );
+                            },
+                          ),
+                        ),
+                        if (_hourlyForecasts.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _buildHourlyDetails(
+                            _hourlyForecasts[_selectedHourlyIndex.clamp(
+                              0,
+                              _hourlyForecasts.length - 1,
+                            )],
+                          ),
+                        ],
+                        const SizedBox(height: 28),
 
-                            // SECTION 2: 5-Day Forecast (Dự báo 5 ngày)
+                        // SECTION 2: 5-Day Forecast (Dự báo 5 ngày)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
                             const Text(
                               'DỰ BÁO 5 NGÀY TỚI',
                               style: TextStyle(
@@ -2468,17 +2633,52 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Column(
-                              children: [
-                                for (var dayItem in (_forecastData!['daily'] as List? ?? []))
-                                  _buildDailyRow(dayItem),
-                              ],
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Chạm để mở',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF2563EB),
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 24),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 12),
+                        Column(
+                          children: [
+                            for (
+                              var index = 0;
+                              index < _dailyForecasts.length;
+                              index++
+                            )
+                              _buildDailyRow(
+                                _dailyForecasts[index],
+                                index == _expandedDayIndex,
+                                () {
+                                  setState(() {
+                                    _expandedDayIndex =
+                                        _expandedDayIndex == index
+                                        ? null
+                                        : index;
+                                  });
+                                },
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),
@@ -2493,6 +2693,9 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
     final iconUrl = 'https://openweathermap.org/img/wn/$iconCode@2x.png';
     final pop = current['pop'] ?? 0;
     final humidity = current['humidity'] ?? 0;
+    final feelsLike = current['feelsLike'];
+    final windSpeed = current['windSpeed'];
+    final rainAmount = current['rainAmount'];
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -2514,41 +2717,66 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$temp°C',
-                style: const TextStyle(
-                  fontSize: 38,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: -1,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$temp°C',
+                  style: const TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -1,
+                  ),
                 ),
-              ),
-              Text(
-                desc.toString().toUpperCase(),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white.withOpacity(0.9),
+                Text(
+                  desc.toString().toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _buildWhiteChip(Icons.umbrella_rounded, 'Mưa: $pop%'),
-                  const SizedBox(width: 8),
-                  _buildWhiteChip(Icons.water_drop_rounded, 'Độ ẩm: $humidity%'),
-                ],
-              ),
-            ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _buildWhiteChip(Icons.umbrella_rounded, 'Mưa: $pop%'),
+                    _buildWhiteChip(Icons.water_drop_rounded, 'Ẩm: $humidity%'),
+                    if (feelsLike != null)
+                      _buildWhiteChip(
+                        Icons.thermostat_rounded,
+                        'Cảm giác: $feelsLike°',
+                      ),
+                    if (windSpeed != null)
+                      _buildWhiteChip(
+                        Icons.air_rounded,
+                        'Gió: ${_formatMetricNumber(windSpeed, decimals: 1)} m/s',
+                      ),
+                    if (rainAmount is num && rainAmount > 0)
+                      _buildWhiteChip(
+                        Icons.grain_rounded,
+                        'Lượng mưa: ${_formatMetricNumber(rainAmount, decimals: 1)} mm',
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           Image.network(
             iconUrl,
             width: 72,
             height: 72,
-            errorBuilder: (_, __, ___) => const Icon(Icons.wb_sunny_rounded, size: 60, color: Colors.amber),
+            errorBuilder: (_, __, ___) => const Icon(
+              Icons.wb_sunny_rounded,
+              size: 60,
+              color: Colors.amber,
+            ),
           ),
         ],
       ),
@@ -2580,72 +2808,270 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
     );
   }
 
-  Widget _buildHourlyCard(Map<String, dynamic> item, bool isSelected) {
+  String _formatMetricNumber(dynamic value, {int decimals = 0}) {
+    final number = value is num
+        ? value.toDouble()
+        : double.tryParse(value?.toString() ?? '');
+    if (number == null || !number.isFinite) return '--';
+    return decimals == 0
+        ? number.round().toString()
+        : number.toStringAsFixed(decimals);
+  }
+
+  Widget _buildHourlyCard(
+    Map<String, dynamic> item,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
     final time = item['time'] ?? '00:00';
     final temp = item['temp'] ?? 0;
     final iconCode = item['icon'] ?? '01d';
     final pop = item['pop'] ?? 0;
     final iconUrl = 'https://openweathermap.org/img/wn/$iconCode@2x.png';
 
-    return Container(
-      width: 76,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
-          width: isSelected ? 1.5 : 1.0,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 76,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF3B82F6)
+                : const Color(0xFFE2E8F0),
+            width: isSelected ? 1.5 : 1.0,
+          ),
         ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            time,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: isSelected ? const Color(0xFF1E40AF) : const Color(0xFF64748B),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              time,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isSelected
+                    ? const Color(0xFF1E40AF)
+                    : const Color(0xFF64748B),
+              ),
             ),
-          ),
-          Image.network(
-            iconUrl,
-            width: 38,
-            height: 38,
-            errorBuilder: (_, __, ___) => const Icon(Icons.cloud, size: 28, color: Colors.blue),
-          ),
-          Text(
-            '$temp°',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
+            Image.network(
+              iconUrl,
+              width: 38,
+              height: 38,
+              errorBuilder: (_, __, ___) =>
+                  const Icon(Icons.cloud, size: 28, color: Colors.blue),
             ),
-          ),
-          if (pop > 0)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.water_drop, size: 10, color: Color(0xFF0284C7)),
-                Text(
-                  '$pop%',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
+            Text(
+              '$temp°',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            if (pop > 0)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.water_drop,
+                    size: 10,
                     color: Color(0xFF0284C7),
                   ),
+                  Text(
+                    '$pop%',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0284C7),
+                    ),
+                  ),
+                ],
+              )
+            else
+              const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHourlyDetails(Map<String, dynamic> item) {
+    final time = item['time'] ?? '--:--';
+    final date = item['dateStr']?.toString() ?? '';
+    final description = item['description']?.toString() ?? '';
+    final metrics = <Widget>[
+      if (item['feelsLike'] != null)
+        _buildDetailMetric(
+          Icons.thermostat_rounded,
+          'Cảm giác như',
+          '${_formatMetricNumber(item['feelsLike'])}°C',
+        ),
+      if (item['pop'] != null)
+        _buildDetailMetric(
+          Icons.umbrella_rounded,
+          'Xác suất mưa',
+          '${_formatMetricNumber(item['pop'])}%',
+        ),
+      if (item['rainAmount'] != null)
+        _buildDetailMetric(
+          Icons.grain_rounded,
+          'Lượng mưa/3 giờ',
+          '${_formatMetricNumber(item['rainAmount'], decimals: 1)} mm',
+        ),
+      if (item['humidity'] != null)
+        _buildDetailMetric(
+          Icons.water_drop_rounded,
+          'Độ ẩm',
+          '${_formatMetricNumber(item['humidity'])}%',
+        ),
+      if (item['windSpeed'] != null)
+        _buildDetailMetric(
+          Icons.air_rounded,
+          'Tốc độ gió',
+          '${_formatMetricNumber(item['windSpeed'], decimals: 1)} m/s',
+        ),
+      if (item['windGust'] is num && (item['windGust'] as num) > 0)
+        _buildDetailMetric(
+          Icons.storm_rounded,
+          'Gió giật',
+          '${_formatMetricNumber(item['windGust'], decimals: 1)} m/s',
+        ),
+      if (item['pressure'] != null)
+        _buildDetailMetric(
+          Icons.speed_rounded,
+          'Áp suất',
+          '${_formatMetricNumber(item['pressure'])} hPa',
+        ),
+      if (item['visibilityKm'] != null)
+        _buildDetailMetric(
+          Icons.visibility_rounded,
+          'Tầm nhìn',
+          '${_formatMetricNumber(item['visibilityKm'], decimals: 1)} km',
+        ),
+      if (item['cloudiness'] != null)
+        _buildDetailMetric(
+          Icons.cloud_rounded,
+          'Độ phủ mây',
+          '${_formatMetricNumber(item['cloudiness'])}%',
+        ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFDBEAFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.schedule_rounded,
+                size: 16,
+                color: Color(0xFF2563EB),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Chi tiết $time${date.isEmpty ? '' : ' · $date'}',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E40AF),
                 ),
-              ],
-            )
-          else
-            const SizedBox(height: 12),
+              ),
+            ],
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              description,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+            ),
+          ],
+          if (metrics.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildMetricGrid(metrics),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildDailyRow(Map<String, dynamic> item) {
+  Widget _buildMetricGrid(List<Widget> metrics) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = (constraints.maxWidth - 8) / 2;
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final metric in metrics)
+              SizedBox(width: itemWidth, child: metric),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailMetric(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFF2563EB)),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyRow(
+    Map<String, dynamic> item,
+    bool isExpanded,
+    VoidCallback onTap,
+  ) {
     final dayName = item['dayName'] ?? '';
     final minTemp = item['minTemp'] ?? 0;
     final maxTemp = item['maxTemp'] ?? 0;
@@ -2654,83 +3080,191 @@ class _DetailedWeatherModalState extends State<_DetailedWeatherModal> {
     final pop = item['popMax'] ?? 0;
     final iconUrl = 'https://openweathermap.org/img/wn/$iconCode@2x.png';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+    final metrics = <Widget>[
+      _buildDetailMetric(
+        Icons.thermostat_rounded,
+        'Nhiệt độ',
+        '${_formatMetricNumber(minTemp)}° – ${_formatMetricNumber(maxTemp)}°',
       ),
-      child: Row(
+      if (item['feelsLikeMin'] != null && item['feelsLikeMax'] != null)
+        _buildDetailMetric(
+          Icons.device_thermostat_rounded,
+          'Cảm giác như',
+          '${_formatMetricNumber(item['feelsLikeMin'])}° – ${_formatMetricNumber(item['feelsLikeMax'])}°',
+        ),
+      _buildDetailMetric(
+        Icons.umbrella_rounded,
+        'Mưa cao nhất',
+        '${_formatMetricNumber(pop)}%',
+      ),
+      if (item['rainTotal'] != null)
+        _buildDetailMetric(
+          Icons.grain_rounded,
+          'Tổng lượng mưa',
+          '${_formatMetricNumber(item['rainTotal'], decimals: 1)} mm',
+        ),
+      if (item['averageHumidity'] != null)
+        _buildDetailMetric(
+          Icons.water_drop_rounded,
+          'Độ ẩm trung bình',
+          '${_formatMetricNumber(item['averageHumidity'])}%',
+        ),
+      if (item['maxWindSpeed'] != null)
+        _buildDetailMetric(
+          Icons.air_rounded,
+          'Gió mạnh nhất',
+          '${_formatMetricNumber(item['maxWindSpeed'], decimals: 1)} m/s',
+        ),
+      if (item['maxWindGust'] is num && (item['maxWindGust'] as num) > 0)
+        _buildDetailMetric(
+          Icons.storm_rounded,
+          'Gió giật',
+          '${_formatMetricNumber(item['maxWindGust'], decimals: 1)} m/s',
+        ),
+      if (item['averagePressure'] != null)
+        _buildDetailMetric(
+          Icons.speed_rounded,
+          'Áp suất trung bình',
+          '${_formatMetricNumber(item['averagePressure'])} hPa',
+        ),
+      if (item['minVisibilityKm'] != null)
+        _buildDetailMetric(
+          Icons.visibility_rounded,
+          'Tầm nhìn thấp nhất',
+          '${_formatMetricNumber(item['minVisibilityKm'], decimals: 1)} km',
+        ),
+      if (item['maxCloudiness'] != null)
+        _buildDetailMetric(
+          Icons.cloud_rounded,
+          'Mây nhiều nhất',
+          '${_formatMetricNumber(item['maxCloudiness'])}%',
+        ),
+    ];
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: isExpanded ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isExpanded ? const Color(0xFFBFDBFE) : const Color(0xFFF1F5F9),
+        ),
+      ),
+      child: Column(
         children: [
-          // Day Name
-          SizedBox(
-            width: 85,
-            child: Text(
-              dayName,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E293B),
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 78,
+                    child: Text(
+                      dayName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ),
+                  Image.network(
+                    iconUrl,
+                    width: 34,
+                    height: 34,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.wb_sunny,
+                      size: 24,
+                      color: Colors.amber,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: pop > 0
+                        ? Text(
+                            'Mưa: $pop%',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0284C7),
+                            ),
+                          )
+                        : Text(
+                            desc,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                  ),
+                  Text(
+                    '${_formatMetricNumber(minTemp)}°',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Container(
+                    width: 34,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF38BDF8), Color(0xFFF97316)],
+                      ),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${_formatMetricNumber(maxTemp)}°',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    isExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 18,
+                    color: const Color(0xFF64748B),
+                  ),
+                ],
               ),
             ),
           ),
-
-          // Icon & Description
-          Image.network(
-            iconUrl,
-            width: 36,
-            height: 36,
-            errorBuilder: (_, __, ___) => const Icon(Icons.wb_sunny, size: 24, color: Colors.amber),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: pop > 0
-                ? Text(
-                    'Mưa: $pop%',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0284C7),
+          if (isExpanded) ...[
+            const Divider(height: 1, color: Color(0xFFDBEAFE)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (desc.toString().isNotEmpty) ...[
+                    Text(
+                      desc,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF475569),
+                      ),
                     ),
-                  )
-                : const SizedBox.shrink(),
-          ),
-
-          // Temp range bar
-          Row(
-            children: [
-              Text(
-                '$minTemp°',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
-                ),
+                    const SizedBox(height: 8),
+                  ],
+                  _buildMetricGrid(metrics),
+                ],
               ),
-              const SizedBox(width: 6),
-              Container(
-                width: 45,
-                height: 4,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF38BDF8), Color(0xFFF97316)],
-                  ),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '$maxTemp°',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );

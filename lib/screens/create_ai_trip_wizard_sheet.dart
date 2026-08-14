@@ -228,6 +228,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
   // Step 5: Budget & Currency (Single value for total trip)
   bool _useCustomBudget = false;
   String _selectedBudgetLevel = 'Vừa phải'; // Tiết kiệm, Vừa phải, Sang trọng
+  int _travelerCount = 1;
   final TextEditingController _customBudgetController = TextEditingController(
     text: '7,000,000',
   );
@@ -237,6 +238,15 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
   // Custom Request for Gemini AI (optional free text from user)
   final TextEditingController _customRequestController =
       TextEditingController();
+  final Set<String> _selectedQuickPreferences = <String>{};
+
+  // Chi phí tham khảo Cần Thơ/người/ngày, làm tròn từ dữ liệu du lịch thực tế.
+  // Tổng gợi ý cộng thêm 10% dự phòng và luôn thay đổi theo số ngày, số người.
+  static const Map<String, int> _dailyBudgetProfiles = <String, int>{
+    'Tiết kiệm': 725000,
+    'Vừa phải': 1740000,
+    'Sang trọng': 3850000,
+  };
 
   @override
   void initState() {
@@ -248,12 +258,118 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       end: today.add(const Duration(days: 2)),
     );
     _days = 3;
+    _customBudgetController.text = _formatBudgetInput(
+      _suggestedBudgetFor('Vừa phải'),
+    );
 
     _loadCategoriesFromDB();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToSelectedDate();
     });
+  }
+
+  int _parseBudgetInput(String value) {
+    return int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  }
+
+  int _roundBudget(num value) {
+    return ((value / 100000).round() * 100000).toInt();
+  }
+
+  int _roundBudgetUp(num value) {
+    return ((value / 100000).ceil() * 100000).toInt();
+  }
+
+  int _suggestedDailyBudgetFor(String level) {
+    final daily =
+        _dailyBudgetProfiles[level] ?? _dailyBudgetProfiles['Vừa phải']!;
+    return _roundBudgetUp(daily * 1.10);
+  }
+
+  int _suggestedBudgetFor(String level) {
+    return (_suggestedDailyBudgetFor(level) *
+            math.max(1, _days) *
+            math.max(1, _travelerCount))
+        .toInt();
+  }
+
+  int get _selectedBudgetAmount {
+    if (_useCustomBudget) {
+      return _parseBudgetInput(_customBudgetController.text);
+    }
+    return _suggestedBudgetFor(_selectedBudgetLevel);
+  }
+
+  int get _recommendedCustomMinimum {
+    return _roundBudget(_suggestedBudgetFor('Tiết kiệm') * 0.75);
+  }
+
+  int get _budgetPerPersonPerDay {
+    final divisor = math.max(1, _days) * math.max(1, _travelerCount);
+    return _roundBudgetUp(_selectedBudgetAmount / divisor);
+  }
+
+  String _formatBudgetInput(int value) {
+    final digits = math.max(0, value).toString();
+    final buffer = StringBuffer();
+    for (int index = 0; index < digits.length; index++) {
+      if (index > 0 && (digits.length - index) % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(digits[index]);
+    }
+    return buffer.toString();
+  }
+
+  String _formatVnd(int value) => _formatBudgetInput(value) + ' VNĐ';
+
+  String _effectiveBudgetLevel() {
+    if (!_useCustomBudget) return _selectedBudgetLevel;
+    final daily = _budgetPerPersonPerDay;
+    if (daily < 1200000) return 'Tiết kiệm';
+    if (daily < 2800000) return 'Vừa phải';
+    return 'Sang trọng';
+  }
+
+  Map<String, int> _budgetBreakdown() {
+    final total = _selectedBudgetAmount;
+    final lodging = (total * 0.30).round();
+    final food = (total * 0.30).round();
+    final localTransport = (total * 0.15).round();
+    final activities = (total * 0.15).round();
+    return <String, int>{
+      'Lưu trú': lodging,
+      'Ăn uống': food,
+      'Đi lại nội thành': localTransport,
+      'Tham quan': activities,
+      'Dự phòng': math.max(
+        0,
+        total - lodging - food - localTransport - activities,
+      ),
+    };
+  }
+
+  List<String> _quickPreferenceOptions() {
+    final options = <String>[
+      'Ít đi bộ',
+      'Phù hợp trẻ em',
+      'Có người lớn tuổi',
+      'Ưu tiên trong nhà',
+      'Ăn món địa phương',
+      'Ưu tiên miễn phí',
+      'Bắt đầu ngày sớm',
+      'Nghỉ trưa thoải mái',
+    ];
+    final destination =
+        (_destinationSearchController.text.trim().isNotEmpty
+                ? _destinationSearchController.text
+                : _selectedDestination)
+            .toLowerCase();
+    if (destination.contains('cần thơ') || destination.contains('can tho')) {
+      options.insert(0, 'Chợ nổi Cái Răng sáng sớm');
+    }
+    return options.take(9).toList();
   }
 
   Future<void> _loadCategoriesFromDB() async {
@@ -411,38 +527,13 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     }
 
     if (_currentStep == 2 && _useCustomBudget) {
-      final rawText = _customBudgetController.text
-          .replaceAll('.', '')
-          .replaceAll(',', '')
-          .trim();
-      final customAmount = int.tryParse(rawText) ?? 0;
-      final int minRequired = _days >= 3 ? 3000000 : 1000000;
+      final customAmount = _parseBudgetInput(_customBudgetController.text);
 
-      if (customAmount < minRequired) {
+      if (customAmount <= 0) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: [
-                const Icon(
-                  Icons.info_outline_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _days >= 3
-                        ? 'Chưa đáp ứng được ngân sách tối thiểu!'
-                        : 'Chưa đáp ứng được ngân sách tối thiểu!',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            content: const Text('Vui lòng nhập ngân sách lớn hơn 0.'),
             backgroundColor: Colors.indigo.shade900,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -452,6 +543,19 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           ),
         );
         return;
+      }
+      if (customAmount < _recommendedCustomMinimum) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Ngân sách khá thấp; AI sẽ ưu tiên địa điểm miễn phí và bình dân.',
+            ),
+            backgroundColor: Colors.orange.shade800,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     }
 
@@ -511,27 +615,8 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     setState(() => _isCreating = true);
     _startProgressTimer();
 
-    // Calculate budget number for whole trip
-    int budgetInVND = 7000000;
-    if (_useCustomBudget && _customBudgetController.text.trim().isNotEmpty) {
-      final raw = _customBudgetController.text
-          .replaceAll(',', '')
-          .replaceAll('.', '')
-          .trim();
-      final parsed = int.tryParse(raw) ?? 7000000;
-      budgetInVND = math.max(parsed, _days >= 3 ? 3000000 : 1000000);
-    } else {
-      final bLower = _selectedBudgetLevel.toLowerCase();
-      if (bLower.contains('tiết kiệm') || bLower.contains('tiet kiem')) {
-        budgetInVND = 3000000;
-      } else if (bLower.contains('sang trọng') ||
-          bLower.contains('sang trong') ||
-          bLower.contains('sang')) {
-        budgetInVND = 15000000;
-      } else {
-        budgetInVND = 7000000;
-      }
-    }
+    // Tổng ngân sách đã được tính động theo số ngày và số người.
+    final int budgetInVND = _selectedBudgetAmount;
 
     final String finalDestination =
         _destinationSearchController.text.trim().isNotEmpty
@@ -628,15 +713,20 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       }
 
       final String customReq = _customRequestController.text.trim();
+      final String effectiveBudgetLevel = _effectiveBudgetLevel();
 
       final aiPlan = await DatabaseService().generateAIItinerary(
         destination: finalDestination,
         days: _days,
         pace: 'Vừa phải',
         companion: _privacyLevel,
-        budget: _selectedBudgetLevel,
+        budget: effectiveBudgetLevel,
+        budgetTotal: budgetInVND,
+        travelerCount: _travelerCount,
+        dailyBudgetPerPerson: _budgetPerPersonPerDay,
         categories: _selectedCategories,
         startDate: startDate,
+        preferenceTags: _selectedQuickPreferences.toList(),
         customRequest: customReq.isNotEmpty ? customReq : null,
       );
       final dynamic weatherSummary = aiPlan['weatherOptimization'];
@@ -3912,11 +4002,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
   // STEP 5: Budget & Currency (Single values for total trip)
   Widget _buildStep5Budget() {
-    final bool isLowBudgetDisabled = _days >= 3;
-    if (isLowBudgetDisabled && _selectedBudgetLevel == 'Tiết kiệm') {
-      _selectedBudgetLevel = 'Vừa phải';
-    }
-
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
@@ -3939,33 +4024,191 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Chi phí ước tính cho chuyến đi $_days ngày',
+            'Ước tính cho ' +
+                _days.toString() +
+                ' ngày, chưa gồm chi phí đến Cần Thơ',
             style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          _buildTravelerCountCard(),
+          const SizedBox(height: 14),
 
-          // Preset Option 1: Tiết kiệm
           _buildBudgetPresetCard(
             'Tiết kiệm',
-            '3.000.000 VNĐ / chuyến đi',
-            isDisabled: isLowBudgetDisabled,
-            disabledReason:
-                'Mức Tiết kiệm (3tr) chỉ phù hợp cho chuyến đi 1-2 ngày. Chuyến đi $_days ngày cần ngân sách tối thiểu từ mức Vừa phải.',
+            _formatVnd(_suggestedBudgetFor('Tiết kiệm')) +
+                ' / chuyến · ' +
+                _formatVnd(
+                  (_suggestedBudgetFor('Tiết kiệm') /
+                          (math.max(1, _days) * _travelerCount))
+                      .round(),
+                ) +
+                '/người/ngày',
           ),
           const SizedBox(height: 12),
-
-          // Preset Option 2: Vừa phải
-          _buildBudgetPresetCard('Vừa phải', '7.000.000 VNĐ / chuyến đi'),
+          _buildBudgetPresetCard(
+            'Vừa phải',
+            _formatVnd(_suggestedBudgetFor('Vừa phải')) +
+                ' / chuyến · ' +
+                _formatVnd(
+                  (_suggestedBudgetFor('Vừa phải') /
+                          (math.max(1, _days) * _travelerCount))
+                      .round(),
+                ) +
+                '/người/ngày',
+          ),
           const SizedBox(height: 12),
-
-          // Preset Option 3: Sang trọng
-          _buildBudgetPresetCard('Sang trọng', '15.000.000 VNĐ / chuyến đi'),
+          _buildBudgetPresetCard(
+            'Sang trọng',
+            _formatVnd(_suggestedBudgetFor('Sang trọng')) +
+                ' / chuyến · ' +
+                _formatVnd(
+                  (_suggestedBudgetFor('Sang trọng') /
+                          (math.max(1, _days) * _travelerCount))
+                      .round(),
+                ) +
+                '/người/ngày',
+          ),
           const SizedBox(height: 12),
-
-          // Custom Option 4: Tự nhập số tiền (Directly below!)
           _buildCustomBudgetCard(),
-
+          const SizedBox(height: 14),
+          _buildBudgetSummaryCard(),
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTravelerCountCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F4FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _aiPurple.withOpacity(0.18)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.group_outlined, color: _aiPurple, size: 21),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Số người',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  'Ngân sách sẽ tự tính lại',
+                  style: TextStyle(fontSize: 11, color: Colors.black54),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: _travelerCount > 1
+                ? () => setState(() => _travelerCount--)
+                : null,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+            icon: const Icon(Icons.remove_circle_outline_rounded, size: 22),
+          ),
+          Container(
+            width: 34,
+            alignment: Alignment.center,
+            child: Text(
+              _travelerCount.toString(),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: _aiPurple,
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: _travelerCount < 10
+                ? () => setState(() => _travelerCount++)
+                : null,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+            icon: const Icon(Icons.add_circle_outline_rounded, size: 22),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBudgetSummaryCard() {
+    if (_selectedBudgetAmount <= 0) return const SizedBox.shrink();
+    final breakdown = _budgetBreakdown();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.blueGrey.shade100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.pie_chart_outline_rounded,
+                size: 18,
+                color: _aiPurple,
+              ),
+              const SizedBox(width: 7),
+              const Expanded(
+                child: Text(
+                  'Phân bổ tham khảo',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+              ),
+              Text(
+                _formatVnd(_selectedBudgetAmount),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: _aiPurple,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: breakdown.entries.map((entry) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(
+                  entry.key + ': ' + _formatVnd(entry.value),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 9),
+          Text(
+            'Khoảng ' +
+                _formatVnd(_budgetPerPersonPerDay) +
+                '/người/ngày. Đây là ước tính, giá thực tế có thể thay đổi.',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.35,
+              color: Colors.grey.shade700,
+            ),
+          ),
         ],
       ),
     );
@@ -4062,7 +4305,9 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                           CurrencyInputFormatter(),
                         ],
                         decoration: InputDecoration(
-                          hintText: _days >= 3 ? '3.000.000' : '1.000.000',
+                          hintText: _formatBudgetInput(
+                            _suggestedBudgetFor('Tiết kiệm'),
+                          ),
                           hintStyle: TextStyle(
                             color: Colors.grey.shade400,
                             fontSize: 15,
@@ -4100,21 +4345,21 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
               ),
               Builder(
                 builder: (context) {
-                  final rawText = _customBudgetController.text
-                      .replaceAll('.', '')
-                      .replaceAll(',', '')
-                      .trim();
-                  final int customAmount = int.tryParse(rawText) ?? 0;
-                  final int minRequired = _days >= 3 ? 3000000 : 1000000;
-                  if (customAmount > 0 && customAmount < minRequired) {
+                  final customAmount = _parseBudgetInput(
+                    _customBudgetController.text,
+                  );
+                  if (customAmount > 0 &&
+                      customAmount < _recommendedCustomMinimum) {
                     return Padding(
                       padding: const EdgeInsets.only(top: 8.0, left: 4.0),
                       child: Text(
-                        'Chưa đáp ứng được ngân sách tối thiểu cho chuyến đi $_days ngày',
-                        style: const TextStyle(
+                        'Thấp hơn mức tham khảo ' +
+                            _formatVnd(_recommendedCustomMinimum) +
+                            '; AI sẽ ưu tiên lựa chọn miễn phí và bình dân.',
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Colors.redAccent,
+                          color: Colors.orange.shade900,
                         ),
                       ),
                     );
@@ -4131,11 +4376,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
   // STEP 6: Custom Request for AI
   Widget _buildStep6CustomRequest() {
-    final List<String> exampleRequests = [
-      'Đi gia đình có người lớn tuổi & trẻ em, ưu tiên xe hơi di chuyển tận nơi',
-      'Trải nghiệm Chợ nổi Cái Răng sáng sớm & hủ tiếu ghe truyền thống',
-      'Săn quán ăn đặc sản & café gu bản địa ngon bổ rẻ',
-    ];
+    final quickPreferences = _quickPreferenceOptions();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -4176,6 +4417,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
             controller: _customRequestController,
             maxLines: 4,
             maxLength: 250,
+            onChanged: (_) => setState(() {}),
             style: const TextStyle(fontSize: 15, height: 1.5),
             decoration: InputDecoration(
               hintText:
@@ -4209,59 +4451,64 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
 
           const SizedBox(height: 20),
 
-          // Example chips
-          const Text(
-            'Ghi chú nhanh:',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Colors.black54,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Ghi chú nhanh (có thể chọn nhiều):',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black54,
+                  ),
+                ),
+              ),
+              if (_selectedQuickPreferences.isNotEmpty)
+                TextButton(
+                  onPressed: () =>
+                      setState(() => _selectedQuickPreferences.clear()),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                  ),
+                  child: const Text('Xóa', style: TextStyle(fontSize: 12)),
+                ),
+            ],
           ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: exampleRequests.map((example) {
-              final isSelected = _customRequestController.text == example;
-              return GestureDetector(
-                onTap: () {
+            children: quickPreferences.map((preference) {
+              final isSelected = _selectedQuickPreferences.contains(preference);
+              return FilterChip(
+                selected: isSelected,
+                showCheckmark: true,
+                checkmarkColor: Colors.white,
+                label: Text(preference),
+                labelStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : _aiPurple,
+                ),
+                backgroundColor: _aiPurple.withOpacity(0.06),
+                selectedColor: _aiPurple,
+                side: BorderSide(
+                  color: _aiPurple.withOpacity(isSelected ? 1 : 0.28),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                visualDensity: VisualDensity.compact,
+                onSelected: (selected) {
                   setState(() {
-                    if (isSelected) {
-                      _customRequestController.clear();
+                    if (selected) {
+                      _selectedQuickPreferences.add(preference);
                     } else {
-                      _customRequestController.text = example;
+                      _selectedQuickPreferences.remove(preference);
                     }
                   });
                 },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFF8E2DE2)
-                        : const Color(0xFF8E2DE2).withOpacity(0.07),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: const Color(
-                        0xFF8E2DE2,
-                      ).withOpacity(isSelected ? 1.0 : 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    example,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isSelected
-                          ? Colors.white
-                          : const Color(0xFF8E2DE2),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
               );
             }).toList(),
           ),
@@ -4288,7 +4535,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
     bool isDisabled = false,
     String? disabledReason,
   }) {
-    final String levelKey = levelName.split(' ')[0];
+    final String levelKey = levelName;
     final isSelected = _selectedBudgetLevel == levelKey && !_useCustomBudget;
 
     return InkWell(
