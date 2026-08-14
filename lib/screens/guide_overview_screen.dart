@@ -4293,17 +4293,6 @@ class _GuideOverviewScreenState extends State<GuideOverviewScreen>
                                 _dragHeight = null;
 
                                 if (!_isMapExpanded || _isSheetHalf) {
-                                  final int numDays =
-                                      (_itineraryData['days'] as int?) ?? 1;
-                                  if (_checkedSections != null) {
-                                    _checkedSections = Set.from(_sectionNames);
-                                  }
-                                  if (_checkedDays != null) {
-                                    _checkedDays = Set.from(
-                                      Iterable.generate(numDays, (i) => i + 1),
-                                    );
-                                  }
-
                                   if (_activeSearchQuery != null) {
                                     _activeSearchQuery = null;
                                     _filteredMapPlaces = [];

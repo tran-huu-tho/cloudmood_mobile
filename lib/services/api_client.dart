@@ -5,10 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiClient {
-  // 🌐 Cấu hình địa chỉ Server Backend:
-  // Render Cloud Backend (Dự phòng khi Backend cục bộ không hoạt động)
-  static const String remoteFallbackUrl =
-      'https://cloudmood-backend.onrender.com';
   static const String configuredLocalUrl = String.fromEnvironment(
     'CLOUDMOOD_API_URL',
     defaultValue: '',
@@ -32,15 +28,12 @@ class ApiClient {
 
   static List<String> get _candidateBackendUrls {
     final candidates = <String>[
-      if (_activeBaseUrl != null) _activeBaseUrl!,
+      ?_activeBaseUrl,
       if (configuredLocalUrl.trim().isNotEmpty) configuredLocalUrl.trim(),
-      if (defaultTargetPlatform == TargetPlatform.android)
-        'http://127.0.0.1:3000',
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
       if (defaultTargetPlatform == TargetPlatform.android)
         'http://10.0.2.2:3000',
-      if (kIsWeb || defaultTargetPlatform != TargetPlatform.android)
-        'http://localhost:3000',
-      remoteFallbackUrl,
     ];
     return candidates
         .map((url) => url.replaceAll(RegExp(r'/$'), ''))
@@ -66,10 +59,7 @@ class ApiClient {
             ((decoded['apiVersion'] as num?)?.toInt() ?? 0) >= 2 &&
             features is Map &&
             features['generatedWeatherMatrix'] == true &&
-            features['replacementProposals'] == true &&
-            (!requireAutoWeather ||
-                (features['backgroundAutoWeatherOptimization'] == true &&
-                    features['autoWeatherUndo'] == true))) {
+            features['replacementProposals'] == true) {
           _activeBaseUrl = url;
           _lastCheckTime = DateTime.now();
           debugPrint(
@@ -81,10 +71,7 @@ class ApiClient {
         // Thử địa chỉ tiếp theo.
       }
     }
-    throw Exception(
-      'Backend đang chạy phiên bản cũ hoặc thiết bị chưa kết nối được backend local${requireAutoWeather ? ' có cập nhật thời tiết tự động' : ''}. '
-      'Hãy khởi động backend mới; với Android thật cần bật adb reverse tcp:3000 tcp:3000.',
-    );
+    _activeBaseUrl = defaultLocalUrl;
   }
 
   /// Lấy baseUrl hiện tại (trả về ngay lập tức `_activeBaseUrl` hoặc `defaultLocalUrl`)
@@ -93,11 +80,11 @@ class ApiClient {
   }
 
   /// Kiểm tra xem Backend local có đang chạy hay không.
-  /// Ưu tiên chạy local backend trước, nếu không khả dụng thì tự động chuyển sang Render Backend.
   static Future<String> getOrCheckBaseUrl({bool forceCheck = false}) async {
     final now = DateTime.now();
-    // Nếu đã kiểm tra thành công trong vòng 2 phút gần đây
-    if (!forceCheck && _activeBaseUrl != null && _lastCheckTime != null) {
+    if (!forceCheck &&
+        _activeBaseUrl != null &&
+        _lastCheckTime != null) {
       if (now.difference(_lastCheckTime!).inMinutes < 2) {
         return _activeBaseUrl!;
       }
@@ -111,15 +98,7 @@ class ApiClient {
     }
 
     _isChecking = true;
-    final localCandidates = <String>[
-      if (configuredLocalUrl.trim().isNotEmpty) configuredLocalUrl.trim(),
-      if (defaultTargetPlatform == TargetPlatform.android)
-        'http://127.0.0.1:3000',
-      if (defaultTargetPlatform == TargetPlatform.android)
-        'http://10.0.2.2:3000',
-      if (kIsWeb || defaultTargetPlatform != TargetPlatform.android)
-        'http://localhost:3000',
-    ].map((url) => url.replaceAll(RegExp(r'/$'), '')).toSet();
+    final localCandidates = _candidateBackendUrls;
 
     try {
       for (final localUrl in localCandidates) {
@@ -130,22 +109,21 @@ class ApiClient {
           final response = await http
               .get(Uri.parse(localUrl))
               .timeout(const Duration(milliseconds: 1500));
-          _activeBaseUrl = localUrl;
-          _lastCheckTime = DateTime.now();
-          debugPrint(
-            '[ApiClient] ✅ Đã kết nối Backend cục bộ thành công: $_activeBaseUrl (HTTP ${response.statusCode})',
-          );
-          return _activeBaseUrl!;
+          if (response.statusCode == 200 || response.statusCode == 404) {
+            _activeBaseUrl = localUrl;
+            _lastCheckTime = DateTime.now();
+            debugPrint(
+              '[ApiClient] ✅ Đã kết nối Backend cục bộ thành công: $_activeBaseUrl (HTTP ${response.statusCode})',
+            );
+            return _activeBaseUrl!;
+          }
         } catch (error) {
           debugPrint('[ApiClient] Backend $localUrl không khả dụng: $error');
         }
       }
 
-      _activeBaseUrl = remoteFallbackUrl;
+      _activeBaseUrl = defaultLocalUrl;
       _lastCheckTime = DateTime.now();
-      debugPrint(
-        '[ApiClient] ⚠️ Không có backend cục bộ khả dụng. Đã chuyển sang Render Backend: $_activeBaseUrl',
-      );
     } finally {
       _isChecking = false;
     }
@@ -166,26 +144,13 @@ class ApiClient {
     };
   }
 
-  /// Gửi HTTP Request kèm tự động chuyển đổi (Failover) sang Render Backend nếu Local Backend gặp sự cố
+  /// Gửi HTTP Request tới Local Backend
   static Future<http.Response> _sendRequestWithFailover(
     Future<http.Response> Function(String currentBaseUrl) requestFn, {
     bool allowRemoteFallback = true,
   }) async {
     String currentBaseUrl = await getOrCheckBaseUrl();
-    try {
-      return await requestFn(currentBaseUrl);
-    } catch (e) {
-      // Nếu đang gọi local backend mà bị lỗi kết nối, chuyển ngay sang Render Backend & thử lại
-      if (allowRemoteFallback && currentBaseUrl != remoteFallbackUrl) {
-        debugPrint(
-          '[ApiClient] Lỗi kết nối tới $currentBaseUrl ($e). Đang thử lại qua Render Backend ($remoteFallbackUrl)...',
-        );
-        _activeBaseUrl = remoteFallbackUrl;
-        _lastCheckTime = DateTime.now();
-        return await requestFn(remoteFallbackUrl);
-      }
-      rethrow;
-    }
+    return await requestFn(currentBaseUrl);
   }
 
   static Future<http.Response> get(

@@ -122,7 +122,7 @@ class _CloudmoodHomeScreenState extends State<CloudmoodHomeScreen> {
       final response = await ApiClient.get(
         '/weather/current',
         query: queryParams,
-        timeout: const Duration(seconds: 12),
+        timeout: const Duration(seconds: 25),
       );
       if (response.statusCode == 200) {
         final rawData = Map<String, dynamic>.from(jsonDecode(response.body));
