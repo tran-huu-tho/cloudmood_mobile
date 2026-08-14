@@ -121,6 +121,7 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
         minRating: _selectedMinRating > 0 ? _selectedMinRating : null,
       );
 
+      if (!mounted) return;
       setState(() {
         _places = fetched;
         _isLoading = false;
@@ -128,7 +129,9 @@ class _CloudmoodPlacesScreenState extends State<CloudmoodPlacesScreen> {
       });
     } catch (e) {
       debugPrint('Error loading places: $e');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

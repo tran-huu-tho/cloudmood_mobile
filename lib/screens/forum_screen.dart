@@ -259,6 +259,13 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
           post['isLiked'] = originalState;
           post['_count']['likes'] = originalCount;
         });
+        if (response.statusCode == 401 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'),
+            ),
+          );
+        }
       }
     } catch (e) {
       setState(() {
@@ -292,6 +299,13 @@ class _CloudmoodForumScreenState extends State<CloudmoodForumScreen> {
         setState(() {
           post['isSaved'] = originalState;
         });
+        if (response.statusCode == 401 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'),
+            ),
+          );
+        }
       }
     } catch (e) {
       setState(() {
