@@ -323,6 +323,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           _post!['isLiked'] = originalState;
           _post!['_count']['likes'] = originalCount;
         });
+        if (response.statusCode == 401 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'),
+            ),
+          );
+        }
       }
     } catch (e) {
       setState(() {
@@ -356,6 +363,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         setState(() {
           _post!['isSaved'] = originalState;
         });
+        if (response.statusCode == 401 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'),
+            ),
+          );
+        }
       }
     } catch (e) {
       setState(() {
@@ -515,12 +529,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         _fetchDetails();
       } else {
         String errorMsg = 'Gửi bình luận thất bại. Vui lòng thử lại.';
-        try {
-          final errorData = json.decode(response.body);
-          if (errorData['message'] != null) {
-            errorMsg = errorData['message'].toString();
-          }
-        } catch (_) {}
+        if (response.statusCode == 401) {
+          errorMsg = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+        } else {
+          try {
+            final errorData = json.decode(response.body);
+            if (errorData['message'] != null) {
+              errorMsg = errorData['message'].toString();
+            }
+          } catch (_) {}
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(errorMsg)),
