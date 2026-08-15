@@ -1033,13 +1033,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             (d) => (d['day'] as num?)?.toInt() == dayNum && d['place'] != null,
           )
           .toList();
+      rawDayPlaces.sort((a, b) {
+        final int orderA = (a['sortOrder'] as num?)?.toInt() ?? 0;
+        final int orderB = (b['sortOrder'] as num?)?.toInt() ?? 0;
+        if (orderA != orderB) {
+          return orderA.compareTo(orderB);
+        }
+        final int idA = (a['id'] as num?)?.toInt() ?? 0;
+        final int idB = (b['id'] as num?)?.toInt() ?? 0;
+        return idA.compareTo(idB);
+      });
 
       if (rawDayPlaces.length < 2) continue;
 
-      final optimizedPlaces = _optimizeDayPlacesWithAStar(rawDayPlaces);
-
       final List<LatLng> waypoints = [];
-      for (var d in optimizedPlaces) {
+      for (var d in rawDayPlaces) {
         final p = d['place'];
         if (p != null && p['latitude'] != null && p['longitude'] != null) {
           final lat = (p['latitude'] as num).toDouble();
@@ -5627,7 +5635,21 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           if (_activeNavStartPlace != null &&
                               _activeNavEndPlace != null) {
                             final List<Polyline> navPolylines = [];
+                            final p1 = _activeNavStartPlace!;
+                            final p2 = _activeNavEndPlace!;
+                            final lat1 = (p1['latitude'] as num?)?.toDouble() ??
+                                (p1['place']?['latitude'] as num?)?.toDouble();
+                            final lng1 =
+                                (p1['longitude'] as num?)?.toDouble() ??
+                                (p1['place']?['longitude'] as num?)?.toDouble();
+                            final lat2 = (p2['latitude'] as num?)?.toDouble() ??
+                                (p2['place']?['latitude'] as num?)?.toDouble();
+                            final lng2 =
+                                (p2['longitude'] as num?)?.toDouble() ??
+                                (p2['place']?['longitude'] as num?)?.toDouble();
+
                             if (_activeNavRoutePoints.length >= 2) {
+                              // Main driving route on the street
                               navPolylines.add(
                                 Polyline(
                                   points: _activeNavRoutePoints,
@@ -5642,6 +5664,54 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   color: const Color(0xFF2563EB),
                                 ),
                               );
+
+                              // Walking/Access connector from Start Marker to Road start
+                              if (lat1 != null && lng1 != null) {
+                                final startPoint = LatLng(lat1, lng1);
+                                final roadStart = _activeNavRoutePoints.first;
+                                final distKm = _calculateDistanceKm(
+                                  startPoint.latitude,
+                                  startPoint.longitude,
+                                  roadStart.latitude,
+                                  roadStart.longitude,
+                                );
+                                if (distKm > 0.003) {
+                                  navPolylines.add(
+                                    Polyline(
+                                      points: [startPoint, roadStart],
+                                      strokeWidth: 3.5,
+                                      color: const Color(0xFF60A5FA),
+                                      pattern: StrokePattern.dashed(
+                                        segments: const [5, 4],
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+
+                              // Walking/Access connector from Road end to Destination Marker
+                              if (lat2 != null && lng2 != null) {
+                                final endPoint = LatLng(lat2, lng2);
+                                final roadEnd = _activeNavRoutePoints.last;
+                                final distKm = _calculateDistanceKm(
+                                  endPoint.latitude,
+                                  endPoint.longitude,
+                                  roadEnd.latitude,
+                                  roadEnd.longitude,
+                                );
+                                if (distKm > 0.003) {
+                                  navPolylines.add(
+                                    Polyline(
+                                      points: [roadEnd, endPoint],
+                                      strokeWidth: 3.5,
+                                      color: const Color(0xFF60A5FA),
+                                      pattern: StrokePattern.dashed(
+                                        segments: const [5, 4],
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
                             }
                             return navPolylines;
                           }
@@ -5677,6 +5747,56 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                   color: color.withAlpha(230),
                                 ),
                               );
+
+                              // Add dashed connector lines for off-road places
+                              final rawDayPlaces = _details
+                                  .where(
+                                    (d) =>
+                                        (d['day'] as num?)?.toInt() == dayNum &&
+                                        d['place'] != null,
+                                  )
+                                  .toList();
+                              for (var d in rawDayPlaces) {
+                                final p = d['place'];
+                                if (p != null &&
+                                    p['latitude'] != null &&
+                                    p['longitude'] != null) {
+                                  final lat = (p['latitude'] as num).toDouble();
+                                  final lon =
+                                      (p['longitude'] as num).toDouble();
+                                  if (lat != 0.0 && lon != 0.0) {
+                                    final placePoint = LatLng(lat, lon);
+                                    LatLng? closestPoint;
+                                    double minDistanceKm = double.infinity;
+                                    for (final rp in roadPoints) {
+                                      final dist = _calculateDistanceKm(
+                                        lat,
+                                        lon,
+                                        rp.latitude,
+                                        rp.longitude,
+                                      );
+                                      if (dist < minDistanceKm) {
+                                        minDistanceKm = dist;
+                                        closestPoint = rp;
+                                      }
+                                    }
+                                    if (closestPoint != null &&
+                                        minDistanceKm > 0.003 &&
+                                        minDistanceKm < 0.2) {
+                                      polylines.add(
+                                        Polyline(
+                                          points: [placePoint, closestPoint],
+                                          strokeWidth: 3.0,
+                                          color: color.withAlpha(180),
+                                          pattern: StrokePattern.dashed(
+                                            segments: const [4, 4],
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              }
                             } else {
                               final rawDayPlaces = _details
                                   .where(
@@ -5685,11 +5805,22 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                                         d['place'] != null,
                                   )
                                   .toList();
-                              final dayPlaces = _optimizeDayPlacesWithAStar(
-                                rawDayPlaces,
-                              );
+                              rawDayPlaces.sort((a, b) {
+                                final int orderA =
+                                    (a['sortOrder'] as num?)?.toInt() ?? 0;
+                                final int orderB =
+                                    (b['sortOrder'] as num?)?.toInt() ?? 0;
+                                if (orderA != orderB) {
+                                  return orderA.compareTo(orderB);
+                                }
+                                final int idA =
+                                    (a['id'] as num?)?.toInt() ?? 0;
+                                final int idB =
+                                    (b['id'] as num?)?.toInt() ?? 0;
+                                return idA.compareTo(idB);
+                              });
                               final List<LatLng> dayPoints = [];
-                              for (var d in dayPlaces) {
+                              for (var d in rawDayPlaces) {
                                 final p = d['place'];
                                 if (p != null &&
                                     p['latitude'] != null &&
@@ -11227,12 +11358,68 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       return;
     }
 
-    _showPremiumNotification(
-      title: 'Đang tìm địa điểm thay thế',
-      message: 'RAG và Rule Engine đang kiểm tra các phương án trong CSDL...',
-      icon: Icons.auto_awesome_rounded,
-      color: AppTheme.primary,
+    // Show high-end Loading Dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: Color(0xFF2563EB),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Đang tìm địa điểm thay thế...',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    fontFamily: 'SDK_SC_Web-Heavy',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  userPrompt != null && userPrompt.trim().isNotEmpty
+                      ? 'Trợ lý AI đang tìm kiếm theo yêu cầu của bạn...'
+                      : 'Hệ thống đang đối soát thời tiết, cự ly và giờ mở cửa phù hợp...',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    height: 1.35,
+                    fontFamily: 'SDK_SC_Web-Heavy',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
+
     try {
       final result = await DatabaseService().proposePlaceReplacements(
         itineraryId: itineraryId,
@@ -11240,6 +11427,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         prompt: userPrompt,
         requireIndoor: requireIndoor,
       );
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // Dismiss loading
+      }
       if (!mounted) return;
       final proposals = (result['proposals'] as List? ?? const [])
           .whereType<Map>()
@@ -11266,6 +11456,9 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         requireIndoor: requireIndoor,
       );
     } catch (error) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // Dismiss loading
+      }
       if (!mounted) return;
       _showPremiumNotification(
         title: 'Không thể thay thế địa điểm',
@@ -13018,6 +13211,23 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         weatherSnapshots: weatherSnapshots,
       );
       if (!mounted) return;
+
+      final rawChanges = List<Map<String, dynamic>>.from(
+        proposal['changes'] ?? [],
+      );
+
+      // Nếu không có thay đổi nào cần thiết -> Thông báo ngay lịch trình đã tối ưu nhất!
+      if (rawChanges.isEmpty) {
+        _showPremiumNotification(
+          title: 'Phương án hiện tại đã tối ưu nhất',
+          message:
+              'Hệ thống đã phân tích thời tiết và cung đường di chuyển: Lịch trình hiện tại của bạn đã là phương án tối ưu nhất, không cần thay đổi thêm.',
+          icon: Icons.verified_rounded,
+          color: const Color(0xFF059669),
+        );
+        return;
+      }
+
       final shouldApply = await _showDynamicOptimizationPreview(
         dayNum,
         proposal,
@@ -13058,7 +13268,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
           );
         }
       }
-      if (mounted) await _offerManualReplacementForUnresolved(proposal);
     } catch (error) {
       if (mounted) {
         final errorMsg = error.toString().replaceFirst('Exception: ', '');
@@ -13517,38 +13726,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
                           ),
                         );
                       }),
-                      ...unresolved.map(
-                        (entry) => Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF7ED),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFFED7AA)),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                color: Color(0xFFD97706),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Cần lưu ý: ${entry['place']?['name']}\n${entry['reason']}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF9A3412),
-                                    fontFamily: 'SDK_SC_Web-Heavy',
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -13611,6 +13788,46 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     );
   }
 
+  String _sanitizeReason(String raw) {
+    String text = raw;
+    final replacements = {
+      'nhóm CULTURE': 'loại hình văn hóa - lịch sử',
+      'nhóm culture': 'loại hình văn hóa - lịch sử',
+      'CULTURE': 'văn hóa - lịch sử',
+      'culture': 'văn hóa - lịch sử',
+      'nhóm DINING': 'loại hình ẩm thực - ăn uống',
+      'nhóm dining': 'loại hình ẩm thực - ăn uống',
+      'DINING': 'ẩm thực - ăn uống',
+      'dining': 'ẩm thực - ăn uống',
+      'nhóm CAFE': 'quán cà phê',
+      'nhóm cafe': 'quán cà phê',
+      'CAFE': 'quán cà phê',
+      'cafe': 'quán cà phê',
+      'nhóm NATURE': 'thiên nhiên - ngoài trời',
+      'nhóm nature': 'thiên nhiên - ngoài trời',
+      'NATURE': 'thiên nhiên - ngoài trời',
+      'nature': 'thiên nhiên - ngoài trời',
+      'nhóm SHOPPING': 'mua sắm',
+      'nhóm shopping': 'mua sắm',
+      'SHOPPING': 'mua sắm',
+      'shopping': 'mua sắm',
+      'nhóm ENTERTAINMENT': 'vui chơi - giải trí',
+      'nhóm entertainment': 'vui chơi - giải trí',
+      'ENTERTAINMENT': 'vui chơi - giải trí',
+      'entertainment': 'vui chơi - giải trí',
+      'nhóm ACCOMMODATION': 'khách sạn - lưu trú',
+      'nhóm accommodation': 'khách sạn - lưu trú',
+      'ACCOMMODATION': 'khách sạn - lưu trú',
+      'accommodation': 'khách sạn - lưu trú',
+      'ATTRACTION': 'tham quan',
+      'attraction': 'tham quan',
+    };
+    replacements.forEach((key, val) {
+      text = text.replaceAll(key, val);
+    });
+    return text;
+  }
+
   Future<void> _offerManualReplacementForUnresolved(
     Map<String, dynamic> proposal,
   ) async {
@@ -13635,26 +13852,233 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
       return;
     }
     final placeName = first['place']?['name']?.toString() ?? 'địa điểm này';
-    final wantsManual = await showDialog<bool>(
+    final placeCategory =
+        first['place']?['category']?['name']?.toString() ?? '';
+    final rawReason = first['reason']?.toString() ??
+        'Cần thay đổi địa điểm để lịch trình phù hợp hơn.';
+    final cleanReason = _sanitizeReason(rawReason);
+
+    final wantsManual = await showModalBottomSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cần yêu cầu thay thế'),
-        content: Text(
-          'Không tìm được phương án tự động phù hợp cho $placeName. '
-          'Bạn có muốn nhập yêu cầu thay thế thủ công không?',
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 20,
+              offset: Offset(0, -4),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Giữ nguyên'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Nhập yêu cầu'),
-          ),
-        ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Color(0xFFD97706),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Cần yêu cầu thay thế',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      fontFamily: 'SDK_SC_Web-Heavy',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Place Info Card
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.place_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          placeName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                            fontFamily: 'SDK_SC_Web-Heavy',
+                          ),
+                        ),
+                        if (placeCategory.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            placeCategory,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                              fontFamily: 'SDK_SC_Web-Heavy',
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Reason notice box
+            Container(
+              padding: const EdgeInsets.all(13),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: Color(0xFFD97706),
+                    size: 19,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Nguyên nhân đề xuất thay đổi:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF92400E),
+                            fontFamily: 'SDK_SC_Web-Heavy',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          cleanReason,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: Color(0xFF78350F),
+                            fontFamily: 'SDK_SC_Web-Heavy',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF475569),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                    ),
+                    onPressed: () => Navigator.pop(sheetContext, false),
+                    child: const Text(
+                      'Giữ nguyên',
+                      style: TextStyle(
+                        fontFamily: 'SDK_SC_Web-Heavy',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                    ),
+                    onPressed: () => Navigator.pop(sheetContext, true),
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                    label: const Text(
+                      'Tìm địa điểm thay thế',
+                      style: TextStyle(
+                        fontFamily: 'SDK_SC_Web-Heavy',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
+
     if (wantsManual == true && mounted) {
       final reason = first['reason']?.toString().toLowerCase() ?? '';
       final environment = first['place']?['environmentType']
@@ -17437,46 +17861,72 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     Map<String, dynamic> p1,
     Map<String, dynamic> p2,
   ) async {
-    final lat1 = (p1['latitude'] as num?)?.toDouble();
-    final lng1 = (p1['longitude'] as num?)?.toDouble();
-    final lat2 = (p2['latitude'] as num?)?.toDouble();
-    final lng2 = (p2['longitude'] as num?)?.toDouble();
+    final p1Map = p1['place'] != null && p1['place'] is Map
+        ? Map<String, dynamic>.from(p1['place'] as Map)
+        : p1;
+    final p2Map = p2['place'] != null && p2['place'] is Map
+        ? Map<String, dynamic>.from(p2['place'] as Map)
+        : p2;
 
-    final String name1 = (p1['name'] ?? '').toString().trim();
-    final String name2 = (p2['name'] ?? '').toString().trim();
-    final String address1 = (p1['address'] ?? '').toString().trim();
-    final String address2 = (p2['address'] ?? '').toString().trim();
+    final lat1 = (p1Map['latitude'] as num?)?.toDouble();
+    final lng1 = (p1Map['longitude'] as num?)?.toDouble();
+    final lat2 = (p2Map['latitude'] as num?)?.toDouble();
+    final lng2 = (p2Map['longitude'] as num?)?.toDouble();
 
-    String originParam = '';
-    if (name1.isNotEmpty) {
-      originParam = name1;
-      if (address1.isNotEmpty && !name1.contains(address1)) {
-        originParam += ', $address1';
-      }
-    } else if (lat1 != null && lng1 != null) {
-      originParam = '$lat1,$lng1';
-    }
+    final String name1 =
+        (p1Map['name'] ?? p1Map['placeName'] ?? '').toString().trim();
+    final String name2 =
+        (p2Map['name'] ?? p2Map['placeName'] ?? '').toString().trim();
+    final String address1 = (p1Map['address'] ?? '').toString().trim();
+    final String address2 = (p2Map['address'] ?? '').toString().trim();
 
-    String destParam = '';
-    if (name2.isNotEmpty) {
-      destParam = name2;
-      if (address2.isNotEmpty && !name2.contains(address2)) {
-        destParam += ', $address2';
-      }
-    } else if (lat2 != null && lng2 != null) {
-      destParam = '$lat2,$lng2';
-    }
+    final urlsToTry = <String>[];
 
-    final encodedOrigin = Uri.encodeComponent(originParam);
-    final encodedDest = Uri.encodeComponent(destParam);
-
-    final urlsToTry = <String>[
-      'https://www.google.com/maps/dir/?api=1&origin=$encodedOrigin&destination=$encodedDest&travelmode=driving',
-      if (lat1 != null && lng1 != null && lat2 != null && lng2 != null)
+    // 1. Ưu tiên cao nhất: Tọa độ GPS chính xác 100% (không phụ thuộc vào tìm kiếm tên text)
+    if (lat1 != null &&
+        lng1 != null &&
+        lat2 != null &&
+        lng2 != null &&
+        lat1 != 0.0 &&
+        lng1 != 0.0 &&
+        lat2 != 0.0 &&
+        lng2 != 0.0) {
+      urlsToTry.add(
         'https://www.google.com/maps/dir/?api=1&origin=$lat1,$lng1&destination=$lat2,$lng2&travelmode=driving',
-      if (lat2 != null && lng2 != null)
+      );
+      urlsToTry.add(
         'google.navigation:q=$lat2,$lng2&mode=d',
-    ];
+      );
+    } else if (lat2 != null && lng2 != null && lat2 != 0.0 && lng2 != 0.0) {
+      urlsToTry.add(
+        'https://www.google.com/maps/dir/?api=1&destination=$lat2,$lng2&travelmode=driving',
+      );
+      urlsToTry.add(
+        'google.navigation:q=$lat2,$lng2&mode=d',
+      );
+    }
+
+    // 2. Dự phòng: Tìm kiếm theo tên + địa chỉ nếu thiếu tọa độ GPS
+    String originParam = name1.isNotEmpty
+        ? (address1.isNotEmpty && !name1.contains(address1)
+            ? '$name1, $address1'
+            : name1)
+        : (lat1 != null && lng1 != null ? '$lat1,$lng1' : '');
+    String destParam = name2.isNotEmpty
+        ? (address2.isNotEmpty && !name2.contains(address2)
+            ? '$name2, $address2'
+            : name2)
+        : (lat2 != null && lng2 != null ? '$lat2,$lng2' : '');
+
+    if (originParam.isNotEmpty && destParam.isNotEmpty) {
+      urlsToTry.add(
+        'https://www.google.com/maps/dir/?api=1&origin=${Uri.encodeComponent(originParam)}&destination=${Uri.encodeComponent(destParam)}&travelmode=driving',
+      );
+    } else if (destParam.isNotEmpty) {
+      urlsToTry.add(
+        'https://www.google.com/maps/dir/?api=1&destination=${Uri.encodeComponent(destParam)}&travelmode=driving',
+      );
+    }
 
     bool launched = false;
     for (final urlStr in urlsToTry) {

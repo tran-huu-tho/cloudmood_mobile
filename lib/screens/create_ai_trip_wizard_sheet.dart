@@ -204,8 +204,7 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
       'iconCode': Icons.shopping_bag_rounded.codePoint,
     },
     {'name': 'Công viên', 'iconCode': Icons.park_rounded.codePoint},
-    {'name': 'Bảo tàng', 'iconCode': Icons.museum_rounded.codePoint},
-    {'name': 'Check-in', 'iconCode': Icons.camera_alt_rounded.codePoint},
+    {'name': 'Điểm tham quan', 'iconCode': Icons.tour_rounded.codePoint},
   ];
 
   // Step 3: Pace (Nhịp độ chuyến đi)
@@ -351,25 +350,94 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
   }
 
   List<String> _quickPreferenceOptions() {
-    final options = <String>[
-      'Ít đi bộ',
-      'Phù hợp trẻ em',
-      'Có người lớn tuổi',
-      'Ưu tiên trong nhà',
-      'Ăn món địa phương',
-      'Ưu tiên miễn phí',
-      'Bắt đầu ngày sớm',
-      'Nghỉ trưa thoải mái',
-    ];
     final destination =
         (_destinationSearchController.text.trim().isNotEmpty
                 ? _destinationSearchController.text
                 : _selectedDestination)
             .toLowerCase();
+    final budgetLevel = _effectiveBudgetLevel();
+    final pace = _selectedPace.toLowerCase();
+    final options = <String>[];
+
+    // 1. GỢI Ý THEO ĐỊA ĐIỂM ĐẾN
     if (destination.contains('cần thơ') || destination.contains('can tho')) {
-      options.insert(0, 'Chợ nổi Cái Răng sáng sớm');
+      options.add('Chợ nổi Cái Răng sáng sớm');
+      options.add('Đặc sản Miền Tây');
+    } else if (destination.contains('đà nẵng') ||
+        destination.contains('da nang') ||
+        destination.contains('nha trang') ||
+        destination.contains('phú quốc') ||
+        destination.contains('phu quoc') ||
+        destination.contains('vũng tàu') ||
+        destination.contains('vung tau') ||
+        destination.contains('quy nhơn') ||
+        destination.contains('quy nhon')) {
+      options.add('Ngắm bình minh trên biển');
+      options.add('Hải sản tươi sống');
+    } else if (destination.contains('đà lạt') ||
+        destination.contains('da lat') ||
+        destination.contains('sa pa') ||
+        destination.contains('sapa')) {
+      options.add('Săn mây sáng sớm');
+      options.add('Cà phê view đồi');
+    } else if (destination.contains('hà nội') ||
+        destination.contains('ha noi') ||
+        destination.contains('hội an') ||
+        destination.contains('hoi an') ||
+        destination.contains('huế') ||
+        destination.contains('hue')) {
+      options.add('Dạo phố cổ ban đêm');
+      options.add('Khám phá di tích lịch sử');
     }
-    return options.take(9).toList();
+
+    // 2. GỢI Ý THEO MỨC NGÂN SÁCH (Tách biệt hoàn toàn, tránh mâu thuẫn Sang trọng vs Miễn phí)
+    if (budgetLevel == 'Tiết kiệm') {
+      options.add('Ưu tiên miễn phí');
+      options.add('Ăn quán bình dân');
+      options.add('Tối ưu chi phí vé');
+    } else if (budgetLevel == 'Sang trọng') {
+      options.add('Nhà hàng cao cấp');
+      options.add('Dịch vụ chuẩn VIP');
+      options.add('View đẹp check-in sang chảnh');
+    } else {
+      // Vừa phải
+      options.add('Ăn món địa phương');
+      options.add('Chi phí hợp lý');
+    }
+
+    // 3. GỢI Ý THEO ĐỐI TƯỢNG ĐI CÙNG
+    if (_travelerCount >= 3) {
+      options.add('Phù hợp trẻ em');
+      options.add('Có người lớn tuổi');
+    } else if (_travelerCount == 2) {
+      options.add('Không gian cho cặp đôi');
+    }
+
+    // 4. GỢI Ý THEO NHỊP ĐỘ CHUYẾN ĐI (Pace)
+    if (pace.contains('thong thả')) {
+      options.add('Ít đi bộ');
+      options.add('Nghỉ trưa thoải mái');
+    } else if (pace.contains('dày đặc')) {
+      options.add('Bắt đầu ngày sớm');
+      options.add('Khám phá tối đa điểm');
+    } else {
+      options.add('Ít đi bộ');
+      options.add('Nghỉ trưa thoải mái');
+    }
+
+    // 5. GỢI Ý AN TOÀN / KHÔNG GIAN
+    options.add('Ưu tiên trong nhà');
+    options.add('Check-in chụp ảnh đẹp');
+
+    // Loại bỏ trùng lặp và giữ danh sách tinh gọn (~9-10 tags)
+    final uniqueOptions = <String>[];
+    for (final opt in options) {
+      if (!uniqueOptions.contains(opt)) {
+        uniqueOptions.add(opt);
+      }
+    }
+
+    return uniqueOptions.take(10).toList();
   }
 
   Future<void> _loadCategoriesFromDB() async {
@@ -820,26 +888,6 @@ class _CreateAITripWizardSheetState extends State<CreateAITripWizardSheet> {
                 itinerary: updatedResult,
                 initialTabIndex: 1, // Directly open "Hành trình" tab
               ),
-            ),
-          );
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.auto_awesome_rounded, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _buildWeatherOptimizationSuccessMessage(
-                        weatherOptimization,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: const Color(0xFF8E2DE2),
-              behavior: SnackBarBehavior.fixed,
             ),
           );
         }

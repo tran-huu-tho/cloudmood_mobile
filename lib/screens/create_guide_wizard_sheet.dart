@@ -81,11 +81,9 @@ class _CreateGuideWizardSheetState extends State<CreateGuideWizardSheet> {
     {'name': 'Khách sạn', 'emoji': '🏨', 'iconCode': 0xe318},
     {'name': 'Quán ăn', 'emoji': '🍲', 'iconCode': 0xe57a},
     {'name': 'Cà phê', 'emoji': '☕', 'iconCode': 0xe395},
-    {'name': 'Mua sắm', 'emoji': '🛍️', 'iconCode': 0xe59c},
+    {'name': 'Trung tâm thương mại', 'emoji': '🛍️', 'iconCode': 0xe59c},
     {'name': 'Công viên', 'emoji': '🌳', 'iconCode': 0xe4a1},
-    {'name': 'Bảo tàng', 'emoji': '🏛️', 'iconCode': 0xe40a},
-    {'name': 'Tham quan', 'emoji': '📸', 'iconCode': 0xe675},
-    {'name': 'Check-in', 'emoji': '✨', 'iconCode': 0xe12b},
+    {'name': 'Điểm tham quan', 'emoji': '📸', 'iconCode': 0xe675},
   ];
 
   @override
