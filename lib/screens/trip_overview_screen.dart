@@ -1299,10 +1299,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
   bool _isReordering = false;
   bool _isUpdatingDatabase = false;
   final Set<int> _optimizingDayNumbers = <int>{};
-  bool _autoWeatherEnabled = false;
-  bool _isLoadingAutoWeatherSettings = true;
-  bool _isUpdatingAutoWeatherSettings = false;
-  int _autoWeatherRainThreshold = 70;
   final Map<String, String> _segmentTransportModes = {};
 
   @override
@@ -1462,9 +1458,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
     _loadData(
       silent: _details.isNotEmpty || _savedPlaces.isNotEmpty,
     ).whenComplete(_loadVisitedDetails);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadAutoWeatherSettings(showLatestChange: true);
-    });
 
     // Kết nối Socket Real-time cho Chuyến đi
     final itinId = _itineraryData['id'] is int
@@ -1535,9 +1528,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
             '⚡ Real-time update từ máy chủ: Đang cập nhật dữ liệu ngầm...',
           );
           await _loadData(silent: true);
-          if (actionType.startsWith('AUTO_WEATHER')) {
-            await _loadAutoWeatherSettings(showLatestChange: true);
-          }
         }
       });
     }
@@ -12949,236 +12939,6 @@ class _TripOverviewScreenState extends State<TripOverviewScreen>
         'isLoading': weather['isAvailable'] != true,
       };
     }).toList();
-  }
-
-  Future<void> _loadAutoWeatherSettings({bool showLatestChange = false}) async {
-    if (_itineraryData['isGuide'] == true) {
-      if (mounted) setState(() => _isLoadingAutoWeatherSettings = false);
-      return;
-    }
-    try {
-      final itineraryId = (_itineraryData['id'] as num).toInt();
-      final settings = await DatabaseService().getAutoWeatherSettings(
-        itineraryId: itineraryId,
-      );
-      if (!mounted) return;
-      setState(() {
-        _autoWeatherEnabled = settings['enabled'] == true;
-        _autoWeatherRainThreshold =
-            (settings['rainThreshold'] as num?)?.toInt() ?? 70;
-        _isLoadingAutoWeatherSettings = false;
-      });
-      if (showLatestChange && settings['latestHistory'] is Map) {
-        await _announceAutoWeatherHistory(
-          Map<String, dynamic>.from(settings['latestHistory'] as Map),
-        );
-      }
-    } catch (error) {
-      debugPrint('Không thể tải cấu hình tự động thời tiết: $error');
-      if (mounted) setState(() => _isLoadingAutoWeatherSettings = false);
-    }
-  }
-
-  Future<void> _announceAutoWeatherHistory(Map<String, dynamic> history) async {
-    final historyId = (history['id'] as num?)?.toInt();
-    if (historyId == null || !mounted) return;
-    final itineraryId = (_itineraryData['id'] as num).toInt();
-    final prefs = await SharedPreferences.getInstance();
-    final seenKey = 'seen_auto_weather_history_$itineraryId';
-    if (prefs.getInt(seenKey) == historyId) return;
-    await prefs.setInt(seenKey, historyId);
-
-    final summary = history['summary'] is Map
-        ? Map<String, dynamic>.from(history['summary'] as Map)
-        : <String, dynamic>{};
-    final day = (history['day'] as num?)?.toInt() ?? 1;
-    final changes = summary['changes'] is List
-        ? List<dynamic>.from(summary['changes'] as List)
-        : <dynamic>[];
-    final unresolved = summary['unresolved'] is List
-        ? List<dynamic>.from(summary['unresolved'] as List)
-        : <dynamic>[];
-    final status = history['status']?.toString() ?? '';
-
-    if (status == 'APPLIED') {
-      _showPremiumNotification(
-        title: 'Đã tự động cập nhật ngày $day',
-        message: unresolved.isEmpty
-            ? 'Đã điều chỉnh ${changes.length} địa điểm hoặc khung giờ do thời tiết xấu.'
-            : 'Đã điều chỉnh ${changes.length} mục; còn ${unresolved.length} địa điểm cần xử lý thủ công.',
-        icon: Icons.thunderstorm_rounded,
-        color: const Color(0xFF2563EB),
-        actionLabel: unresolved.isEmpty ? 'Hoàn tác' : 'Xem',
-        onAction: unresolved.isEmpty
-            ? () => _undoAutoWeatherOptimization(historyId)
-            : () => _showAutoWeatherAppliedDialog(
-                historyId: historyId,
-                day: day,
-                changeCount: changes.length,
-                unresolved: unresolved,
-              ),
-        displayDuration: const Duration(seconds: 8),
-      );
-      return;
-    }
-
-    if (status == 'NEEDS_ATTENTION' && unresolved.isNotEmpty) {
-      final entry = _firstAutoWeatherUnresolved(unresolved);
-      final detailId = (entry['detailId'] as num?)?.toInt();
-      _showPremiumNotification(
-        title: 'Cần xử lý địa điểm ngày $day',
-        message:
-            entry['reason']?.toString() ??
-            'Không tìm được địa điểm trong nhà phù hợp để tự động thay thế.',
-        icon: Icons.warning_amber_rounded,
-        color: const Color(0xFFD97706),
-        actionLabel: detailId == null ? null : 'Xử lý',
-        onAction: detailId == null
-            ? null
-            : () => _openAutoWeatherUnresolved(entry),
-        displayDuration: const Duration(seconds: 8),
-      );
-    }
-  }
-
-  Map<String, dynamic> _firstAutoWeatherUnresolved(List<dynamic> unresolved) {
-    if (unresolved.isEmpty || unresolved.first is! Map) {
-      return <String, dynamic>{};
-    }
-    return Map<String, dynamic>.from(unresolved.first as Map);
-  }
-
-  void _openAutoWeatherUnresolved(Map<String, dynamic> entry) {
-    final detailId = (entry['detailId'] as num?)?.toInt();
-    if (detailId == null) return;
-    Map<String, dynamic>? detail;
-    for (final item in _details) {
-      if ((item['id'] as num?)?.toInt() == detailId) {
-        detail = item;
-        break;
-      }
-    }
-    if (detail != null) {
-      _showReplacementRequirementDialog(detail, requireIndoor: true);
-    }
-  }
-
-  Future<void> _showAutoWeatherAppliedDialog({
-    required int historyId,
-    required int day,
-    required int changeCount,
-    required List<dynamic> unresolved,
-  }) async {
-    if (!mounted) return;
-    final entry = _firstAutoWeatherUnresolved(unresolved);
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Kết quả tự động · Ngày $day'),
-        content: Text(
-          'Đã điều chỉnh $changeCount mục. Còn ${unresolved.length} địa điểm '
-          'không có phương án trong nhà phù hợp và cần bạn nhập yêu cầu thay thế.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              _undoAutoWeatherOptimization(historyId);
-            },
-            child: const Text('Hoàn tác'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              _openAutoWeatherUnresolved(entry);
-            },
-            child: const Text('Xử lý địa điểm'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _toggleAutoWeather(bool enabled) async {
-    if (!_checkCanEdit() || _isUpdatingAutoWeatherSettings) return;
-    final previous = _autoWeatherEnabled;
-    setState(() {
-      _autoWeatherEnabled = enabled;
-      _isUpdatingAutoWeatherSettings = true;
-    });
-    try {
-      final itineraryId = (_itineraryData['id'] as num).toInt();
-      final settings = await DatabaseService().updateAutoWeatherSettings(
-        itineraryId: itineraryId,
-        enabled: enabled,
-        rainThreshold: _autoWeatherRainThreshold,
-      );
-      if (!mounted) return;
-      setState(() {
-        _autoWeatherEnabled = settings['enabled'] == true;
-        _autoWeatherRainThreshold =
-            (settings['rainThreshold'] as num?)?.toInt() ?? 70;
-      });
-      _showPremiumNotification(
-        title: enabled
-            ? 'Đã bật tự động ứng phó thời tiết'
-            : 'Đã tắt tự động ứng phó thời tiết',
-        message: enabled
-            ? 'Máy chủ sẽ quét mỗi 15 phút và tự thay điểm phù hợp trong 72 giờ tới.'
-            : 'Lịch trình chỉ được tối ưu khi bạn bấm Tối ưu ngay.',
-        icon: enabled ? Icons.shield_rounded : Icons.pause_circle_outline,
-        color: enabled ? const Color(0xFF059669) : const Color(0xFF64748B),
-      );
-    } catch (error) {
-      if (mounted) {
-        setState(() => _autoWeatherEnabled = previous);
-        _showPremiumNotification(
-          title: 'Không thể đổi chế độ tự động',
-          message: error.toString().replaceFirst('Exception: ', ''),
-          icon: Icons.error_outline_rounded,
-          color: Colors.orange,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isUpdatingAutoWeatherSettings = false);
-    }
-  }
-
-  Future<void> _undoAutoWeatherOptimization(int historyId) async {
-    if (!_checkCanEdit() || _isUpdatingDatabase) return;
-    _isUpdatingDatabase = true;
-    try {
-      final itineraryId = (_itineraryData['id'] as num).toInt();
-      final success = await DatabaseService().undoAutoWeatherOptimization(
-        itineraryId: itineraryId,
-        historyId: historyId,
-      );
-      if (success && mounted) {
-        await _loadData(silent: true);
-        _updateRoadPolylines();
-        _showPremiumNotification(
-          title: 'Đã hoàn tác cập nhật tự động',
-          message: 'Địa điểm và thời gian đã trở về trạng thái trước đó.',
-          icon: Icons.undo_rounded,
-          color: const Color(0xFF059669),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        _showPremiumNotification(
-          title: 'Không thể hoàn tác',
-          message: error.toString().replaceFirst('Exception: ', ''),
-          icon: Icons.error_outline_rounded,
-          color: Colors.orange,
-        );
-      }
-    } finally {
-      _isUpdatingDatabase = false;
-    }
-  }
-
-  Widget _buildAutoWeatherControl() {
-    return const SizedBox.shrink();
   }
 
   Future<void> _optimizeDay(int dayIndex) async {
